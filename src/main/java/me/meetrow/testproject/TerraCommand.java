@@ -1573,6 +1573,8 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                             + " | Current: " + signedPercent(climate.currentInfluence())
                             + " (" + signedTemperature(climate.currentTemperatureOffsetCelsius(), plugin) + ")"
                             + " | Altitude Temp: " + signedTemperature(climate.altitudeTemperatureOffsetCelsius(), plugin)
+                            + " | Local: " + signedTemperature(climate.localTemperatureOffsetCelsius(), plugin)
+                            + " | Water: " + signedTemperature(climate.submergedTemperatureOffsetCelsius(), plugin)
                             + " | Altitude Growth: x" + String.format(Locale.US, "%.2f", climate.altitudeGrowthMultiplier())
                             + (plugin.getClimateDebugRegion(player.getLocation()) != null ? " | Debug Area" : ""),
                     NamedTextColor.GREEN

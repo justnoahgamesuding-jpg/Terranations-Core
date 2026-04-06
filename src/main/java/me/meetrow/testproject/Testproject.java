@@ -5511,7 +5511,7 @@ public final class Testproject extends JavaPlugin {
     public ClimateSnapshot getClimate(Location location) {
         if (!isClimateEnabled() || location == null || location.getWorld() == null) {
             return new ClimateSnapshot(20.0D, 1.0D, ClimateSeason.SPRING, "Temperate", false, false, false, 1.0D, 0.0D, 0.0D,
-                    0.5D, 0.5D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.5D, 0.5D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
         ClimateSeason season = getCurrentClimateSeason();
@@ -5543,8 +5543,11 @@ public final class Testproject extends JavaPlugin {
         double currentOffset = getClimateCurrentTemperatureOffset(currentInfluence, heatFactor, polarFactor);
         double altitudeOffset = getClimateAltitudeTemperatureOffset(location);
         double rainOffset = getClimateRainTemperatureOffset(location);
+        double localOffset = getClimateLocalTemperatureOffset(location);
+        double submergedOffset = getClimateSubmergedTemperatureOffset(location);
         double temperature = baseTemperature + bandOffset + humidityOffset + continentalOffset + currentOffset
-                + altitudeOffset + rainOffset + biomeTemperatureOffset + (dayNightSwing * getClimateTimeFactor(location.getWorld()));
+                + altitudeOffset + rainOffset + biomeTemperatureOffset + localOffset + submergedOffset
+                + (dayNightSwing * getClimateTimeFactor(location.getWorld()));
         double altitudeGrowthMultiplier = getClimateAltitudeGrowthMultiplier(location);
         boolean raining = location.getWorld().hasStorm();
         boolean recentlyRained = hasClimateRecentlyRained(location.getWorld());
@@ -5555,7 +5558,7 @@ public final class Testproject extends JavaPlugin {
         return new ClimateSnapshot(temperature, growthMultiplier, season, climateName, freezing, raining, recentlyRained,
                 altitudeGrowthMultiplier, bandOffset, altitudeOffset,
                 humidity, continentality, currentInfluence, rainGrowthBonus, rainOffset,
-                humidityOffset, continentalOffset, currentOffset);
+                humidityOffset, continentalOffset, currentOffset, localOffset, submergedOffset);
     }
 
     private double getClimateBiomeTemperatureOffset(Location location) {
@@ -6052,16 +6055,144 @@ public final class Testproject extends JavaPlugin {
         if (location == null) {
             return 0.0D;
         }
-        return (getClimateOptimalAltitudeY() - location.getY()) * getClimateAltitudeTemperaturePerBlock();
+        double optimalY = getClimateOptimalAltitudeY();
+        double delta = optimalY - location.getY();
+        double softenedDistance = getClimateSoftenedAltitudeDistance(location.getY(), location);
+        double offset = Math.signum(delta) * softenedDistance * getClimateAltitudeTemperaturePerBlock();
+
+        double highlandsStartY = getConfig().getDouble("climate.altitude.highlands-start-y", 160.0D);
+        if (location.getY() > highlandsStartY) {
+            offset -= (location.getY() - highlandsStartY)
+                    * Math.max(0.0D, getConfig().getDouble("climate.altitude.highlands-temperature-per-block-c", 0.03D));
+        }
+        return offset;
     }
 
     public double getClimateAltitudeGrowthMultiplier(Location location) {
         if (location == null) {
             return 1.0D;
         }
-        double distance = Math.abs(location.getY() - getClimateOptimalAltitudeY());
+        double distance = getClimateSoftenedAltitudeDistance(location.getY(), location);
         double penalty = distance * getClimateAltitudeGrowthPenaltyPerBlock();
+        double highlandsStartY = getConfig().getDouble("climate.altitude.highlands-start-y", 160.0D);
+        if (location.getY() > highlandsStartY) {
+            penalty += (location.getY() - highlandsStartY)
+                    * Math.max(0.0D, getConfig().getDouble("climate.altitude.highlands-growth-penalty-per-block", 0.004D));
+        }
         return Math.max(0.18D, Math.min(1.0D, 1.0D - penalty));
+    }
+
+    private double getClimateSoftenedAltitudeDistance(double y, Location location) {
+        double distance = Math.abs(y - getClimateOptimalAltitudeY());
+        double softRange = Math.max(0.0D, getConfig().getDouble("climate.altitude.soft-range-blocks", 36.0D));
+        double softenedDistance = Math.max(0.0D, distance - softRange);
+        double coldBiomeThreshold = Math.max(0.0D, Math.min(2.0D,
+                getConfig().getDouble("climate.altitude.cold-biome-temperature-threshold", 0.2D)));
+        double coldBiomeMultiplier = Math.max(1.0D,
+                getConfig().getDouble("climate.altitude.cold-biome-distance-multiplier", 1.35D));
+        if (location != null && getLocalBiomeTemperature(location) <= coldBiomeThreshold) {
+            softenedDistance *= coldBiomeMultiplier;
+        }
+        return softenedDistance;
+    }
+
+    private double getClimateLocalTemperatureOffset(Location location) {
+        if (location == null || location.getWorld() == null || !getConfig().getBoolean("climate.local-effects.enabled", true)) {
+            return 0.0D;
+        }
+        int radius = Math.max(1, getConfig().getInt("climate.local-effects.block-radius", 3));
+        int verticalRadius = Math.max(0, getConfig().getInt("climate.local-effects.vertical-radius", 2));
+        double heat = 0.0D;
+        double cold = 0.0D;
+
+        Location center = location.getBlock().getLocation().add(0.5D, 0.5D, 0.5D);
+        World world = center.getWorld();
+        if (world == null) {
+            return 0.0D;
+        }
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -verticalRadius; y <= verticalRadius; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    Block block = world.getBlockAt(center.getBlockX() + x, center.getBlockY() + y, center.getBlockZ() + z);
+                    double strength = getClimateBlockTemperatureStrength(block);
+                    if (Math.abs(strength) < 0.0001D) {
+                        continue;
+                    }
+                    double dx = x;
+                    double dy = y;
+                    double dz = z;
+                    double distance = Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
+                    double weight = 1.0D / (1.0D + distance);
+                    if (strength > 0.0D) {
+                        heat += strength * weight;
+                    } else {
+                        cold += (-strength) * weight;
+                    }
+                }
+            }
+        }
+
+        double maxHeat = Math.max(0.0D, getConfig().getDouble("climate.local-effects.max-heat-offset-c", 4.0D));
+        double maxCold = Math.max(0.0D, getConfig().getDouble("climate.local-effects.max-cold-offset-c", 3.5D));
+        return Math.min(maxHeat, heat) - Math.min(maxCold, cold);
+    }
+
+    private double getClimateSubmergedTemperatureOffset(Location location) {
+        if (location == null || location.getWorld() == null || !getConfig().getBoolean("climate.local-effects.enabled", true)) {
+            return 0.0D;
+        }
+        Block feet = location.getBlock();
+        Block head = feet.getRelative(BlockFace.UP);
+        boolean submerged = feet.isLiquid() || head.isLiquid() || feet.isPassable() && isWaterlogged(feet) || isWaterlogged(head);
+        if (!submerged) {
+            return 0.0D;
+        }
+        return Math.min(0.0D, getConfig().getDouble("climate.local-effects.submerged-temperature-offset-c", -2.5D));
+    }
+
+    private boolean isWaterlogged(Block block) {
+        if (block == null) {
+            return false;
+        }
+        if (!(block.getBlockData() instanceof org.bukkit.block.data.Waterlogged waterlogged)) {
+            return false;
+        }
+        return waterlogged.isWaterlogged();
+    }
+
+    private double getClimateBlockTemperatureStrength(Block block) {
+        if (block == null) {
+            return 0.0D;
+        }
+        Material type = block.getType();
+        return switch (type) {
+            case LAVA -> 2.4D;
+            case MAGMA_BLOCK -> 1.2D;
+            case CAMPFIRE -> 1.0D;
+            case SOUL_CAMPFIRE -> 0.75D;
+            case FIRE -> 1.35D;
+            case SOUL_FIRE -> 1.0D;
+            case TORCH, WALL_TORCH -> 0.28D;
+            case SOUL_TORCH, SOUL_WALL_TORCH -> 0.18D;
+            case ICE -> -0.45D;
+            case PACKED_ICE -> -0.8D;
+            case BLUE_ICE -> -1.2D;
+            case FROSTED_ICE -> -0.5D;
+            case SNOW_BLOCK, POWDER_SNOW -> -0.25D;
+            default -> getClimateLitBlockTemperatureStrength(block);
+        };
+    }
+
+    private double getClimateLitBlockTemperatureStrength(Block block) {
+        Material type = block.getType();
+        if (type != Material.FURNACE && type != Material.BLAST_FURNACE && type != Material.SMOKER) {
+            return 0.0D;
+        }
+        if (block.getBlockData() instanceof org.bukkit.block.data.Lightable lightable && lightable.isLit()) {
+            return 0.85D;
+        }
+        return 0.0D;
     }
 
     private double sampleClimateRegionField(long seed, double worldX, double worldZ, double cellSize, int searchRadius) {
@@ -12042,7 +12173,7 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("country-border-particles.view-radius-blocks", 48.0D);
         getConfig().addDefault("realtime-clock.enabled", false);
         getConfig().addDefault("realtime-clock.timezone", "Europe/Amsterdam");
-        getConfig().addDefault("realtime-clock.update-interval-ticks", 20L);
+        getConfig().addDefault("realtime-clock.update-interval-ticks", 2400L);
         getConfig().addDefault("realtime-clock.freeze-daylight-cycle", true);
         getConfig().addDefault("realtime-clock.worlds", new ArrayList<>());
         getConfig().addDefault("player-presence-sounds.enabled", true);
@@ -12093,8 +12224,14 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("climate.biome-adaptation.temperature-baseline", 0.8D);
         getConfig().addDefault("climate.biome-adaptation.humidity-weight", 0.65D);
         getConfig().addDefault("climate.altitude.optimal-y", 63.0D);
-        getConfig().addDefault("climate.altitude.temperature-per-block-c", 0.08D);
-        getConfig().addDefault("climate.altitude.growth-penalty-per-block", 0.012D);
+        getConfig().addDefault("climate.altitude.temperature-per-block-c", 0.035D);
+        getConfig().addDefault("climate.altitude.growth-penalty-per-block", 0.004D);
+        getConfig().addDefault("climate.altitude.soft-range-blocks", 36.0D);
+        getConfig().addDefault("climate.altitude.highlands-start-y", 160.0D);
+        getConfig().addDefault("climate.altitude.highlands-temperature-per-block-c", 0.03D);
+        getConfig().addDefault("climate.altitude.highlands-growth-penalty-per-block", 0.004D);
+        getConfig().addDefault("climate.altitude.cold-biome-temperature-threshold", 0.2D);
+        getConfig().addDefault("climate.altitude.cold-biome-distance-multiplier", 1.35D);
         getConfig().addDefault("climate.latitude-scale-blocks", 750.0D);
         getConfig().addDefault("climate.seasons.enabled", true);
         getConfig().addDefault("climate.season-override", "auto");
@@ -12112,6 +12249,12 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("climate.rain.temperature-drop-c", 2.5D);
         getConfig().addDefault("climate.rain.recent-growth-bonus", 0.20D);
         getConfig().addDefault("climate.rain.recent-duration-seconds", 900L);
+        getConfig().addDefault("climate.local-effects.enabled", true);
+        getConfig().addDefault("climate.local-effects.block-radius", 3);
+        getConfig().addDefault("climate.local-effects.vertical-radius", 2);
+        getConfig().addDefault("climate.local-effects.max-heat-offset-c", 4.0D);
+        getConfig().addDefault("climate.local-effects.max-cold-offset-c", 3.5D);
+        getConfig().addDefault("climate.local-effects.submerged-temperature-offset-c", -2.5D);
         getConfig().addDefault("climate.freeze-water.enabled", true);
         getConfig().addDefault("climate.freeze-water.interval-ticks", 100L);
         getConfig().addDefault("climate.freeze-water.radius-blocks", 10);
@@ -15973,7 +16116,7 @@ public final class Testproject extends JavaPlugin {
             return;
         }
 
-        long interval = Math.max(1L, getConfig().getLong("realtime-clock.update-interval-ticks", 20L));
+        long interval = Math.max(1L, getConfig().getLong("realtime-clock.update-interval-ticks", 2400L));
         applyRealTimeToConfiguredWorlds();
         realTimeClockTask = getServer().getScheduler().runTaskTimer(this, this::applyRealTimeToConfiguredWorlds, interval, interval);
     }

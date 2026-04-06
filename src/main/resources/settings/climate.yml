@@ -40,8 +40,17 @@ climate:
   altitude:
     # Best farming height used by growth calculations.
     optimal-y: 63.0
-    temperature-per-block-c: 0.08
-    growth-penalty-per-block: 0.012
+    temperature-per-block-c: 0.035
+    growth-penalty-per-block: 0.004
+    # Height around the optimal Y that stays mostly neutral before penalties ramp in.
+    soft-range-blocks: 36.0
+    # Extra penalties for very high mountain terrain.
+    highlands-start-y: 160.0
+    highlands-temperature-per-block-c: 0.03
+    highlands-growth-penalty-per-block: 0.004
+    # Cold biomes stay harsher at altitude than warm amplified terrain.
+    cold-biome-temperature-threshold: 0.2
+    cold-biome-distance-multiplier: 1.35
 
   # Larger values make climate zones wider.
   latitude-scale-blocks: 750.0
@@ -76,6 +85,14 @@ climate:
     temperature-drop-c: 2.5
     recent-growth-bonus: 0.20
     recent-duration-seconds: 900
+
+  local-effects:
+    enabled: true
+    block-radius: 3
+    vertical-radius: 2
+    max-heat-offset-c: 4.0
+    max-cold-offset-c: 3.5
+    submerged-temperature-offset-c: -2.5
 
   freeze-water:
     enabled: true

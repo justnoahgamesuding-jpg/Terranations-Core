@@ -18,6 +18,8 @@ public record ClimateSnapshot(
         double rainTemperatureOffsetCelsius,
         double humidityTemperatureOffsetCelsius,
         double continentalTemperatureOffsetCelsius,
-        double currentTemperatureOffsetCelsius
+        double currentTemperatureOffsetCelsius,
+        double localTemperatureOffsetCelsius,
+        double submergedTemperatureOffsetCelsius
 ) {
 }

@@ -65,7 +65,7 @@ npc-head-tracking:
 realtime-clock:
   enabled: false
   timezone: "Europe/Amsterdam"
-  update-interval-ticks: 20
+  update-interval-ticks: 2400
   freeze-daylight-cycle: true
   # Leave empty to target every loaded world.
   worlds: []
