@@ -106,6 +106,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 
 public final class Testproject extends JavaPlugin {
     private static final LegacyComponentSerializer AMPERSAND_SERIALIZER = LegacyComponentSerializer.legacyAmpersand();
@@ -121,6 +122,7 @@ public final class Testproject extends JavaPlugin {
     private static final boolean DEFAULT_PLAYTEST_PVP = false;
     private static final boolean DEFAULT_PLAYTEST_KEEP_COUNTRY_DATA = false;
     private static final boolean DEFAULT_PLAYTEST_SAVE_PLAYER_PROGRESSION = false;
+    private static final Pattern SHA1_PATTERN = Pattern.compile("^[a-fA-F0-9]{40}$");
     private static final DateTimeFormatter PLAYTEST_DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
     public static final String ADMIN_PERMISSION = "terra.admin";
@@ -257,6 +259,7 @@ public final class Testproject extends JavaPlugin {
     private PlaytestGuiListener playtestGuiListener;
     private StabilityGuiListener stabilityGuiListener;
     private QuestAdminGuiListener questAdminGuiListener;
+    private BetterHudBridge betterHudBridge;
     private BossBar globalXpBoostBossBar;
     private final Set<UUID> cooldownDebugPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, BossBar> breakCooldownDebugBars = new ConcurrentHashMap<>();
@@ -381,6 +384,14 @@ public final class Testproject extends JavaPlugin {
 
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new TerraPlaceholderExpansion(this).register();
+        }
+        betterHudBridge = new BetterHudBridge(this);
+        betterHudBridge.registerQuestPlaceholders();
+        if (getServer().getPluginManager().getPlugin("BetterHud") != null) {
+            getServer().getScheduler().runTask(this, () -> {
+                betterHudBridge.registerQuestPlaceholders();
+                betterHudBridge.reloadBetterHud();
+            });
         }
 
         getServer().getPluginManager().registerEvents(new BlockDelayListener(this), this);
@@ -1191,6 +1202,37 @@ public final class Testproject extends JavaPlugin {
 
     public void setJoinLeaveMessagesEnabled(boolean enabled) {
         setManagedConfigValue("join-leave-messages.enabled", enabled);
+    }
+
+    public void sendConfiguredResourcePack(Player player) {
+        if (player == null || coreSettingsConfig == null || !coreSettingsConfig.getBoolean("resource-pack.enabled", false)) {
+            return;
+        }
+        String url = coreSettingsConfig.getString("resource-pack.url", "").trim();
+        if (url.isBlank()) {
+            return;
+        }
+        long delayTicks = Math.max(0L, coreSettingsConfig.getLong("resource-pack.delay-ticks", 40L));
+        getServer().getScheduler().runTaskLater(this, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            String sha1 = coreSettingsConfig.getString("resource-pack.sha1", "").trim();
+            if (SHA1_PATTERN.matcher(sha1).matches()) {
+                player.setResourcePack(url, hexToBytes(sha1));
+            } else {
+                player.setResourcePack(url);
+            }
+        }, delayTicks);
+    }
+
+    private byte[] hexToBytes(String hex) {
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int index = 0; index < bytes.length; index++) {
+            int position = index * 2;
+            bytes[index] = (byte) Integer.parseInt(hex.substring(position, position + 2), 16);
+        }
+        return bytes;
     }
 
     public boolean isMaintenanceModeEnabled() {
@@ -12217,6 +12259,10 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("player-presence-sounds.leave-sound", "BLOCK_AMETHYST_CLUSTER_BREAK");
         getConfig().addDefault("player-presence-sounds.sound-volume", 0.6D);
         getConfig().addDefault("player-presence-sounds.sound-pitch", 1.2D);
+        getConfig().addDefault("resource-pack.enabled", false);
+        getConfig().addDefault("resource-pack.url", "");
+        getConfig().addDefault("resource-pack.sha1", "");
+        getConfig().addDefault("resource-pack.delay-ticks", 40L);
         getConfig().addDefault("join-leave-messages.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.interval-minutes", 5);
@@ -14311,6 +14357,42 @@ public final class Testproject extends JavaPlugin {
         return Math.min(current, target) + "/" + target;
     }
 
+    public String getTutorialQuestStatusText(UUID playerId) {
+        if (!hasActiveTutorialQuest(playerId)) {
+            return "No active objective";
+        }
+        int current = getTutorialQuestCurrentValue(playerId);
+        int target = Math.max(1, getTutorialQuestTargetValue(playerId));
+        int percent = getTutorialQuestPercent(playerId);
+        return current + "/" + target + " complete  " + percent + "%";
+    }
+
+    public String getTutorialQuestProgressBarText(UUID playerId) {
+        int filled = Math.max(0, Math.min(12, (int) Math.round((getTutorialQuestPercent(playerId) / 100.0D) * 12.0D)));
+        StringBuilder builder = new StringBuilder(14);
+        builder.append('[');
+        for (int index = 0; index < 12; index++) {
+            builder.append(index < filled ? '#' : '-');
+        }
+        builder.append(']');
+        return builder.toString();
+    }
+
+    public String getTutorialQuestAccentColor(UUID playerId) {
+        if (!hasActiveTutorialQuest(playerId)) {
+            return "#7C8794";
+        }
+        String profession = getTutorialQuestProfessionKey(playerId);
+        return switch (profession.toLowerCase(Locale.ROOT)) {
+            case "miner" -> "#D1A85A";
+            case "lumberjack" -> "#74B87F";
+            case "farmer" -> "#B5C96A";
+            case "builder" -> "#D48F68";
+            case "blacksmith" -> "#B98BD6";
+            default -> "#DAB06A";
+        };
+    }
+
     public int getTutorialQuestCurrentValue(UUID playerId) {
         PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
         if (activeQuest == null) {
@@ -15638,6 +15720,7 @@ public final class Testproject extends JavaPlugin {
         migrateLegacyMainConfigSection("npc-head-tracking");
         migrateLegacyMainConfigSection("realtime-clock");
         migrateLegacyMainConfigSection("player-presence-sounds");
+        migrateLegacyMainConfigSection("resource-pack");
         migrateLegacyMainConfigSection("join-leave-messages");
         migrateLegacyMainConfigSection("lag-reduction");
         migrateLegacyMainConfigSection("country-sounds");
@@ -15732,6 +15815,7 @@ public final class Testproject extends JavaPlugin {
                 || path.startsWith("npc-head-tracking.")
                 || path.startsWith("realtime-clock.")
                 || path.startsWith("player-presence-sounds.")
+                || path.startsWith("resource-pack.")
                 || path.startsWith("join-leave-messages.")
                 || path.startsWith("lag-reduction.")
                 || path.startsWith("country-sounds.")

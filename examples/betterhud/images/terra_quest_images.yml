@@ -1,0 +1,11 @@
+terra_quest_panel:
+  type: single
+  file: "quest/quest_panel.png"
+
+terra_quest_accent:
+  type: single
+  file: "quest/quest_accent.png"
+
+terra_quest_divider:
+  type: single
+  file: "quest/quest_divider.png"

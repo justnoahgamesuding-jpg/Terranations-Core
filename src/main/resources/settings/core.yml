@@ -78,6 +78,16 @@ player-presence-sounds:
   sound-volume: 0.6
   sound-pitch: 1.2
 
+# Optional server resource-pack delivery.
+# Use a direct HTTPS URL to a zip. GitHub raw URLs work for small packs:
+# https://raw.githubusercontent.com/<user>/<repo>/<branch>/terranations_hud_pack.zip
+resource-pack:
+  enabled: false
+  url: ""
+  # Leave empty unless you calculate a SHA-1 hash for the zip.
+  sha1: ""
+  delay-ticks: 40
+
 # Custom server join and leave broadcast formatting.
 join-leave-messages:
   enabled: true

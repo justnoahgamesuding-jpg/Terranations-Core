@@ -63,6 +63,9 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
             case "quest_hint", "quest_active_hint" -> plugin.getTutorialQuestHint(player.getUniqueId());
             case "quest_hint_plain", "quest_active_hint_plain" -> plugin.getTutorialQuestHintPlain(player.getUniqueId());
             case "quest_progress", "quest_active_progress" -> plugin.getTutorialQuestProgressText(player.getUniqueId());
+            case "quest_status", "quest_active_status" -> plugin.getTutorialQuestStatusText(player.getUniqueId());
+            case "quest_progress_bar", "quest_active_progress_bar" -> plugin.getTutorialQuestProgressBarText(player.getUniqueId());
+            case "quest_accent", "quest_active_accent" -> plugin.getTutorialQuestAccentColor(player.getUniqueId());
             case "quest_current", "quest_active_current" -> String.valueOf(plugin.getTutorialQuestCurrentValue(player.getUniqueId()));
             case "quest_target", "quest_active_target" -> String.valueOf(plugin.getTutorialQuestTargetValue(player.getUniqueId()));
             case "quest_percent", "quest_active_percent" -> String.valueOf(plugin.getTutorialQuestPercent(player.getUniqueId()));

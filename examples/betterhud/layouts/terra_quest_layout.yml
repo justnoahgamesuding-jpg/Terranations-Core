@@ -1,37 +1,57 @@
 terra_quest_layout:
+  images:
+    1:
+      name: terra_quest_panel
+      x: 0
+      y: 0
+    2:
+      name: terra_quest_accent
+      x: 0
+      y: 0
+    3:
+      name: terra_quest_divider
+      x: 16
+      y: 16
   texts:
     1:
       name: terra_quest_font
-      pattern: "<#D9BC79>Quest"
-      x: 0
-      y: 0
-      scale: 0.7
+      pattern: "<[terra_quest_accent]>* <#F2E4C7>QUEST"
+      x: 16
+      y: 5
+      scale: 0.34
       align: left
     2:
       name: terra_quest_font
-      pattern: "<#F7F1E3>%terra_quest_title_plain%"
-      x: 0
-      y: 11
-      scale: 0.55
+      pattern: "<#F5F1E8>[terra_quest_title_plain]"
+      x: 16
+      y: 22
+      scale: 0.46
       align: left
     3:
       name: terra_quest_font
-      pattern: "<#B9C0C9>%terra_quest_objective_plain%"
-      x: 0
-      y: 21
-      scale: 0.45
+      pattern: "<#AFB7C1>[terra_quest_objective_plain]"
+      x: 16
+      y: 34
+      scale: 0.31
       align: left
     4:
       name: terra_quest_font
-      pattern: "<#8ED6A5>%terra_quest_progress%"
-      x: 0
-      y: 31
-      scale: 0.5
+      pattern: "<[terra_quest_accent]>[terra_quest_progress_bar] <#D5DDD8>[terra_quest_progress]"
+      x: 16
+      y: 48
+      scale: 0.33
       align: left
     5:
       name: terra_quest_font
-      pattern: "<#7DA5D8>%terra_quest_hint_plain%"
-      x: 0
-      y: 41
-      scale: 0.4
+      pattern: "<#D3E3D8>[terra_quest_status]"
+      x: 16
+      y: 58
+      scale: 0.27
+      align: left
+    6:
+      name: terra_quest_font
+      pattern: "<#7592AE>[terra_quest_hint_plain]"
+      x: 16
+      y: 67
+      scale: 0.26
       align: left

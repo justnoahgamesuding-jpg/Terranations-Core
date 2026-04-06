@@ -6,5 +6,5 @@ terra_quest_hud:
         x: 0
         y: 0
       pixel:
-        x: 12
-        y: 12
+        x: 120
+        y: 20

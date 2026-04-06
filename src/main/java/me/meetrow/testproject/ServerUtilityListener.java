@@ -28,6 +28,7 @@ public final class ServerUtilityListener implements Listener {
                     "player", event.getPlayer().getName()
             ))));
         }
+        plugin.sendConfiguredResourcePack(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
