@@ -1,0 +1,161 @@
+# Core gameplay and server-behavior settings.
+# Use this file for general systems that are not climate, stability,
+# merchant-shop, or territory-map specific.
+
+# Block action delay shared across normal break/place actions.
+block-delay:
+  # Enables the global break/place cooldown system.
+  enabled: false
+  # Base cooldown in seconds before profession reductions.
+  seconds: 30
+
+# Global economy scaling used by Terra-owned prices and rewards.
+economy:
+  enabled: true
+  # Multiplies money rewards earned from Terra systems.
+  reward-scale: 0.20
+  # Multiplies Terra shop and trade prices.
+  price-scale: 0.20
+
+rewards:
+  break:
+    # Enables job XP and money reward handling for block breaking.
+    enabled: true
+    # Allows money payouts in addition to XP payouts.
+    money-enabled: true
+
+hostile-mobs:
+  # If false, normal hostile mobs are actively suppressed.
+  spawning-enabled: true
+
+phantoms:
+  enabled: false
+
+# Regenerates wilderness damage and removes temporary wilderness builds.
+wilderness-regeneration:
+  enabled: true
+  # Seconds before a broken wilderness block is restored.
+  seconds: 600
+  # Seconds before a placed wilderness block is removed.
+  build-decay-seconds: 300
+
+# Admin ore vision overlay radius.
+ore-vision:
+  horizontal-radius: 20
+  vertical-radius: 12
+
+# Country route-trader timing.
+traders:
+  enabled: true
+  spawn-minutes-min: 180
+  spawn-minutes-max: 360
+  active-minutes: 90
+  # Delay before a player can receive another personal trader contract.
+  delivery-cooldown-minutes: 30
+  # Lifetime of an accepted contract.
+  accepted-quest-minutes: 1440
+
+# Nearby NPC head tracking for Terra trader/merchant entities.
+npc-head-tracking:
+  enabled: true
+  range-blocks: 5.0
+  interval-ticks: 4
+
+# Real-world time syncing for configured worlds.
+realtime-clock:
+  enabled: false
+  timezone: "Europe/Amsterdam"
+  update-interval-ticks: 20
+  freeze-daylight-cycle: true
+  # Leave empty to target every loaded world.
+  worlds: []
+
+# Join/leave presence sounds.
+player-presence-sounds:
+  enabled: true
+  join-sound: "BLOCK_AMETHYST_BLOCK_CHIME"
+  leave-sound: "BLOCK_AMETHYST_CLUSTER_BREAK"
+  sound-volume: 0.6
+  sound-pitch: 1.2
+
+# Custom server join and leave broadcast formatting.
+join-leave-messages:
+  enabled: true
+
+# General lag-reduction systems.
+lag-reduction:
+  ground-item-clear:
+    enabled: true
+    interval-minutes: 5
+    warning-seconds: [60, 30, 10]
+  mob-stacking:
+    enabled: true
+    radius-blocks: 8.0
+    max-stack-size: 50
+    name-format: "&e%type% &7x&f%amount%"
+  item-merge:
+    enabled: true
+    radius-blocks: 2.5
+
+# Country invitation and transfer feedback sounds.
+country-sounds:
+  enabled: true
+  invite-sent-sound: "BLOCK_NOTE_BLOCK_PLING"
+  invite-received-sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
+  transfer-request-sound: "BLOCK_AMETHYST_BLOCK_RESONATE"
+  transfer-accepted-sound: "UI_TOAST_CHALLENGE_COMPLETE"
+  sound-volume: 0.8
+  sound-pitch: 1.0
+
+# Local/country/global chat sound feedback.
+chat-sounds:
+  enabled: true
+  message-sound: "BLOCK_NOTE_BLOCK_HAT"
+  sound-volume: 0.25
+  sound-pitch: 1.6
+
+# Passive tip broadcast system.
+terra-tips:
+  enabled: true
+  interval-minutes: 8
+
+# Hunger tuning and climate-based hunger modifiers.
+hunger:
+  speed-multiplier: 1.0
+  climate:
+    comfort-min-c: 12.0
+    comfort-max-c: 24.0
+    mild-step-c: 8.0
+    extreme-step-c: 18.0
+    mild-bonus: 0.18
+    extreme-bonus: 0.42
+    max-multiplier: 1.85
+
+# Passive profession proc chances.
+profession-procs:
+  farmer:
+    instant-grow:
+      base-chance: 0.02
+      per-level: 0.006
+      max-chance: 0.25
+  lumberjack:
+    instant-grow:
+      base-chance: 0.02
+      per-level: 0.005
+      max-chance: 0.20
+
+# Country home teleport cooldown in seconds.
+country-home:
+  cooldown-seconds: 3600
+
+# Hard item restrictions for movement/storage progression.
+items:
+  # If false, players cannot throw or use ender pearls.
+  ender-pearls-enabled: true
+  # If false, players cannot place or open shulker boxes.
+  shulker-boxes-enabled: true
+  # Per-material functional overrides written by /terra items <material> ...
+  # Example:
+  # materials:
+  #   CRAFTING_TABLE: false
+  materials: {}

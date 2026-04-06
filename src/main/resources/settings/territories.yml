@@ -1,0 +1,46 @@
+# Country territory integration and boundary visuals.
+
+territories:
+  # Requires WorldGuard support at runtime.
+  enabled: true
+
+  chat-notifications:
+    enabled: true
+
+  title-notifications:
+    enabled: true
+    fade-in: 10
+    stay: 50
+    fade-out: 20
+    enter-sound: "BLOCK_NOTE_BLOCK_CHIME"
+    leave-sound: "BLOCK_NOTE_BLOCK_BASS"
+    sound-volume: 1.0
+    sound-pitch: 1.0
+
+  dynmap:
+    enabled: true
+    marker-set-id: "terra_countries"
+    marker-set-label: "Terra Countries"
+    use-status-colors: true
+    line-color: "#4caf50"
+    fill-color: "#4caf50"
+    open-line-color: "#2ecc40"
+    open-fill-color: "#2ecc40"
+    closed-line-color: "#ff4136"
+    closed-fill-color: "#ff4136"
+    ownerless-line-color: "#7fdbff"
+    ownerless-fill-color: "#7fdbff"
+    show-center-marker: true
+    marker-icon: "world"
+    marker-y-offset: 1.0
+    use-3d-regions: false
+    boost: true
+    line-weight: 2
+    line-opacity: 0.9
+    fill-opacity: 0.4
+
+# Passive border particle rendering around country territory.
+country-border-particles:
+  enabled: true
+  interval-ticks: 20
+  view-radius-blocks: 48.0

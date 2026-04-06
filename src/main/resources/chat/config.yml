@@ -1,0 +1,26 @@
+local:
+  radius-blocks: 50.0
+
+global:
+  cooldown-minutes: 5
+
+formats:
+  local: "&8[&7Local&8] &f[%country%] {prefix}&7%player%&8: &f%message%"
+  country: "&8[&aCountry&8] &f[%country%] {prefix}&a%player%&8: &f%message%"
+  global: "&8[&6Global&8] &f[%country%] {prefix}&6%player%&8: &f%message%"
+
+messages:
+  country:
+    usage: "&7Usage: &a/cc &7or &a/country chat [on|off]"
+    toggle-usage: "&7Usage: &a/cc [on|off] &7or &a/country chat [on|off]"
+    not-in-country: "&cYou must be in a country to use country chat."
+    enabled: "&aCountry chat enabled. Your normal messages now go to your country."
+    disabled: "&eCountry chat disabled. Your normal messages now use local chat."
+  global:
+    usage: "&7Usage: &a/gc [on|off]"
+    toggle-usage: "&7Usage: &a/gc [on|off]"
+    enabled: "&aGlobal chat enabled. Use &f!message &ato talk server-wide."
+    disabled: "&eGlobal chat disabled. Messages starting with &f! &ewill no longer go global."
+    not-enabled: "&cGlobal chat is disabled for you. Use &f/gc on &cto enable it."
+    prefix-empty: "&cType a message after &f!&c to use global chat."
+    cooldown: "&cYou can use global chat again in &f%time%&c."

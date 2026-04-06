@@ -1,0 +1,109 @@
+enabled: true
+display-name: "&aFarmer"
+icon: GOLDEN_HOE
+slot: 12
+player-cap: 10
+
+progression:
+  max-level: 10
+  base-xp: 85
+  xp-multiplier: 1.6
+  level-up-money-base: 16.0
+  level-up-money-multiplier: 1.12
+
+starter-kit:
+  - material: WOODEN_HOE
+    amount: 1
+  - material: WHEAT_SEEDS
+    amount: 24
+  - material: BREAD
+    amount: 8
+
+rewards:
+  double-drop-chance: 0.10
+  farmland-create-xp: 3
+  coarse-dirt-convert-xp: 2
+
+levels:
+  1:
+    unlocks:
+      - Wooden Hoe
+      - Till Soil
+      - Plant Wheat
+      - Harvest Wheat
+      - Craft Bread
+      - Basic field upkeep
+    blocks:
+      WHEAT: { enabled: true, xp: 5 }
+  2:
+    unlocks:
+      - Stone Hoe
+      - Plant and harvest Carrots
+      - Plant and harvest Potatoes
+      - Cook Potatoes, Chicken, Mutton, Rabbit
+      - Craft Cookies and Stews
+      - Build a starter crop rotation
+    blocks:
+      CARROTS: { enabled: true, xp: 6 }
+      POTATOES: { enabled: true, xp: 6 }
+  3:
+    unlocks:
+      - Water Buckets
+      - Plant and harvest Beetroot
+      - Cook Pork and Fish
+      - Craft Pumpkin Pie
+      - Expand irrigation for bigger farms
+    blocks:
+      BEETROOTS: { enabled: true, xp: 7 }
+  4:
+    unlocks:
+      - Iron Hoe
+      - Harvest Pumpkin
+      - Harvest Melon
+      - Cook Beef
+      - Craft Cake
+      - Run larger seasonal harvests
+    blocks:
+      PUMPKIN: { enabled: true, xp: 8 }
+      MELON: { enabled: true, xp: 8 }
+  5:
+    unlocks:
+      - Golden Hoe
+      - Use Smokers
+      - Plant and harvest Nether Wart
+      - Craft Rabbit Stew
+      - Speed up food production chains
+    blocks:
+      NETHER_WART: { enabled: true, xp: 10 }
+  6:
+    unlocks:
+      - Plant and harvest Cocoa
+      - Dry Kelp
+      - Craft Suspicious Stew
+      - Start specialty crop farming
+    blocks:
+      COCOA: { enabled: true, xp: 10 }
+  7:
+    unlocks:
+      - Diamond Hoe
+      - Plant and harvest Sweet Berries
+      - Improve high-value food gathering
+    blocks:
+      SWEET_BERRY_BUSH: { enabled: true, xp: 11 }
+  8:
+    unlocks:
+      - Plant and harvest Sugar Cane
+      - Maintain large utility crop fields
+    blocks:
+      SUGAR_CANE: { enabled: true, xp: 12 }
+  9:
+    unlocks:
+      - Plant and harvest Cactus
+      - Handle difficult desert crops
+    blocks:
+      CACTUS: { enabled: true, xp: 13 }
+  10:
+    unlocks:
+      - Netherite Hoe
+      - Master Farmer rewards
+      - Full access to the complete farmer toolkit

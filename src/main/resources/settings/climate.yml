@@ -1,0 +1,84 @@
+# Climate simulation, seasonal behavior, debug tools, and crop effects.
+
+climate:
+  # Master switch for the climate gameplay system.
+  enabled: true
+  # Temperature display unit shown in admin tools and lore.
+  temperature-unit: "C"
+
+  # Controls where the warm/cold latitude model is centered.
+  equator:
+    # spawn = use world spawn alignment, fixed = use coordinate below.
+    mode: "spawn"
+    coordinate: 0.0
+
+  # Special admin playtest climate bubble.
+  playtest-mode:
+    enabled: false
+    center-x: 0.0
+    center-z: 0.0
+    radius-blocks: 256.0
+    center-temperature-c: 30.0
+    edge-temperature-c: 18.0
+
+  # Large-scale temperature variation pattern.
+  pattern:
+    enabled: true
+    scale-blocks: 160.0
+    strength-c: 6.0
+    seed-offset: 0
+
+  # Blend the procedural climate model with the world's actual local biome data.
+  # This helps datapack biomes from Terralith/Terralith-style worlds feel correct
+  # without breaking the larger seasonal and latitude systems.
+  biome-adaptation:
+    enabled: true
+    temperature-strength-c: 12.0
+    temperature-baseline: 0.8
+    humidity-weight: 0.65
+
+  altitude:
+    # Best farming height used by growth calculations.
+    optimal-y: 63.0
+    temperature-per-block-c: 0.08
+    growth-penalty-per-block: 0.012
+
+  # Larger values make climate zones wider.
+  latitude-scale-blocks: 750.0
+
+  seasons:
+    enabled: true
+  # auto, spring, summer, autumn, winter
+  season-override: "auto"
+
+  debug-bossbar:
+    enabled: true
+    interval-ticks: 20
+
+  debug-particles:
+    enabled: true
+    interval-ticks: 10
+    view-radius-blocks: 80.0
+    spacing-blocks: 2
+    size: 1.0
+
+  # Radius for the live player-centered climate display.
+  live-display:
+    view-radius-blocks: 48.0
+
+  # Happy particle effect for crops in strong conditions.
+  crop-effect:
+    enabled: true
+    interval-ticks: 1200
+    radius-blocks: 16
+
+  rain:
+    temperature-drop-c: 2.5
+    recent-growth-bonus: 0.20
+    recent-duration-seconds: 900
+
+  freeze-water:
+    enabled: true
+    interval-ticks: 100
+    radius-blocks: 10
+    vertical-radius-blocks: 4

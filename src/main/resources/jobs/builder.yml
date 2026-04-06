@@ -1,0 +1,55 @@
+enabled: true
+display-name: "&aBuilder"
+icon: BRICKS
+slot: 13
+player-cap: 10
+
+progression:
+  max-level: 10
+  base-xp: 100
+  xp-multiplier: 1.7
+  cooldown-reduction-seconds-per-level: 1
+  level-up-money-base: 18.0
+  level-up-money-multiplier: 1.12
+
+starter-kit:
+  - material: STONE_PICKAXE
+    amount: 1
+  - material: STONE_BRICKS
+    amount: 32
+  - material: BRICKS
+    amount: 16
+
+levels:
+  1:
+    unlocks:
+      - Build with Stone Bricks
+      - Build with Bricks
+  2:
+    unlocks:
+      - Build with Glass
+      - Build with Terracotta
+  3:
+    unlocks:
+      - Build with Concrete
+  4:
+    unlocks:
+      - Build with Quartz
+  5:
+    unlocks:
+      - Build with Prismarine
+  6:
+    unlocks:
+      - Build with Copper blocks
+  7:
+    unlocks:
+      - Build with Deepslate variants
+  8:
+    unlocks:
+      - Build with Blackstone variants
+  9:
+    unlocks:
+      - Build with Purpur
+  10:
+    unlocks:
+      - Master Builder materials

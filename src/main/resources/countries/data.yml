@@ -1,0 +1,13 @@
+# --------------------------------------------------------------------
+# Country data
+# --------------------------------------------------------------------
+# This file stores persistent country definitions and country-owned state.
+# Examples:
+# - owner and members
+# - invites and member roles
+# - open/closed status and tag
+# - territory and home positions
+# - trader spawn data
+# - treasury, resources, boosts, and progression
+
+countries: {}

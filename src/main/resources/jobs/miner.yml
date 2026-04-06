@@ -1,0 +1,159 @@
+enabled: true
+display-name: "&aMiner"
+icon: IRON_PICKAXE
+slot: 10
+player-cap: 10
+
+progression:
+  max-level: 10
+  base-xp: 100
+  xp-multiplier: 1.75
+  cooldown-reduction-seconds-per-level: 2
+  level-up-money-base: 20.0
+  level-up-money-multiplier: 1.15
+
+starter-kit:
+  - material: WOODEN_PICKAXE
+    amount: 1
+  - material: STONE_SHOVEL
+    amount: 1
+  - material: FURNACE
+    amount: 1
+  - material: TORCH
+    amount: 16
+
+rewards:
+  double-drop-chance: 0.10
+
+levels:
+  1:
+    unlocks:
+      - Mine Stone and Cobblestone
+      - Start earning miner XP from basic mining
+    blocks:
+      STONE:
+        enabled: true
+        xp: 5
+      COBBLESTONE:
+        enabled: true
+        xp: 5
+  2:
+    unlocks:
+      - Mine Gravel and common stone variants
+      - Learn early cave clearing routes
+    blocks:
+      GRAVEL:
+        enabled: true
+        xp: 6
+      ANDESITE:
+        enabled: true
+        xp: 6
+      GRANITE:
+        enabled: true
+        xp: 6
+      DIORITE:
+        enabled: true
+        xp: 6
+  3:
+    unlocks:
+      - Mine Coal Ore
+      - Mine early Copper veins
+    blocks:
+      COAL_ORE:
+        enabled: true
+        xp: 12
+      COPPER_ORE:
+        enabled: true
+        xp: 16
+      TUFF:
+        enabled: true
+        xp: 7
+  4:
+    unlocks:
+      - Mine Iron Ore
+      - Mine deeper deepslate Coal and Copper
+    blocks:
+      DEEPSLATE_COAL_ORE:
+        enabled: true
+        xp: 13
+      DEEPSLATE_COPPER_ORE:
+        enabled: true
+        xp: 18
+      IRON_ORE:
+        enabled: true
+        xp: 18
+  5:
+    unlocks:
+      - Mine Deepslate Iron Ore
+      - Break into the deeper cave layers
+    blocks:
+      DEEPSLATE_IRON_ORE:
+        enabled: true
+        xp: 20
+      DEEPSLATE:
+        enabled: true
+        xp: 8
+  6:
+    unlocks:
+      - Mine Redstone and Lapis
+      - Start farming stronger XP veins
+    blocks:
+      REDSTONE_ORE:
+        enabled: true
+        xp: 22
+      DEEPSLATE_REDSTONE_ORE:
+        enabled: true
+        xp: 24
+      LAPIS_ORE:
+        enabled: true
+        xp: 20
+      DEEPSLATE_LAPIS_ORE:
+        enabled: true
+        xp: 22
+  7:
+    unlocks:
+      - Mine Gold Ore
+      - Work rich ore pockets in the Nether
+    blocks:
+      GOLD_ORE:
+        enabled: true
+        xp: 28
+      DEEPSLATE_GOLD_ORE:
+        enabled: true
+        xp: 30
+      NETHER_GOLD_ORE:
+        enabled: true
+        xp: 26
+  8:
+    unlocks:
+      - Mine Emerald Ore
+      - Break Obsidian efficiently
+    blocks:
+      EMERALD_ORE:
+        enabled: true
+        xp: 32
+      DEEPSLATE_EMERALD_ORE:
+        enabled: true
+        xp: 35
+      OBSIDIAN:
+        enabled: true
+        xp: 30
+  9:
+    unlocks:
+      - Mine Diamond Ore
+      - Clear premium deep mining routes
+    blocks:
+      DIAMOND_ORE:
+        enabled: true
+        xp: 40
+      DEEPSLATE_DIAMOND_ORE:
+        enabled: true
+        xp: 44
+  10:
+    unlocks:
+      - Mine Ancient Debris
+      - Master all miner-only ore progression
+    blocks:
+      ANCIENT_DEBRIS:
+        enabled: true
+        xp: 60

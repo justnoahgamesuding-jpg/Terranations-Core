@@ -1,0 +1,129 @@
+name: testproject
+version: '1.0-SNAPSHOT'
+main: me.meetrow.testproject.Testproject
+api-version: '1.21'
+softdepend: [Vault, PlaceholderAPI, LuckPerms, WorldEdit, WorldGuard, dynmap, CoreProtect]
+commands:
+  terra:
+    description: Terra plugin commands
+    usage: /terra <help|tutorial|blockdelay|blockvalue|bypass|bypasslist|wildernessregen|fixedore|fixedoretool|setxpboost|cleardata|jobcap|playtest|climate|flyspeed|vanish|orevision|setworldspawn|cooldowndebug|lag|maintenance|realtimeclock|hungerspeed|stability|items|rewards|hostilemobs|phantoms|reload|hardrestart> ...
+  jobs:
+    description: Profession and jobs commands
+    usage: /jobs <open|info|switch|admin> ...
+  trader:
+    description: Trader admin commands
+    usage: /trader <status|time|spawn|remove|open>
+  merchant:
+    description: Merchant admin commands
+    usage: /merchant <status|time|spawn|remove|open|manage>
+  climate:
+    description: Climate debug commands
+    usage: /climate <check|status|enable|unit|seasons|season|bossbar|freeze|display|altitude|playtest|create [fullworld]|refresh|clear|crops>
+  countrychat:
+    description: Send a message to your country
+    usage: /countrychat <message>
+    aliases: [cc]
+  globalchat:
+    description: Send a message to all players with a cooldown
+    usage: /globalchat <message>
+    aliases: [gc]
+  country:
+    description: Country commands
+    usage: /country <create|setowner|join|home|invite|acceptinvite|transfercountry|accepttransfer|disband|joinstatus|leave|kick|info|list|rename|addtag|addtagtocountry|territory|manage|trade|admin|settraderreputation> ...
+  staff:
+    description: Staff tools and moderation utilities
+    usage: /staff [menu|mode|vanish|freeze|heal|tp|bring]
+  flyspeed:
+    description: Set your fly speed
+    usage: /flyspeed <0-10>
+  vanish:
+    description: Toggle vanish mode
+    usage: /vanish [on|off|toggle]
+  spawn:
+    description: Admin country warp command
+    usage: /spawn [country name|menu|admin|warp] [page]
+  balance:
+    description: View or manage Terra balances
+    usage: /balance [player|show|set|add|take]
+  rollbackarea:
+    description: Roll back an area around your location using CoreProtect
+    usage: /rollbackarea <radius> <time>
+  undoarea:
+    description: Restore a previously rolled back area around your location using CoreProtect
+    usage: /undoarea <radius> <time>
+permissions:
+  terra.admin:
+    description: Allows use of all Terra admin commands
+    default: op
+  terra.plugins.view:
+    description: Allows viewing the server plugin list
+    default: op
+  terra.country.use:
+    description: Legacy country access node
+    default: op
+  terra.country.admin:
+    description: Allows admin control over all countries
+    default: op
+  terra.country.create:
+    description: Allows creating countries
+    default: op
+  terra.country.join:
+    description: Allows joining open countries
+    default: op
+  terra.country.invite:
+    description: Allows inviting players to your country
+    default: op
+  terra.country.acceptinvite:
+    description: Allows accepting country invites
+    default: op
+  terra.country.home:
+    description: Allows using the country home command
+    default: op
+  terra.country.disband:
+    description: Allows using the disband country command
+    default: op
+  terra.country.joinstatus:
+    description: Allows changing country join status
+    default: op
+  terra.country.leave:
+    description: Allows leaving your country
+    default: op
+  terra.country.kick:
+    description: Allows kicking players from your country
+    default: op
+  terra.country.info:
+    description: Allows viewing country info
+    default: op
+  terra.country.farmland:
+    description: Allows viewing farmland totals in a country territory
+    default: op
+  terra.country.list:
+    description: Allows listing countries
+    default: op
+  terra.country.rename:
+    description: Allows renaming your country
+    default: op
+  terra.country.setowner:
+    description: Allows setting the owner of any country
+    default: op
+  terra.country.transfer:
+    description: Allows transferring your owned country
+    default: op
+  terra.country.accepttransfer:
+    description: Allows accepting a pending country transfer
+    default: op
+  terra.country.sethome:
+    description: Allows setting the home for a country
+    default: op
+  terra.country.warpadmin:
+    description: Allows using the admin country warp command
+    default: op
+  terra.country.territory:
+    description: Allows linking and syncing country territories with WorldGuard and Dynmap
+    default: op
+  terra.country.tag:
+    description: Allows setting country tags
+    default: op
+  terra.staff:
+    description: Allows using staff mode
+    default: false

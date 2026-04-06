@@ -1,0 +1,430 @@
+enabled: true
+display-name: "&aBlacksmith"
+icon: ANVIL
+slot: 16
+player-cap: 10
+
+progression:
+  max-level: 10
+  base-xp: 100
+  xp-multiplier: 1.72
+  level-up-money-base: 19.0
+  level-up-money-multiplier: 1.14
+
+starter-kit:
+  - material: STONE_PICKAXE
+    amount: 1
+  - material: ANVIL
+    amount: 1
+  - material: FURNACE
+    amount: 1
+  - material: COAL
+    amount: 16
+
+custom-anvil:
+  title: "&8Blacksmith Forge"
+  recipes:
+    LEATHER_HELMET:
+      category: basics
+      slot: 0
+      level: 1
+      xp: 4
+      ingredients:
+        LEATHER: 5
+    LEATHER_CHESTPLATE:
+      category: basics
+      slot: 1
+      level: 1
+      xp: 4
+      ingredients:
+        LEATHER: 8
+    LEATHER_LEGGINGS:
+      category: basics
+      slot: 2
+      level: 1
+      xp: 4
+      ingredients:
+        LEATHER: 7
+    LEATHER_BOOTS:
+      category: basics
+      slot: 3
+      level: 1
+      xp: 4
+      ingredients:
+        LEATHER: 4
+    FURNACE:
+      category: basics
+      slot: 4
+      level: 1
+      xp: 5
+      ingredients:
+        COBBLESTONE: 8
+    ANVIL:
+      category: iron
+      slot: 10
+      level: 5
+      xp: 14
+      ingredients:
+        IRON_BLOCK: 3
+        IRON_INGOT: 4
+    STONE_SWORD:
+      category: stone
+      slot: 0
+      level: 1
+      xp: 5
+      ingredients:
+        COBBLESTONE: 2
+        STICK: 1
+    STONE_PICKAXE:
+      category: stone
+      slot: 1
+      level: 1
+      xp: 5
+      ingredients:
+        COBBLESTONE: 3
+        STICK: 2
+    STONE_AXE:
+      category: stone
+      slot: 2
+      level: 1
+      xp: 5
+      ingredients:
+        COBBLESTONE: 3
+        STICK: 2
+    STONE_SHOVEL:
+      category: stone
+      slot: 3
+      level: 1
+      xp: 5
+      ingredients:
+        COBBLESTONE: 1
+        STICK: 2
+    STONE_HOE:
+      category: stone
+      slot: 4
+      level: 1
+      xp: 5
+      ingredients:
+        COBBLESTONE: 2
+        STICK: 2
+    IRON_SWORD:
+      category: iron
+      slot: 0
+      level: 3
+      xp: 8
+      ingredients:
+        IRON_INGOT: 2
+        STICK: 1
+    IRON_PICKAXE:
+      category: iron
+      slot: 1
+      level: 3
+      xp: 8
+      ingredients:
+        IRON_INGOT: 3
+        STICK: 2
+    IRON_AXE:
+      category: iron
+      slot: 2
+      level: 3
+      xp: 8
+      ingredients:
+        IRON_INGOT: 3
+        STICK: 2
+    IRON_SHOVEL:
+      category: iron
+      slot: 3
+      level: 3
+      xp: 8
+      ingredients:
+        IRON_INGOT: 1
+        STICK: 2
+    IRON_HOE:
+      category: iron
+      slot: 4
+      level: 3
+      xp: 8
+      ingredients:
+        IRON_INGOT: 2
+        STICK: 2
+    IRON_HELMET:
+      category: iron
+      slot: 5
+      level: 5
+      xp: 12
+      ingredients:
+        IRON_INGOT: 5
+    IRON_CHESTPLATE:
+      category: iron
+      slot: 6
+      level: 5
+      xp: 12
+      ingredients:
+        IRON_INGOT: 8
+    IRON_LEGGINGS:
+      category: iron
+      slot: 7
+      level: 5
+      xp: 12
+      ingredients:
+        IRON_INGOT: 7
+    IRON_BOOTS:
+      category: iron
+      slot: 8
+      level: 5
+      xp: 12
+      ingredients:
+        IRON_INGOT: 4
+    BUCKET:
+      category: iron
+      slot: 9
+      level: 3
+      xp: 8
+      ingredients:
+        IRON_INGOT: 3
+    GOLDEN_SWORD:
+      category: gold
+      slot: 0
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 2
+        STICK: 1
+    GOLDEN_PICKAXE:
+      category: gold
+      slot: 1
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 3
+        STICK: 2
+    GOLDEN_AXE:
+      category: gold
+      slot: 2
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 3
+        STICK: 2
+    GOLDEN_SHOVEL:
+      category: gold
+      slot: 3
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 1
+        STICK: 2
+    GOLDEN_HOE:
+      category: gold
+      slot: 4
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 2
+        STICK: 2
+    GOLDEN_HELMET:
+      category: gold
+      slot: 5
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 5
+    GOLDEN_CHESTPLATE:
+      category: gold
+      slot: 6
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 8
+    GOLDEN_LEGGINGS:
+      category: gold
+      slot: 7
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 7
+    GOLDEN_BOOTS:
+      category: gold
+      slot: 8
+      level: 4
+      xp: 9
+      ingredients:
+        GOLD_INGOT: 4
+    DIAMOND_SWORD:
+      category: diamond
+      slot: 0
+      level: 7
+      xp: 15
+      ingredients:
+        DIAMOND: 2
+        STICK: 1
+    DIAMOND_PICKAXE:
+      category: diamond
+      slot: 1
+      level: 7
+      xp: 15
+      ingredients:
+        DIAMOND: 3
+        STICK: 2
+    DIAMOND_AXE:
+      category: diamond
+      slot: 2
+      level: 7
+      xp: 15
+      ingredients:
+        DIAMOND: 3
+        STICK: 2
+    DIAMOND_SHOVEL:
+      category: diamond
+      slot: 3
+      level: 7
+      xp: 15
+      ingredients:
+        DIAMOND: 1
+        STICK: 2
+    DIAMOND_HOE:
+      category: diamond
+      slot: 4
+      level: 7
+      xp: 15
+      ingredients:
+        DIAMOND: 2
+        STICK: 2
+    DIAMOND_HELMET:
+      category: diamond
+      slot: 5
+      level: 8
+      xp: 18
+      ingredients:
+        DIAMOND: 5
+    DIAMOND_CHESTPLATE:
+      category: diamond
+      slot: 6
+      level: 8
+      xp: 18
+      ingredients:
+        DIAMOND: 8
+    DIAMOND_LEGGINGS:
+      category: diamond
+      slot: 7
+      level: 8
+      xp: 18
+      ingredients:
+        DIAMOND: 7
+    DIAMOND_BOOTS:
+      category: diamond
+      slot: 8
+      level: 8
+      xp: 18
+      ingredients:
+        DIAMOND: 4
+    NETHERITE_SWORD:
+      category: netherite
+      slot: 0
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_SWORD: 1
+        NETHERITE_INGOT: 1
+    NETHERITE_PICKAXE:
+      category: netherite
+      slot: 1
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_PICKAXE: 1
+        NETHERITE_INGOT: 1
+    NETHERITE_AXE:
+      category: netherite
+      slot: 2
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_AXE: 1
+        NETHERITE_INGOT: 1
+    NETHERITE_SHOVEL:
+      category: netherite
+      slot: 3
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_SHOVEL: 1
+        NETHERITE_INGOT: 1
+    NETHERITE_HOE:
+      category: netherite
+      slot: 4
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_HOE: 1
+        NETHERITE_INGOT: 1
+    NETHERITE_HELMET:
+      category: netherite
+      slot: 5
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_HELMET: 1
+        NETHERITE_INGOT: 1
+    NETHERITE_CHESTPLATE:
+      category: netherite
+      slot: 6
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_CHESTPLATE: 1
+        NETHERITE_INGOT: 1
+    NETHERITE_LEGGINGS:
+      category: netherite
+      slot: 7
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_LEGGINGS: 1
+        NETHERITE_INGOT: 1
+    NETHERITE_BOOTS:
+      category: netherite
+      slot: 8
+      level: 10
+      xp: 24
+      ingredients:
+        DIAMOND_BOOTS: 1
+        NETHERITE_INGOT: 1
+
+levels:
+  1:
+    unlocks:
+      - Craft Stone tools
+      - Craft Stone sword
+  2:
+    unlocks:
+      - Better forge discipline
+      - Improved smelting returns
+  3:
+    unlocks:
+      - Craft Iron tools
+      - Smelt Iron ore efficiently
+  4:
+    unlocks:
+      - Craft Golden gear
+      - Smelt Gold ore efficiently
+  5:
+    unlocks:
+      - Craft Iron armor
+  6:
+    unlocks:
+      - Veteran smith precision
+  7:
+    unlocks:
+      - Craft Diamond tools
+      - Craft Diamond sword
+  8:
+    unlocks:
+      - Craft Diamond armor
+  9:
+    unlocks:
+      - Elite forge knowledge
+  10:
+    unlocks:
+      - Craft Netherite gear
+      - Smelt Ancient Debris into Netherite Scrap

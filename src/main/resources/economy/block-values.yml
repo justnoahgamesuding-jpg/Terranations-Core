@@ -1,0 +1,11 @@
+# Block reward values.
+# Each block can define Terra job XP and money rewards for block breaking.
+# Format:
+# BLOCK_NAME:
+#   xp: <whole number>
+#   money: <decimal amount>
+
+# Basic stone example.
+STONE:
+  xp: 4
+  money: 2.0

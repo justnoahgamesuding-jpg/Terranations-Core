@@ -1,0 +1,101 @@
+# Structural stability and cave-in rules.
+# This system is tuned to push players toward realistic support,
+# weight distribution, and sensible building patterns.
+
+stability:
+  enabled: true
+
+  # Radius of a local scan triggered by block changes.
+  scan-radius: 8
+  # Delay before a scheduled collapse begins.
+  warning-delay-ticks: 40
+
+  batch-interval-ticks: 2
+  collapse-batch-size: 18
+  max-cluster-size: 192
+  max-clusters-per-scan: 3
+  max-pending-collapses: 24
+  max-falling-blocks-per-collapse: 24
+
+  # Nearby players can be notified/debugged within this radius.
+  player-warning-radius-blocks: 16.0
+
+  debug:
+    enabled: true
+    interval-ticks: 20
+    view-radius-blocks: 6.0
+
+  # Structural support detection around candidate blocks.
+  support-radius-horizontal: 2
+  support-radius-vertical: 2
+  support-frame:
+    horizontal-span: 3
+    vertical-height: 3
+
+  # Span allowances per material class.
+  loose-max-span: 2
+  packed-max-span: 3
+  soft-rock-max-span: 4
+  fragile-max-span: 4
+
+  min-open-faces: 2
+  fall-sideways-speed: 0.16
+  loose-grounded-stack-height: 2
+  shaft-open-depth: 3
+
+  wetness:
+    rain-stress: 0.7
+    near-water-stress: 0.8
+    water-radius: 2
+
+  # Load/weight tracing for heavier structures.
+  weight-trace-height: 16
+  load-stress-multiplier: 0.42
+  adjacent-support-factor: 0.35
+  foundation-support-factor: 1.15
+  support-frame-bonus: 2.8
+  anchor-support-bonus: 1.5
+  roof-load-factor: 0.3
+  column-weight-factor: 0.24
+
+  # Global strictness slider.
+  # 100 = current baseline.
+  # Higher = stricter, lower = more forgiving.
+  strictness:
+    percent: 100
+
+  # Mining leniency for natural terrain.
+  # Player-built structures still use the stricter support rules.
+  mining:
+    # Raises the stress threshold for non-player-built terrain.
+    natural-terrain-tolerance-multiplier: 1.85
+    # Natural cave-ins need slightly larger clusters before they start.
+    natural-min-collapse-size-bonus: 2
+    # Natural roofs need a wider open span before they count as unstable.
+    natural-roof-extra-span: 2
+    # Natural shaft walls need deeper exposure than built structures.
+    natural-shaft-extra-depth: 1
+    # Long unsupported tunnels can still cave in even if they are not very wide.
+    natural-tunnel-min-length: 6
+    natural-tunnel-min-width: 3
+    natural-tunnel-min-height: 3
+    # Large unsupported mined rooms/chambers should collapse reliably.
+    natural-room-min-width: 5
+    natural-room-min-length: 5
+    natural-room-min-height: 5
+
+  rubble:
+    enabled: true
+    chance: 0.22
+    max-per-collapse: 12
+
+  # Minimum connected unstable size before a collapse qualifies.
+  loose-min-collapse-size: 2
+  packed-min-collapse-size: 3
+  soft-rock-min-collapse-size: 4
+  fragile-min-collapse-size: 4
+
+  # Stability meter fills from qualifying structural break/place actions.
+  meter:
+    actions-per-charge: 20
+    debug-duration-ticks: 100

@@ -1,0 +1,89 @@
+enabled: true
+display-name: "&aLumberjack"
+icon: IRON_AXE
+slot: 11
+player-cap: 10
+
+progression:
+  max-level: 10
+  base-xp: 90
+  xp-multiplier: 1.65
+  level-up-money-base: 16.0
+  level-up-money-multiplier: 1.12
+
+starter-kit:
+  - material: WOODEN_AXE
+    amount: 1
+  - material: OAK_SAPLING
+    amount: 4
+  - material: BREAD
+    amount: 6
+
+rewards:
+  double-drop-chance: 0.10
+
+levels:
+  1:
+    unlocks:
+      - Oak Log
+      - Birch Log
+      - Jungle Log
+    blocks:
+      OAK_LOG: { enabled: true, xp: 5 }
+      BIRCH_LOG: { enabled: true, xp: 5 }
+      JUNGLE_LOG: { enabled: true, xp: 5 }
+  2:
+    unlocks:
+      - Spruce Log
+      - Acacia Log
+    blocks:
+      SPRUCE_LOG: { enabled: true, xp: 6 }
+      ACACIA_LOG: { enabled: true, xp: 6 }
+  3:
+    unlocks:
+      - Dark Oak Log
+      - Mangrove Log
+    blocks:
+      DARK_OAK_LOG: { enabled: true, xp: 7 }
+      MANGROVE_LOG: { enabled: true, xp: 7 }
+  4:
+    unlocks:
+      - Cherry Log
+      - Bamboo Block
+    blocks:
+      CHERRY_LOG: { enabled: true, xp: 8 }
+      BAMBOO_BLOCK: { enabled: true, xp: 8 }
+  5:
+    unlocks:
+      - Crimson Stem
+      - Warped Stem
+    blocks:
+      CRIMSON_STEM: { enabled: true, xp: 10 }
+      WARPED_STEM: { enabled: true, xp: 10 }
+  6:
+    unlocks:
+      - Stripped Overworld Logs
+    blocks:
+      STRIPPED_OAK_LOG: { enabled: true, xp: 8 }
+      STRIPPED_BIRCH_LOG: { enabled: true, xp: 8 }
+      STRIPPED_SPRUCE_LOG: { enabled: true, xp: 8 }
+  7:
+    unlocks:
+      - Stripped Nether Stems
+    blocks:
+      STRIPPED_CRIMSON_STEM: { enabled: true, xp: 11 }
+      STRIPPED_WARPED_STEM: { enabled: true, xp: 11 }
+  8:
+    unlocks:
+      - Wood and Hyphae blocks
+    blocks:
+      OAK_WOOD: { enabled: true, xp: 9 }
+      CRIMSON_HYPHAE: { enabled: true, xp: 12 }
+  9:
+    unlocks:
+      - Mangrove Roots
+    blocks:
+      MANGROVE_ROOTS: { enabled: true, xp: 14 }
+  10:
+    unlocks:
+      - All tree harvesting mastered

@@ -1,0 +1,12 @@
+# --------------------------------------------------------------------
+# Shared runtime data
+# --------------------------------------------------------------------
+# This file stores runtime and player/system data that does not belong
+# in the split settings files or dedicated data folders.
+
+bypass: {}
+professions: {}
+world-spawn: {}
+maintenance:
+  enabled: false
+  allowed-players: []

@@ -1,0 +1,123 @@
+# Wandering merchant wave timing and trade configuration.
+
+merchant-shop:
+  enabled: true
+
+  # If true, merchant buy rotations are generated from a random pool.
+  # End-dimension items are excluded from this pool.
+  random-buy-rotation-enabled: true
+
+  # Number of random buy offers shown in each rotation window.
+  random-buy-offers-per-rotation: 5
+
+  # Delay window between merchant waves.
+  spawn-minutes-min: 60
+  spawn-minutes-max: 120
+
+  # Total active time for one merchant wave.
+  active-minutes: 10
+  # How often buy rotations change while the wave is active.
+  rotation-minutes: 2
+  # Per-player cooldown between trades.
+  trade-cooldown-seconds: 30
+
+  # Search radius around the host country home/spawn.
+  spawn-radius: 8
+
+  # Goods the merchant buys from players.
+  buy-rotations:
+    "0":
+      "0":
+        material: COBBLESTONE
+        amount: 32
+        price: 0.80
+        stock: 12
+      "1":
+        material: OAK_LOG
+        amount: 24
+        price: 0.95
+        stock: 10
+      "2":
+        material: WHEAT
+        amount: 32
+        price: 0.70
+        stock: 12
+    "1":
+      "0":
+        material: IRON_INGOT
+        amount: 12
+        price: 2.20
+        stock: 8
+      "1":
+        material: SPRUCE_LOG
+        amount: 24
+        price: 1.00
+        stock: 10
+      "2":
+        material: POTATO
+        amount: 32
+        price: 0.65
+        stock: 12
+    "2":
+      "0":
+        material: STONE
+        amount: 32
+        price: 0.90
+        stock: 12
+      "1":
+        material: COAL
+        amount: 20
+        price: 1.10
+        stock: 10
+      "2":
+        material: CARROT
+        amount: 32
+        price: 0.70
+        stock: 12
+    "3":
+      "0":
+        material: SAND
+        amount: 32
+        price: 0.65
+        stock: 10
+      "1":
+        material: BIRCH_LOG
+        amount: 24
+        price: 0.95
+        stock: 10
+      "2":
+        material: PUMPKIN
+        amount: 12
+        price: 1.40
+        stock: 8
+    "4":
+      "0":
+        material: BRICKS
+        amount: 16
+        price: 1.80
+        stock: 8
+      "1":
+        material: HAY_BLOCK
+        amount: 12
+        price: 1.10
+        stock: 8
+      "2":
+        material: BREAD
+        amount: 10
+        price: 1.20
+        stock: 10
+
+  # Goods the merchant sells to players.
+  sell-offers:
+    "0":
+      material: EMERALD
+      amount: 2
+      price: 5.00
+    "1":
+      material: IRON_INGOT
+      amount: 8
+      price: 2.20
+    "2":
+      material: BREAD
+      amount: 8
+      price: 1.20

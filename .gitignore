@@ -1,0 +1,40 @@
+# Maven build output
+target/
+
+# IntelliJ / JetBrains project files
+.idea/
+*.iml
+out/
+
+# VS Code
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# NetBeans
+nbproject/private/
+build/
+dist/
+nbbuild/
+.nb-gradle/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and runtime dumps
+*.log
+logs/
+hs_err_pid*
+replay_pid*
+
+# Local environment files
+.env
+.env.*
+
+# Java tooling
+*.class

@@ -1,0 +1,18 @@
+# Jobs root GUI settings.
+# Use this file for shared job-menu presentation only.
+# Per-profession progression, rewards, unlocks, and restrictions live in:
+# - jobs/miner.yml
+# - jobs/lumberjack.yml
+# - jobs/farmer.yml
+# - jobs/builder.yml
+# - jobs/blacksmith.yml
+
+# Main profession selection GUI.
+gui:
+  title: "&8Choose Your Profession"
+  detail-title: "&8%profession% Progression"
+  level-detail-title: "&8%profession% Level %level%"
+  size: 27
+  lore:
+    - "&7Choose your starting profession."
+    - "&fClick to inspect this profession."
