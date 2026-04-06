@@ -18,6 +18,7 @@ import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
@@ -67,6 +68,8 @@ import org.bukkit.block.data.Ageable;
 import org.bukkit.block.data.Levelled;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
 import org.bukkit.util.Vector;
@@ -186,6 +189,18 @@ public final class Testproject extends JavaPlugin {
     private final Map<UUID, Integer> tutorialIntroIndices = new ConcurrentHashMap<>();
     private final Map<UUID, BukkitTask> tutorialIntroAdvanceTasks = new ConcurrentHashMap<>();
     private final Map<UUID, Scoreboard> tutorialStoredScoreboards = new ConcurrentHashMap<>();
+    private final Map<UUID, Scoreboard> tutorialChecklistStoredScoreboards = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> tutorialStarterXpProgress = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<String>> completedTutorialQuestIds = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<String, Integer>> tutorialQuestProgress = new ConcurrentHashMap<>();
+    private final List<PlayerQuestDefinition> tutorialQuestDefinitions = new ArrayList<>();
+    private final Map<UUID, String> tutorialQuestHudIdCache = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> tutorialQuestHudPercentCache = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> tutorialQuestHudStepCache = new ConcurrentHashMap<>();
+    private final List<PlayerQuestDefinition> generalQuestDefinitions = new ArrayList<>();
+    private final Map<UUID, List<String>> assignedQuestIds = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<String>> completedAssignedQuestIds = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<String, Integer>> assignedQuestProgress = new ConcurrentHashMap<>();
     private final Map<UUID, Double> traderReputations = new ConcurrentHashMap<>();
     private final Map<String, TraderPlayerQuest> traderQuests = new ConcurrentHashMap<>();
     private final Map<String, Long> traderQuestCooldowns = new ConcurrentHashMap<>();
@@ -241,6 +256,7 @@ public final class Testproject extends JavaPlugin {
     private StaffMenuListener staffMenuListener;
     private PlaytestGuiListener playtestGuiListener;
     private StabilityGuiListener stabilityGuiListener;
+    private QuestAdminGuiListener questAdminGuiListener;
     private BossBar globalXpBoostBossBar;
     private final Set<UUID> cooldownDebugPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, BossBar> breakCooldownDebugBars = new ConcurrentHashMap<>();
@@ -294,7 +310,9 @@ public final class Testproject extends JavaPlugin {
     private enum TutorialStage {
         SELECT_PRIMARY,
         EARN_FIRST_XP,
-        JOIN_COUNTRY
+        BUILD_MOMENTUM,
+        JOIN_COUNTRY,
+        CONTRIBUTE_TO_COUNTRY
     }
 
     private enum BlockActionType {
@@ -313,6 +331,7 @@ public final class Testproject extends JavaPlugin {
     private File stabilitySettingsFile;
     private File merchantSettingsFile;
     private File territorySettingsFile;
+    private File questsSettingsFile;
     private FileConfiguration blockValuesConfig;
     private FileConfiguration jobsConfig;
     private FileConfiguration chatConfig;
@@ -324,6 +343,7 @@ public final class Testproject extends JavaPlugin {
     private FileConfiguration stabilitySettingsConfig;
     private FileConfiguration merchantSettingsConfig;
     private FileConfiguration territorySettingsConfig;
+    private FileConfiguration questsSettingsConfig;
     private final Map<Profession, File> professionFiles = new EnumMap<>(Profession.class);
     private final Map<Profession, FileConfiguration> professionConfigs = new EnumMap<>(Profession.class);
     private NamespacedKey itemSourceOwnerKey;
@@ -399,6 +419,8 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(playtestGuiListener, this);
         stabilityGuiListener = new StabilityGuiListener(this);
         getServer().getPluginManager().registerEvents(stabilityGuiListener, this);
+        questAdminGuiListener = new QuestAdminGuiListener(this);
+        getServer().getPluginManager().registerEvents(questAdminGuiListener, this);
         countryWarpGuiListener = new CountryWarpGuiListener(this);
         getServer().getPluginManager().registerEvents(countryWarpGuiListener, this);
         traderQuestListener = new TraderQuestListener(this);
@@ -637,6 +659,15 @@ public final class Testproject extends JavaPlugin {
         }
         tutorialIntroAdvanceTasks.clear();
         tutorialStoredScoreboards.clear();
+        tutorialChecklistStoredScoreboards.clear();
+        tutorialStarterXpProgress.clear();
+        tutorialQuestHudIdCache.clear();
+        tutorialQuestHudPercentCache.clear();
+        tutorialQuestHudStepCache.clear();
+        generalQuestDefinitions.clear();
+        assignedQuestIds.clear();
+        completedAssignedQuestIds.clear();
+        assignedQuestProgress.clear();
         traderReputations.clear();
         traderQuests.clear();
         traderQuestCooldowns.clear();
@@ -1712,6 +1743,12 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
+    public void openQuestAdminMenu(Player player) {
+        if (questAdminGuiListener != null) {
+            questAdminGuiListener.openQuestListMenu(player, 0);
+        }
+    }
+
     public void openJobConfigEditor(Player player) {
         if (jobConfigGuiListener != null) {
             jobConfigGuiListener.openProfessionSelector(player);
@@ -1947,12 +1984,11 @@ public final class Testproject extends JavaPlugin {
             return 0;
         }
 
-        if (onlinePlayer != null) {
-            handleTutorialProfessionXpGain(onlinePlayer);
-        }
-
         int previousLevel = getProfessionLevel(playerId, profession);
         int levelUps = addProfessionXp(playerId, profession, amount);
+        if (onlinePlayer != null) {
+            handleTutorialProfessionXpGain(onlinePlayer, profession, amount);
+        }
         if (levelUps <= 0) {
             return amount;
         }
@@ -12368,7 +12404,9 @@ public final class Testproject extends JavaPlugin {
         reloadCountryBorderParticlePreferences();
         reloadStabilityMeterPreferences();
         reloadPendingStarterKitGrants();
+        reloadTutorialQuestDefinitions();
         reloadTutorialStages();
+        reloadAssignedQuestStates();
         reloadFixedOreBlocks();
         reloadFurnaceSessions();
         reloadTraderData();
@@ -12847,9 +12885,67 @@ public final class Testproject extends JavaPlugin {
             }
         }
     }
+    private void reloadTutorialQuestDefinitions() {
+        tutorialQuestDefinitions.clear();
+        generalQuestDefinitions.clear();
+
+        if (questsSettingsConfig == null) {
+            return;
+        }
+
+        loadQuestDefinitionsInto(tutorialQuestDefinitions, questsSettingsConfig.getConfigurationSection("quests.starter.list"), "starter");
+        loadQuestDefinitionsInto(generalQuestDefinitions, questsSettingsConfig.getConfigurationSection("quests.general.list"), "general");
+    }
+
+    private void loadQuestDefinitionsInto(List<PlayerQuestDefinition> target, ConfigurationSection section, String sectionName) {
+        if (target == null || section == null) {
+            return;
+        }
+
+        for (String questId : section.getKeys(false)) {
+            ConfigurationSection questSection = section.getConfigurationSection(questId);
+            if (questSection == null) {
+                continue;
+            }
+
+            PlayerQuestType type = PlayerQuestType.fromKey(questSection.getString("type"));
+            if (type == null) {
+                getLogger().warning("Skipping " + sectionName + " quest '" + questId + "' because its type is invalid.");
+                continue;
+            }
+
+            Set<String> requiresCompleted = new LinkedHashSet<>();
+            for (String dependency : questSection.getStringList("requires-completed")) {
+                if (dependency != null && !dependency.isBlank()) {
+                    requiresCompleted.add(dependency.trim().toLowerCase(Locale.ROOT));
+                }
+            }
+
+            target.add(new PlayerQuestDefinition(
+                    questId.toLowerCase(Locale.ROOT),
+                    questSection.getInt("order", 0),
+                    questSection.getBoolean("enabled", true),
+                    questSection.getString("title", "&6Quest"),
+                    questSection.getString("objective", "Complete this quest"),
+                    questSection.getString("hint", ""),
+                    Math.max(1, questSection.getInt("target", 1)),
+                    Profession.fromKey(questSection.getString("profession")),
+                    type,
+                    requiresCompleted
+            ));
+        }
+
+        target.sort(Comparator
+                .comparingInt(PlayerQuestDefinition::getOrder)
+                .thenComparing(PlayerQuestDefinition::getId));
+    }
+
     private void reloadTutorialStages() {
         tutorialStages.clear();
         tutorialIntroIndices.clear();
+        tutorialStarterXpProgress.clear();
+        completedTutorialQuestIds.clear();
+        tutorialQuestProgress.clear();
 
         ConfigurationSection section = dataConfig.getConfigurationSection("tutorial");
         if (section == null) {
@@ -12867,8 +12963,79 @@ public final class Testproject extends JavaPlugin {
                 if (introIndex >= 0) {
                     tutorialIntroIndices.put(playerId, introIndex);
                 }
+                int starterProgress = Math.max(0, section.getInt(playerKey + ".starter-xp-progress", 0));
+                if (starterProgress > 0) {
+                    tutorialStarterXpProgress.put(playerId, starterProgress);
+                }
+
+                Set<String> completed = new LinkedHashSet<>();
+                for (String questId : section.getStringList(playerKey + ".completed-quests")) {
+                    if (questId != null && !questId.isBlank()) {
+                        completed.add(questId.trim().toLowerCase(Locale.ROOT));
+                    }
+                }
+                if (!completed.isEmpty()) {
+                    completedTutorialQuestIds.put(playerId, completed);
+                }
+
+                ConfigurationSection progressSection = section.getConfigurationSection(playerKey + ".quest-progress");
+                if (progressSection != null) {
+                    Map<String, Integer> progressByQuest = new LinkedHashMap<>();
+                    for (String questId : progressSection.getKeys(false)) {
+                        int progress = Math.max(0, progressSection.getInt(questId, 0));
+                        if (progress > 0) {
+                            progressByQuest.put(questId.toLowerCase(Locale.ROOT), progress);
+                        }
+                    }
+                    if (!progressByQuest.isEmpty()) {
+                        tutorialQuestProgress.put(playerId, progressByQuest);
+                    }
+                }
+
+                migrateLegacyTutorialQuestState(playerId, stageName, starterProgress);
             } catch (IllegalArgumentException ignored) {
             }
+        }
+    }
+
+    private void migrateLegacyTutorialQuestState(UUID playerId, String stageName, int starterProgress) {
+        if (playerId == null || stageName == null || stageName.isBlank()) {
+            return;
+        }
+        if (completedTutorialQuestIds.containsKey(playerId) || tutorialQuestProgress.containsKey(playerId)) {
+            return;
+        }
+
+        TutorialStage stage;
+        try {
+            stage = TutorialStage.valueOf(stageName.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return;
+        }
+
+        Set<String> completed = completedTutorialQuestIds.computeIfAbsent(playerId, ignored -> new LinkedHashSet<>());
+        Profession primary = getPrimaryProfession(playerId);
+        String momentumQuestId = getDefaultMomentumQuestId(primary);
+
+        if (primary != null) {
+            completed.add("choose_profession");
+        }
+        if (stage == TutorialStage.BUILD_MOMENTUM || stage == TutorialStage.JOIN_COUNTRY || stage == TutorialStage.CONTRIBUTE_TO_COUNTRY) {
+            completed.add("first_profession_xp");
+        }
+        if ((stage == TutorialStage.BUILD_MOMENTUM || stage == TutorialStage.JOIN_COUNTRY || stage == TutorialStage.CONTRIBUTE_TO_COUNTRY)
+                && starterProgress > 0
+                && momentumQuestId != null) {
+            setTutorialQuestProgress(playerId, momentumQuestId, starterProgress, false);
+        }
+        if ((stage == TutorialStage.JOIN_COUNTRY || stage == TutorialStage.CONTRIBUTE_TO_COUNTRY) && momentumQuestId != null) {
+            completed.add(momentumQuestId);
+        }
+        if (stage == TutorialStage.CONTRIBUTE_TO_COUNTRY) {
+            completed.add("join_country");
+        }
+        if (completed.isEmpty()) {
+            completedTutorialQuestIds.remove(playerId);
         }
     }
 
@@ -12889,9 +13056,127 @@ public final class Testproject extends JavaPlugin {
         } else {
             dataConfig.set("tutorial." + playerId + ".intro-index", introIndex);
         }
-        if (tutorialStages.get(playerId) == null && introIndex == null) {
+        int starterProgress = Math.max(0, tutorialStarterXpProgress.getOrDefault(playerId, 0));
+        if (starterProgress <= 0) {
+            dataConfig.set("tutorial." + playerId + ".starter-xp-progress", null);
+        } else {
+            dataConfig.set("tutorial." + playerId + ".starter-xp-progress", starterProgress);
+        }
+
+        Set<String> completed = completedTutorialQuestIds.get(playerId);
+        if (completed == null || completed.isEmpty()) {
+            dataConfig.set("tutorial." + playerId + ".completed-quests", null);
+        } else {
+            dataConfig.set("tutorial." + playerId + ".completed-quests", new ArrayList<>(completed));
+        }
+
+        Map<String, Integer> progressByQuest = tutorialQuestProgress.get(playerId);
+        dataConfig.set("tutorial." + playerId + ".quest-progress", null);
+        if (progressByQuest != null && !progressByQuest.isEmpty()) {
+            for (Map.Entry<String, Integer> entry : progressByQuest.entrySet()) {
+                if (entry.getValue() != null && entry.getValue() > 0) {
+                    dataConfig.set("tutorial." + playerId + ".quest-progress." + entry.getKey(), entry.getValue());
+                }
+            }
+        }
+
+        if (tutorialStages.get(playerId) == null
+                && introIndex == null
+                && starterProgress <= 0
+                && (completed == null || completed.isEmpty())
+                && (progressByQuest == null || progressByQuest.isEmpty())) {
             dataConfig.set("tutorial." + playerId, null);
         }
+        saveDataConfig();
+    }
+
+    private void reloadAssignedQuestStates() {
+        assignedQuestIds.clear();
+        completedAssignedQuestIds.clear();
+        assignedQuestProgress.clear();
+
+        ConfigurationSection section = dataConfig.getConfigurationSection("quests");
+        if (section == null) {
+            return;
+        }
+
+        for (String playerKey : section.getKeys(false)) {
+            try {
+                UUID playerId = UUID.fromString(playerKey);
+
+                List<String> assigned = new ArrayList<>();
+                for (String questId : section.getStringList(playerKey + ".assigned")) {
+                    if (questId != null && !questId.isBlank()) {
+                        assigned.add(questId.trim().toLowerCase(Locale.ROOT));
+                    }
+                }
+                if (!assigned.isEmpty()) {
+                    assignedQuestIds.put(playerId, assigned);
+                }
+
+                Set<String> completed = new LinkedHashSet<>();
+                for (String questId : section.getStringList(playerKey + ".completed")) {
+                    if (questId != null && !questId.isBlank()) {
+                        completed.add(questId.trim().toLowerCase(Locale.ROOT));
+                    }
+                }
+                if (!completed.isEmpty()) {
+                    completedAssignedQuestIds.put(playerId, completed);
+                }
+
+                ConfigurationSection progressSection = section.getConfigurationSection(playerKey + ".progress");
+                if (progressSection != null) {
+                    Map<String, Integer> progressByQuest = new LinkedHashMap<>();
+                    for (String questId : progressSection.getKeys(false)) {
+                        int progress = Math.max(0, progressSection.getInt(questId, 0));
+                        if (progress > 0) {
+                            progressByQuest.put(questId.toLowerCase(Locale.ROOT), progress);
+                        }
+                    }
+                    if (!progressByQuest.isEmpty()) {
+                        assignedQuestProgress.put(playerId, progressByQuest);
+                    }
+                }
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+    }
+
+    private void saveAssignedQuestState(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+
+        List<String> assigned = assignedQuestIds.get(playerId);
+        if (assigned == null || assigned.isEmpty()) {
+            dataConfig.set("quests." + playerId + ".assigned", null);
+        } else {
+            dataConfig.set("quests." + playerId + ".assigned", new ArrayList<>(assigned));
+        }
+
+        Set<String> completed = completedAssignedQuestIds.get(playerId);
+        if (completed == null || completed.isEmpty()) {
+            dataConfig.set("quests." + playerId + ".completed", null);
+        } else {
+            dataConfig.set("quests." + playerId + ".completed", new ArrayList<>(completed));
+        }
+
+        Map<String, Integer> progressByQuest = assignedQuestProgress.get(playerId);
+        dataConfig.set("quests." + playerId + ".progress", null);
+        if (progressByQuest != null && !progressByQuest.isEmpty()) {
+            for (Map.Entry<String, Integer> entry : progressByQuest.entrySet()) {
+                if (entry.getValue() != null && entry.getValue() > 0) {
+                    dataConfig.set("quests." + playerId + ".progress." + entry.getKey(), entry.getValue());
+                }
+            }
+        }
+
+        if ((assigned == null || assigned.isEmpty())
+                && (completed == null || completed.isEmpty())
+                && (progressByQuest == null || progressByQuest.isEmpty())) {
+            dataConfig.set("quests." + playerId, null);
+        }
+
         saveDataConfig();
     }
 
@@ -12951,16 +13236,14 @@ public final class Testproject extends JavaPlugin {
             } else {
                 resumeTutorialIntro(player);
             }
+            updateTutorialChecklist(player);
+            syncTutorialQuestHud(player, true);
             return;
         }
-
-        TutorialStage stage = tutorialStages.get(playerId);
-        if (stage == null) {
-            return;
-        }
-        if (stage == TutorialStage.JOIN_COUNTRY && getPlayerCountry(playerId) != null) {
-            completeTutorial(player);
-        }
+        refreshAssignedQuestFlow(player, false);
+        refreshTutorialQuestFlow(player, false);
+        updateTutorialChecklist(player);
+        syncTutorialQuestHud(player, true);
     }
 
     public void startTutorial(UUID playerId, boolean sendIntro) {
@@ -12968,8 +13251,17 @@ public final class Testproject extends JavaPlugin {
             return;
         }
 
-        tutorialStages.put(playerId, TutorialStage.EARN_FIRST_XP);
+        tutorialStages.remove(playerId);
+        tutorialStarterXpProgress.remove(playerId);
+        completedTutorialQuestIds.remove(playerId);
+        tutorialQuestProgress.remove(playerId);
         saveTutorialStage(playerId);
+        Player player = getServer().getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            refreshAssignedQuestFlow(player, sendIntro);
+            refreshTutorialQuestFlow(player, sendIntro);
+            updateTutorialChecklist(player);
+        }
     }
 
     public void clearTutorial(UUID playerId) {
@@ -12977,7 +13269,18 @@ public final class Testproject extends JavaPlugin {
             return;
         }
         tutorialStages.remove(playerId);
+        tutorialStarterXpProgress.remove(playerId);
+        completedTutorialQuestIds.remove(playerId);
+        tutorialQuestProgress.remove(playerId);
+        tutorialQuestHudIdCache.remove(playerId);
+        tutorialQuestHudPercentCache.remove(playerId);
+        tutorialQuestHudStepCache.remove(playerId);
         saveTutorialStage(playerId);
+        Player player = getServer().getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            clearTutorialChecklist(player);
+            syncTutorialQuestHud(player, true);
+        }
     }
 
     private void sendTutorialIntro(Player player) {
@@ -13097,6 +13400,8 @@ public final class Testproject extends JavaPlugin {
         }
         tutorialIntroIndices.remove(playerId);
         clearTutorialIntroLock(player);
+        refreshTutorialQuestFlow(player, false);
+        updateTutorialChecklist(player);
         saveTutorialStage(playerId);
         player.sendMessage(getMessage("tutorial.intro.finished"));
         player.playSound(player.getLocation(), Sound.UI_TOAST_IN, 0.75F, 1.0F);
@@ -13131,48 +13436,23 @@ public final class Testproject extends JavaPlugin {
         player.removePotionEffect(PotionEffectType.BLINDNESS);
     }
 
-    private void advanceTutorialStage(UUID playerId, TutorialStage newStage, Player player, boolean sendMessages) {
-        if (playerId == null || newStage == null) {
-            return;
-        }
-
-        tutorialStages.put(playerId, newStage);
-        saveTutorialStage(playerId);
-
-        if (!sendMessages || player == null || !player.isOnline()) {
-            return;
-        }
-
-        switch (newStage) {
-            case EARN_FIRST_XP -> {
-                player.sendMessage(getMessage("tutorial.card-border"));
-                player.sendMessage(getMessage("tutorial.primary-selected-header"));
-                for (String line : getTutorialPrimarySelectedLines(playerId)) {
-                    player.sendMessage(line);
-                }
-                player.sendMessage(getMessage("tutorial.card-border"));
-                playTutorialStageAdvanceEffect(player, true);
-            }
-            case JOIN_COUNTRY -> {
-                player.sendMessage(getMessage("tutorial.card-border"));
-                player.sendMessage(getMessage("tutorial.first-xp-header"));
-                for (String line : getMessageList("tutorial.first-xp-lines")) {
-                    player.sendMessage(line);
-                }
-                player.sendMessage(getMessage("tutorial.card-border"));
-                playTutorialStageAdvanceEffect(player, false);
-            }
-            default -> {
-            }
-        }
-    }
-
     private void completeTutorial(Player player) {
         if (player == null) {
             return;
         }
 
-        clearTutorial(player.getUniqueId());
+        UUID playerId = player.getUniqueId();
+        tutorialStages.remove(playerId);
+        tutorialStarterXpProgress.remove(playerId);
+        Set<String> completed = getCompletedTutorialQuestIds(playerId);
+        for (PlayerQuestDefinition quest : tutorialQuestDefinitions) {
+            if (quest.isEnabled()) {
+                completed.add(quest.getId());
+            }
+        }
+        saveTutorialStage(playerId);
+        clearTutorialChecklist(player);
+        syncTutorialQuestHud(player, true);
         player.sendMessage(getMessage("tutorial.card-border"));
         player.sendMessage(getMessage("tutorial.complete-header"));
         for (String line : getMessageList("tutorial.complete-lines")) {
@@ -13185,29 +13465,201 @@ public final class Testproject extends JavaPlugin {
     public void handleTutorialPrimaryProfessionSelected(Player player) {
         if (player != null) {
             UUID playerId = player.getUniqueId();
-            if (tutorialStages.get(playerId) == null) {
-                tutorialStages.put(playerId, TutorialStage.EARN_FIRST_XP);
-                saveTutorialStage(playerId);
-            }
-            if (tutorialStages.get(playerId) == TutorialStage.EARN_FIRST_XP) {
-                player.sendMessage(getMessage("tutorial.primary-selected-header"));
-                for (String line : getTutorialPrimarySelectedLines(playerId)) {
-                    player.sendMessage(line);
-                }
-                playTutorialStageAdvanceEffect(player, true);
-            }
+            tutorialStages.remove(playerId);
+            tutorialStarterXpProgress.remove(playerId);
+            saveTutorialStage(playerId);
+            updateTutorialChecklist(player);
+            refreshAssignedQuestFlow(player, true);
+            refreshTutorialQuestFlow(player, true);
         }
     }
 
-    public void handleTutorialProfessionXpGain(Player player) {
-        if (player != null && tutorialStages.get(player.getUniqueId()) == TutorialStage.EARN_FIRST_XP) {
-            advanceTutorialStage(player.getUniqueId(), TutorialStage.JOIN_COUNTRY, player, true);
+    public void handleTutorialProfessionXpGain(Player player, Profession profession, int amount) {
+        if (player == null || profession == null || amount <= 0) {
+            return;
         }
+        UUID playerId = player.getUniqueId();
+        Profession primary = getPrimaryProfession(playerId);
+        if (primary == null || primary != profession) {
+            return;
+        }
+
+        tutorialStarterXpProgress.put(playerId, Math.max(
+                tutorialStarterXpProgress.getOrDefault(playerId, 0),
+                getProfessionTotalProgressXp(playerId, profession)
+        ));
+        saveTutorialStage(playerId);
+        refreshAssignedQuestFlow(player, true);
+        refreshTutorialQuestFlow(player, true);
     }
 
     public void handleTutorialCountryJoined(Player player) {
-        if (player != null && tutorialStages.get(player.getUniqueId()) == TutorialStage.JOIN_COUNTRY) {
-            completeTutorial(player);
+        if (player != null) {
+            refreshAssignedQuestFlow(player, true);
+            refreshTutorialQuestFlow(player, true);
+        }
+    }
+
+    public void handleTutorialCountryContribution(Player player) {
+        if (player != null) {
+            PlayerQuestDefinition assignedQuest = getActiveAssignedQuest(player.getUniqueId());
+            if (assignedQuest != null && assignedQuest.getType() == PlayerQuestType.CONTRIBUTE_COUNTRY) {
+                addAssignedQuestProgress(player.getUniqueId(), assignedQuest.getId(), 1, false);
+            }
+            PlayerQuestDefinition activeQuest = getActiveTutorialQuest(player.getUniqueId());
+            if (activeQuest != null && activeQuest.getType() == PlayerQuestType.CONTRIBUTE_COUNTRY) {
+                addTutorialQuestProgress(player.getUniqueId(), activeQuest.getId(), 1, false);
+            }
+            refreshAssignedQuestFlow(player, true);
+            refreshTutorialQuestFlow(player, true);
+        }
+    }
+
+    private boolean shouldShowTutorialChecklist(Player player) {
+        if (player == null || !player.isOnline() || isTutorialIntroActive(player.getUniqueId())) {
+            return false;
+        }
+        if (!isTutorialSidebarEnabled()) {
+            return false;
+        }
+        return requiresProfessionSelection(player) || getActiveDisplayedQuest(player.getUniqueId()) != null;
+    }
+
+    private void updateTutorialChecklist(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        if (!shouldShowTutorialChecklist(player)) {
+            clearTutorialChecklist(player);
+            return;
+        }
+
+        ScoreboardManager manager = getServer().getScoreboardManager();
+        if (manager == null) {
+            return;
+        }
+
+        tutorialChecklistStoredScoreboards.computeIfAbsent(player.getUniqueId(), ignored -> player.getScoreboard());
+        Scoreboard scoreboard = manager.getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("terraguide", "dummy", colorize(getTutorialSidebarTitle()));
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+
+        List<String> lines = getTutorialChecklistLines(player);
+        int score = lines.size();
+        int uniqueIndex = 0;
+        for (String line : lines) {
+            if (line == null || line.isBlank()) {
+                line = " ";
+            }
+            String entry = makeUniqueSidebarLine(line, uniqueIndex++);
+            objective.getScore(entry).setScore(score--);
+        }
+        player.setScoreboard(scoreboard);
+    }
+
+    private List<String> getTutorialChecklistLines(Player player) {
+        List<String> lines = new ArrayList<>();
+        PlayerQuestDefinition activeQuest = getActiveDisplayedQuest(player.getUniqueId());
+        if (activeQuest == null) {
+            lines.add(colorize("&7No active quest"));
+            return lines;
+        }
+
+        String progress = getTutorialQuestProgressText(player.getUniqueId());
+        lines.add(colorize("&f "));
+        lines.add(colorize(resolveQuestText(activeQuest.getTitle(), player.getUniqueId(), activeQuest, activeQuest == getActiveAssignedQuest(player.getUniqueId()))));
+        lines.add(colorize("&7" + resolveQuestText(activeQuest.getObjective(), player.getUniqueId(), activeQuest, activeQuest == getActiveAssignedQuest(player.getUniqueId()))));
+        if (!progress.isBlank()) {
+            lines.add(colorize("&e" + progress));
+        }
+        String hint = getTutorialQuestHint(player.getUniqueId());
+        if (!hint.isBlank()) {
+            lines.add(colorize("&8 "));
+            lines.add(colorize("&e" + hint));
+        }
+        return lines;
+    }
+
+    private String formatChecklistLine(boolean done, boolean active, String label) {
+        if (done) {
+            return "&a✔ " + label;
+        }
+        if (active) {
+            return "&e➜ " + label;
+        }
+        return "&7• " + label;
+    }
+
+    private String getTutorialChecklistHint(Player player) {
+        if (player == null) {
+            return "";
+        }
+        if (requiresProfessionSelection(player)) {
+            return "Use /jobs";
+        }
+        TutorialStage stage = tutorialStages.get(player.getUniqueId());
+        if (stage == TutorialStage.EARN_FIRST_XP) {
+            Profession profession = getProfession(player.getUniqueId());
+            return profession != null ? profession.getDisplayName() + " XP" : "Do your job";
+        }
+        if (stage == TutorialStage.BUILD_MOMENTUM) {
+            return getTutorialMomentumHint(player.getUniqueId());
+        }
+        if (stage == TutorialStage.JOIN_COUNTRY) {
+            return "Use /country list";
+        }
+        if (stage == TutorialStage.CONTRIBUTE_TO_COUNTRY) {
+            return "Deposit money or resources";
+        }
+        return "";
+    }
+
+    private int getTutorialStarterXpTarget(UUID playerId) {
+        Profession profession = getPrimaryProfession(playerId);
+        if (profession == null) {
+            return 100;
+        }
+        return switch (profession) {
+            case MINER, LUMBERJACK, FARMER -> 120;
+            case BUILDER, BLACKSMITH -> 90;
+        };
+    }
+
+    private String getTutorialMomentumLabel(UUID playerId, int progress, int target) {
+        Profession profession = getPrimaryProfession(playerId);
+        String name = profession != null ? profession.getDisplayName() : "Starter";
+        return "Build momentum as " + name + " " + Math.min(progress, target) + "/" + target + " XP";
+    }
+
+    private String getTutorialMomentumHint(UUID playerId) {
+        Profession profession = getPrimaryProfession(playerId);
+        if (profession == null) {
+            return "Earn profession XP";
+        }
+        return switch (profession) {
+            case MINER -> "Mine and gather ore";
+            case LUMBERJACK -> "Chop wood and replant";
+            case FARMER -> "Farm, till, plant, or craft food";
+            case BUILDER -> "Place builder blocks";
+            case BLACKSMITH -> "Smelt or forge materials";
+        };
+    }
+
+    private String makeUniqueSidebarLine(String line, int index) {
+        ChatColor[] colors = ChatColor.values();
+        return line + colors[index % colors.length];
+    }
+
+    private void clearTutorialChecklist(Player player) {
+        if (player == null) {
+            return;
+        }
+        ScoreboardManager manager = getServer().getScoreboardManager();
+        Scoreboard previous = tutorialChecklistStoredScoreboards.remove(player.getUniqueId());
+        if (previous != null) {
+            player.setScoreboard(previous);
+        } else if (manager != null && !isTutorialIntroActive(player.getUniqueId())) {
+            player.setScoreboard(manager.getMainScoreboard());
         }
     }
 
@@ -13248,6 +13700,728 @@ public final class Testproject extends JavaPlugin {
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.55F, 1.15F);
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.5F, 1.35F);
         player.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, player.getLocation().add(0.0D, 1.0D, 0.0D), 14, 0.4D, 0.55D, 0.4D, 0.02D);
+    }
+
+    private boolean isTutorialSidebarEnabled() {
+        return questsSettingsConfig != null && questsSettingsConfig.getBoolean("quests.sidebar.enabled", false);
+    }
+
+    private String getTutorialSidebarTitle() {
+        if (questsSettingsConfig == null) {
+            return "&6Terra Guide";
+        }
+        return questsSettingsConfig.getString("quests.sidebar.title", "&6Terra Guide");
+    }
+
+    private String getDefaultMomentumQuestId(Profession profession) {
+        return profession != null ? profession.getKey() + "_momentum" : null;
+    }
+
+    private void setTutorialQuestProgress(UUID playerId, String questId, int progress, boolean save) {
+        if (playerId == null || questId == null || questId.isBlank()) {
+            return;
+        }
+        String normalizedQuestId = questId.toLowerCase(Locale.ROOT);
+        if (progress <= 0) {
+            Map<String, Integer> progressByQuest = tutorialQuestProgress.get(playerId);
+            if (progressByQuest != null) {
+                progressByQuest.remove(normalizedQuestId);
+                if (progressByQuest.isEmpty()) {
+                    tutorialQuestProgress.remove(playerId);
+                }
+            }
+        } else {
+            tutorialQuestProgress.computeIfAbsent(playerId, ignored -> new ConcurrentHashMap<>()).put(normalizedQuestId, progress);
+        }
+        if (save) {
+            saveTutorialStage(playerId);
+        }
+    }
+
+    private void addTutorialQuestProgress(UUID playerId, String questId, int amount, boolean save) {
+        if (playerId == null || questId == null || questId.isBlank() || amount <= 0) {
+            return;
+        }
+        setTutorialQuestProgress(playerId, questId, getStoredTutorialQuestProgress(playerId, questId) + amount, save);
+    }
+
+    private int getStoredTutorialQuestProgress(UUID playerId, String questId) {
+        if (playerId == null || questId == null || questId.isBlank()) {
+            return 0;
+        }
+        Map<String, Integer> progressByQuest = tutorialQuestProgress.get(playerId);
+        if (progressByQuest == null) {
+            return 0;
+        }
+        return Math.max(0, progressByQuest.getOrDefault(questId.toLowerCase(Locale.ROOT), 0));
+    }
+
+    private Set<String> getCompletedTutorialQuestIds(UUID playerId) {
+        return completedTutorialQuestIds.computeIfAbsent(playerId, ignored -> new LinkedHashSet<>());
+    }
+
+    private boolean isTutorialQuestCompleted(UUID playerId, String questId) {
+        if (playerId == null || questId == null || questId.isBlank()) {
+            return false;
+        }
+        Set<String> completed = completedTutorialQuestIds.get(playerId);
+        return completed != null && completed.contains(questId.toLowerCase(Locale.ROOT));
+    }
+
+    private Profession resolveTutorialQuestProfession(UUID playerId, PlayerQuestDefinition quest) {
+        if (quest == null) {
+            return null;
+        }
+        if (quest.getProfession() != null) {
+            return hasProfession(playerId, quest.getProfession()) ? quest.getProfession() : null;
+        }
+        return getPrimaryProfession(playerId);
+    }
+
+    private boolean isTutorialQuestEligible(UUID playerId, PlayerQuestDefinition quest) {
+        if (playerId == null || quest == null || !quest.isEnabled()) {
+            return false;
+        }
+        for (String dependency : quest.getRequiresCompleted()) {
+            if (!isTutorialQuestCompleted(playerId, dependency)) {
+                return false;
+            }
+        }
+        return switch (quest.getType()) {
+            case SELECT_PROFESSION -> quest.getProfession() == null || hasProfession(playerId, quest.getProfession()) || !hasProfession(playerId);
+            case EARN_PROFESSION_XP, REACH_PROFESSION_LEVEL -> resolveTutorialQuestProfession(playerId, quest) != null;
+            case JOIN_COUNTRY, CONTRIBUTE_COUNTRY -> true;
+        };
+    }
+
+    private int getProfessionTotalProgressXp(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null || !hasProfession(playerId, profession)) {
+            return 0;
+        }
+        int level = Math.max(1, getProfessionLevel(playerId, profession));
+        int total = 0;
+        for (int currentLevel = 1; currentLevel < level; currentLevel++) {
+            total += Math.max(0, getProfessionXpRequiredForLevel(profession, currentLevel));
+        }
+        return total + Math.max(0, getProfessionXp(playerId, profession));
+    }
+
+    private int getTutorialQuestCurrentProgress(UUID playerId, PlayerQuestDefinition quest) {
+        return getQuestCurrentProgress(playerId, quest, false);
+    }
+
+    private boolean isTutorialQuestSatisfied(UUID playerId, PlayerQuestDefinition quest) {
+        return getTutorialQuestCurrentProgress(playerId, quest) >= Math.max(1, quest.getTarget());
+    }
+
+    private PlayerQuestDefinition getActiveTutorialQuest(UUID playerId) {
+        if (playerId == null) {
+            return null;
+        }
+        for (PlayerQuestDefinition quest : tutorialQuestDefinitions) {
+            if (!quest.isEnabled() || isTutorialQuestCompleted(playerId, quest.getId())) {
+                continue;
+            }
+            if (isTutorialQuestEligible(playerId, quest)) {
+                return quest;
+            }
+        }
+        return null;
+    }
+
+    private String getActiveTutorialQuestId(UUID playerId) {
+        PlayerQuestDefinition activeQuest = getActiveTutorialQuest(playerId);
+        return activeQuest != null ? activeQuest.getId() : null;
+    }
+
+    public List<PlayerQuestDefinition> getGeneralQuestDefinitions() {
+        return Collections.unmodifiableList(generalQuestDefinitions);
+    }
+
+    public PlayerQuestDefinition getGeneralQuestDefinition(String questId) {
+        if (questId == null || questId.isBlank()) {
+            return null;
+        }
+        String normalizedQuestId = questId.toLowerCase(Locale.ROOT);
+        for (PlayerQuestDefinition definition : generalQuestDefinitions) {
+            if (definition.getId().equalsIgnoreCase(normalizedQuestId)) {
+                return definition;
+            }
+        }
+        return null;
+    }
+
+    public String createGeneralQuestDefinition() {
+        if (questsSettingsConfig == null || questsSettingsFile == null) {
+            return null;
+        }
+
+        ConfigurationSection section = questsSettingsConfig.getConfigurationSection("quests.general.list");
+        if (section == null) {
+            section = questsSettingsConfig.createSection("quests.general.list");
+        }
+
+        String baseId = "quest";
+        int index = 1;
+        while (section.contains(baseId + "_" + index)) {
+            index++;
+        }
+
+        String questId = baseId + "_" + index;
+        int order = generalQuestDefinitions.stream()
+                .mapToInt(PlayerQuestDefinition::getOrder)
+                .max()
+                .orElse(0) + 10;
+
+        section.set(questId + ".order", order);
+        section.set(questId + ".enabled", true);
+        section.set(questId + ".type", PlayerQuestType.EARN_PROFESSION_XP.name().toLowerCase(Locale.ROOT));
+        section.set(questId + ".target", 10);
+        section.set(questId + ".title", "&6New Quest");
+        section.set(questId + ".objective", "Reach %target% %profession% XP");
+        section.set(questId + ".hint", "Work toward the goal");
+        section.set(questId + ".profession", "miner");
+        section.set(questId + ".requires-completed", List.of());
+        saveQuestsSettings();
+        return questId;
+    }
+
+    public boolean deleteGeneralQuestDefinition(String questId) {
+        if (questsSettingsConfig == null || questsSettingsFile == null || questId == null || questId.isBlank()) {
+            return false;
+        }
+        String normalizedQuestId = questId.toLowerCase(Locale.ROOT);
+        if (!questsSettingsConfig.contains("quests.general.list." + normalizedQuestId)) {
+            return false;
+        }
+        questsSettingsConfig.set("quests.general.list." + normalizedQuestId, null);
+        for (UUID playerId : new ArrayList<>(assignedQuestIds.keySet())) {
+            unassignQuestFromPlayer(playerId, normalizedQuestId);
+            Set<String> completed = completedAssignedQuestIds.get(playerId);
+            if (completed != null) {
+                completed.remove(normalizedQuestId);
+                if (completed.isEmpty()) {
+                    completedAssignedQuestIds.remove(playerId);
+                }
+            }
+            Map<String, Integer> progress = assignedQuestProgress.get(playerId);
+            if (progress != null) {
+                progress.remove(normalizedQuestId);
+                if (progress.isEmpty()) {
+                    assignedQuestProgress.remove(playerId);
+                }
+            }
+            saveAssignedQuestState(playerId);
+        }
+        saveQuestsSettings();
+        return true;
+    }
+
+    public boolean setGeneralQuestEnabled(String questId, boolean enabled) {
+        return setGeneralQuestConfigValue(questId, "enabled", enabled);
+    }
+
+    public boolean setGeneralQuestType(String questId, PlayerQuestType type) {
+        return type != null && setGeneralQuestConfigValue(questId, "type", type.name().toLowerCase(Locale.ROOT));
+    }
+
+    public boolean setGeneralQuestProfession(String questId, Profession profession) {
+        return setGeneralQuestConfigValue(questId, "profession", profession != null ? profession.getKey() : null);
+    }
+
+    public boolean setGeneralQuestTarget(String questId, int target) {
+        return setGeneralQuestConfigValue(questId, "target", Math.max(1, target));
+    }
+
+    public boolean setGeneralQuestTitle(String questId, String title) {
+        return setGeneralQuestConfigValue(questId, "title", title);
+    }
+
+    public boolean setGeneralQuestObjective(String questId, String objective) {
+        return setGeneralQuestConfigValue(questId, "objective", objective);
+    }
+
+    public boolean setGeneralQuestHint(String questId, String hint) {
+        return setGeneralQuestConfigValue(questId, "hint", hint);
+    }
+
+    private boolean setGeneralQuestConfigValue(String questId, String suffix, Object value) {
+        if (questsSettingsConfig == null || questsSettingsFile == null || questId == null || questId.isBlank()) {
+            return false;
+        }
+        String normalizedQuestId = questId.toLowerCase(Locale.ROOT);
+        String path = "quests.general.list." + normalizedQuestId;
+        if (!questsSettingsConfig.contains(path)) {
+            return false;
+        }
+        questsSettingsConfig.set(path + "." + suffix, value);
+        saveQuestsSettings();
+        return true;
+    }
+
+    private void saveQuestsSettings() {
+        saveYaml(questsSettingsConfig, questsSettingsFile);
+        questsSettingsConfig = loadCustomConfig(questsSettingsFile, "settings/quests.yml");
+        reloadTutorialQuestDefinitions();
+        for (Player onlinePlayer : getServer().getOnlinePlayers()) {
+            refreshAssignedQuestFlow(onlinePlayer, false);
+            refreshTutorialQuestFlow(onlinePlayer, false);
+            updateTutorialChecklist(onlinePlayer);
+            syncTutorialQuestHud(onlinePlayer, true);
+        }
+    }
+
+    public List<String> getAssignedQuestIds(UUID playerId) {
+        List<String> assigned = assignedQuestIds.get(playerId);
+        return assigned == null ? List.of() : List.copyOf(assigned);
+    }
+
+    public boolean isQuestAssigned(UUID playerId, String questId) {
+        if (playerId == null || questId == null || questId.isBlank()) {
+            return false;
+        }
+        List<String> assigned = assignedQuestIds.get(playerId);
+        return assigned != null && assigned.stream().anyMatch(questId::equalsIgnoreCase);
+    }
+
+    public boolean assignQuestToPlayer(UUID playerId, String questId) {
+        if (playerId == null) {
+            return false;
+        }
+        PlayerQuestDefinition definition = getGeneralQuestDefinition(questId);
+        if (definition == null) {
+            return false;
+        }
+
+        List<String> assigned = assignedQuestIds.computeIfAbsent(playerId, ignored -> new ArrayList<>());
+        if (assigned.stream().anyMatch(definition.getId()::equalsIgnoreCase)) {
+            return false;
+        }
+        assigned.add(definition.getId());
+        saveAssignedQuestState(playerId);
+
+        Player player = getServer().getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            refreshAssignedQuestFlow(player, true);
+            syncTutorialQuestHud(player, true);
+        }
+        return true;
+    }
+
+    public boolean unassignQuestFromPlayer(UUID playerId, String questId) {
+        if (playerId == null || questId == null || questId.isBlank()) {
+            return false;
+        }
+        List<String> assigned = assignedQuestIds.get(playerId);
+        if (assigned == null) {
+            return false;
+        }
+        boolean removed = assigned.removeIf(questId::equalsIgnoreCase);
+        if (!removed) {
+            return false;
+        }
+        if (assigned.isEmpty()) {
+            assignedQuestIds.remove(playerId);
+        }
+        Map<String, Integer> progressByQuest = assignedQuestProgress.get(playerId);
+        if (progressByQuest != null) {
+            progressByQuest.remove(questId.toLowerCase(Locale.ROOT));
+            if (progressByQuest.isEmpty()) {
+                assignedQuestProgress.remove(playerId);
+            }
+        }
+        saveAssignedQuestState(playerId);
+
+        Player player = getServer().getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            refreshAssignedQuestFlow(player, false);
+            syncTutorialQuestHud(player, true);
+        }
+        return true;
+    }
+
+    public List<Player> getQuestAssignablePlayers() {
+        List<Player> players = new ArrayList<>(getServer().getOnlinePlayers());
+        players.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
+        return players;
+    }
+
+    private Set<String> getCompletedAssignedQuestIds(UUID playerId) {
+        return completedAssignedQuestIds.computeIfAbsent(playerId, ignored -> new LinkedHashSet<>());
+    }
+
+    private int getAssignedQuestStoredProgress(UUID playerId, String questId) {
+        if (playerId == null || questId == null || questId.isBlank()) {
+            return 0;
+        }
+        Map<String, Integer> progressByQuest = assignedQuestProgress.get(playerId);
+        if (progressByQuest == null) {
+            return 0;
+        }
+        return Math.max(0, progressByQuest.getOrDefault(questId.toLowerCase(Locale.ROOT), 0));
+    }
+
+    private void setAssignedQuestProgress(UUID playerId, String questId, int progress, boolean save) {
+        if (playerId == null || questId == null || questId.isBlank()) {
+            return;
+        }
+        String normalizedQuestId = questId.toLowerCase(Locale.ROOT);
+        if (progress <= 0) {
+            Map<String, Integer> progressByQuest = assignedQuestProgress.get(playerId);
+            if (progressByQuest != null) {
+                progressByQuest.remove(normalizedQuestId);
+                if (progressByQuest.isEmpty()) {
+                    assignedQuestProgress.remove(playerId);
+                }
+            }
+        } else {
+            assignedQuestProgress.computeIfAbsent(playerId, ignored -> new ConcurrentHashMap<>()).put(normalizedQuestId, progress);
+        }
+        if (save) {
+            saveAssignedQuestState(playerId);
+        }
+    }
+
+    private void addAssignedQuestProgress(UUID playerId, String questId, int amount, boolean save) {
+        if (playerId == null || questId == null || questId.isBlank() || amount <= 0) {
+            return;
+        }
+        setAssignedQuestProgress(playerId, questId, getAssignedQuestStoredProgress(playerId, questId) + amount, save);
+    }
+
+    private int getQuestCurrentProgress(UUID playerId, PlayerQuestDefinition quest, boolean assignedQuest) {
+        if (quest == null) {
+            return 0;
+        }
+        return switch (quest.getType()) {
+            case SELECT_PROFESSION -> quest.getProfession() != null
+                    ? (hasProfession(playerId, quest.getProfession()) ? 1 : 0)
+                    : (hasProfession(playerId) ? 1 : 0);
+            case EARN_PROFESSION_XP -> getProfessionTotalProgressXp(playerId, resolveTutorialQuestProfession(playerId, quest));
+            case REACH_PROFESSION_LEVEL -> {
+                Profession profession = resolveTutorialQuestProfession(playerId, quest);
+                yield profession != null ? getProfessionLevel(playerId, profession) : 0;
+            }
+            case JOIN_COUNTRY -> getPlayerCountry(playerId) != null ? 1 : 0;
+            case CONTRIBUTE_COUNTRY -> assignedQuest
+                    ? getAssignedQuestStoredProgress(playerId, quest.getId())
+                    : getStoredTutorialQuestProgress(playerId, quest.getId());
+        };
+    }
+
+    private PlayerQuestDefinition getActiveAssignedQuest(UUID playerId) {
+        if (playerId == null) {
+            return null;
+        }
+        List<String> assigned = assignedQuestIds.get(playerId);
+        if (assigned == null || assigned.isEmpty()) {
+            return null;
+        }
+        Set<String> completed = completedAssignedQuestIds.get(playerId);
+        for (String questId : assigned) {
+            if (completed != null && completed.contains(questId.toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            PlayerQuestDefinition definition = getGeneralQuestDefinition(questId);
+            if (definition == null || !definition.isEnabled()) {
+                continue;
+            }
+            return definition;
+        }
+        return null;
+    }
+
+    private void refreshTutorialQuestFlow(Player player, boolean sendMessages) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        UUID playerId = player.getUniqueId();
+        String previousQuestId = getActiveTutorialQuestId(playerId);
+        boolean completedAny = false;
+
+        while (true) {
+            PlayerQuestDefinition activeQuest = getActiveTutorialQuest(playerId);
+            if (activeQuest == null || !isTutorialQuestSatisfied(playerId, activeQuest)) {
+                break;
+            }
+
+            getCompletedTutorialQuestIds(playerId).add(activeQuest.getId());
+            if (activeQuest.getType() == PlayerQuestType.CONTRIBUTE_COUNTRY) {
+                setTutorialQuestProgress(playerId, activeQuest.getId(), 0, false);
+            }
+            completedAny = true;
+            saveTutorialStage(playerId);
+
+            if (sendMessages) {
+                player.sendMessage(getMessage("tutorial.card-border"));
+                player.sendMessage(colorize("&aQuest Complete: &f" + ChatColor.stripColor(resolveTutorialQuestText(activeQuest.getTitle(), playerId, activeQuest))));
+                player.sendMessage(colorize("&7" + ChatColor.stripColor(resolveTutorialQuestText(activeQuest.getObjective(), playerId, activeQuest))));
+                player.sendMessage(getMessage("tutorial.card-border"));
+                playTutorialStageAdvanceEffect(player, false);
+            }
+        }
+
+        String currentQuestId = getActiveTutorialQuestId(playerId);
+        if (currentQuestId == null && completedAny) {
+            completeTutorial(player);
+            return;
+        }
+
+        if (sendMessages && currentQuestId != null && (previousQuestId == null || !currentQuestId.equalsIgnoreCase(previousQuestId))) {
+            PlayerQuestDefinition activeQuest = getActiveTutorialQuest(playerId);
+            if (activeQuest != null) {
+                player.sendMessage(getMessage("tutorial.card-border"));
+                player.sendMessage(colorize("&6Active Quest: &f" + ChatColor.stripColor(resolveTutorialQuestText(activeQuest.getTitle(), playerId, activeQuest))));
+                player.sendMessage(colorize("&7" + ChatColor.stripColor(resolveTutorialQuestText(activeQuest.getObjective(), playerId, activeQuest))));
+                String hint = getTutorialQuestHint(playerId);
+                if (!hint.isBlank()) {
+                    player.sendMessage(colorize("&eHint: &7" + ChatColor.stripColor(hint)));
+                }
+                player.sendMessage(getMessage("tutorial.card-border"));
+                playTutorialStageAdvanceEffect(player, activeQuest.getType() == PlayerQuestType.SELECT_PROFESSION);
+            }
+        }
+
+        syncTutorialQuestHud(player, false);
+    }
+
+    private void refreshAssignedQuestFlow(Player player, boolean sendMessages) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        UUID playerId = player.getUniqueId();
+        String previousQuestId = getActiveAssignedQuestId(playerId);
+
+        while (true) {
+            PlayerQuestDefinition activeQuest = getActiveAssignedQuest(playerId);
+            if (activeQuest == null || getQuestCurrentProgress(playerId, activeQuest, true) < Math.max(1, activeQuest.getTarget())) {
+                break;
+            }
+
+            getCompletedAssignedQuestIds(playerId).add(activeQuest.getId());
+            if (activeQuest.getType() == PlayerQuestType.CONTRIBUTE_COUNTRY) {
+                setAssignedQuestProgress(playerId, activeQuest.getId(), 0, false);
+            }
+            saveAssignedQuestState(playerId);
+
+            if (sendMessages) {
+                player.sendMessage(getMessage("tutorial.card-border"));
+                player.sendMessage(colorize("&aAssigned Quest Complete: &f" + ChatColor.stripColor(resolveQuestText(activeQuest.getTitle(), playerId, activeQuest, true))));
+                player.sendMessage(colorize("&7" + ChatColor.stripColor(resolveQuestText(activeQuest.getObjective(), playerId, activeQuest, true))));
+                player.sendMessage(getMessage("tutorial.card-border"));
+                playTutorialStageAdvanceEffect(player, false);
+            }
+        }
+
+        String currentQuestId = getActiveAssignedQuestId(playerId);
+        if (sendMessages && currentQuestId != null && (previousQuestId == null || !currentQuestId.equalsIgnoreCase(previousQuestId))) {
+            PlayerQuestDefinition activeQuest = getActiveAssignedQuest(playerId);
+            if (activeQuest != null) {
+                player.sendMessage(getMessage("tutorial.card-border"));
+                player.sendMessage(colorize("&6Assigned Quest: &f" + ChatColor.stripColor(resolveQuestText(activeQuest.getTitle(), playerId, activeQuest, true))));
+                player.sendMessage(colorize("&7" + ChatColor.stripColor(resolveQuestText(activeQuest.getObjective(), playerId, activeQuest, true))));
+                String hint = getQuestHintText(playerId, activeQuest, true);
+                if (!hint.isBlank()) {
+                    player.sendMessage(colorize("&eHint: &7" + ChatColor.stripColor(hint)));
+                }
+                player.sendMessage(getMessage("tutorial.card-border"));
+                playTutorialStageAdvanceEffect(player, activeQuest.getType() == PlayerQuestType.SELECT_PROFESSION);
+            }
+        }
+    }
+
+    private String getActiveAssignedQuestId(UUID playerId) {
+        PlayerQuestDefinition activeQuest = getActiveAssignedQuest(playerId);
+        return activeQuest != null ? activeQuest.getId() : null;
+    }
+
+    private PlayerQuestDefinition getActiveDisplayedQuest(UUID playerId) {
+        PlayerQuestDefinition assignedQuest = getActiveAssignedQuest(playerId);
+        return assignedQuest != null ? assignedQuest : getActiveTutorialQuest(playerId);
+    }
+
+    private String resolveTutorialQuestText(String text, UUID playerId, PlayerQuestDefinition quest) {
+        return resolveQuestText(text, playerId, quest, false);
+    }
+
+    private String resolveQuestText(String text, UUID playerId, PlayerQuestDefinition quest, boolean assignedQuest) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        Profession profession = resolveTutorialQuestProfession(playerId, quest);
+        int current = getQuestCurrentProgress(playerId, quest, assignedQuest);
+        int target = Math.max(1, quest != null ? quest.getTarget() : 1);
+        String playerName = getServer().getOfflinePlayer(playerId).getName();
+        return text
+                .replace("%player%", playerName != null ? playerName : "player")
+                .replace("%profession%", profession != null ? profession.getDisplayName() : "profession")
+                .replace("%profession_key%", profession != null ? profession.getKey() : "none")
+                .replace("%progress%", String.valueOf(Math.min(current, target)))
+                .replace("%current%", String.valueOf(Math.min(current, target)))
+                .replace("%target%", String.valueOf(target))
+                .replace("%remaining%", String.valueOf(Math.max(0, target - current)));
+    }
+
+    private String getQuestHintText(UUID playerId, PlayerQuestDefinition quest, boolean assignedQuest) {
+        if (quest == null) {
+            return colorize(questsSettingsConfig != null ? questsSettingsConfig.getString("quests.no-active.hint", "") : "");
+        }
+        return colorize(resolveQuestText(quest.getHint(), playerId, quest, assignedQuest));
+    }
+
+    public boolean hasActiveTutorialQuest(UUID playerId) {
+        return playerId != null && !isTutorialIntroActive(playerId) && getActiveDisplayedQuest(playerId) != null;
+    }
+
+    public String getTutorialQuestId(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        return activeQuest != null ? activeQuest.getId() : "";
+    }
+
+    public String getTutorialQuestTitle(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        if (activeQuest == null) {
+            return colorize(questsSettingsConfig != null ? questsSettingsConfig.getString("quests.no-active.title", "&7No active quest") : "&7No active quest");
+        }
+        return colorize(resolveQuestText(activeQuest.getTitle(), playerId, activeQuest, activeQuest == getActiveAssignedQuest(playerId)));
+    }
+
+    public String getTutorialQuestObjective(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        if (activeQuest == null) {
+            return colorize(questsSettingsConfig != null ? questsSettingsConfig.getString("quests.no-active.objective", "&7Explore Terra") : "&7Explore Terra");
+        }
+        return colorize(resolveQuestText(activeQuest.getObjective(), playerId, activeQuest, activeQuest == getActiveAssignedQuest(playerId)));
+    }
+
+    public String getTutorialQuestHint(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        return getQuestHintText(playerId, activeQuest, activeQuest == getActiveAssignedQuest(playerId));
+    }
+
+    public String getTutorialQuestProgressText(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        if (activeQuest == null) {
+            return "";
+        }
+        int current = getQuestCurrentProgress(playerId, activeQuest, activeQuest == getActiveAssignedQuest(playerId));
+        int target = Math.max(1, activeQuest.getTarget());
+        return Math.min(current, target) + "/" + target;
+    }
+
+    public int getTutorialQuestCurrentValue(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        if (activeQuest == null) {
+            return 0;
+        }
+        return Math.min(
+                getQuestCurrentProgress(playerId, activeQuest, activeQuest == getActiveAssignedQuest(playerId)),
+                Math.max(1, activeQuest.getTarget())
+        );
+    }
+
+    public int getTutorialQuestTargetValue(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        return activeQuest != null ? Math.max(1, activeQuest.getTarget()) : 0;
+    }
+
+    public int getTutorialQuestPercent(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        if (activeQuest == null) {
+            return 0;
+        }
+        int current = getQuestCurrentProgress(playerId, activeQuest, activeQuest == getActiveAssignedQuest(playerId));
+        int target = Math.max(1, activeQuest.getTarget());
+        return Math.max(0, Math.min(100, (int) Math.round((Math.min(current, target) * 100.0D) / target)));
+    }
+
+    public int getTutorialQuestSteps(UUID playerId) {
+        int percent = getTutorialQuestPercent(playerId);
+        int maxSteps = getItemsAdderQuestHudMaxSteps();
+        return Math.max(0, Math.min(maxSteps, (int) Math.round((percent / 100.0D) * maxSteps)));
+    }
+
+    public int getTutorialQuestMaxSteps() {
+        return getItemsAdderQuestHudMaxSteps();
+    }
+
+    public String getTutorialQuestTitlePlain(UUID playerId) {
+        return ChatColor.stripColor(getTutorialQuestTitle(playerId));
+    }
+
+    public String getTutorialQuestObjectivePlain(UUID playerId) {
+        return ChatColor.stripColor(getTutorialQuestObjective(playerId));
+    }
+
+    public String getTutorialQuestHintPlain(UUID playerId) {
+        return ChatColor.stripColor(getTutorialQuestHint(playerId));
+    }
+
+    public String getTutorialQuestProfessionKey(UUID playerId) {
+        PlayerQuestDefinition activeQuest = playerId != null && !isTutorialIntroActive(playerId) ? getActiveDisplayedQuest(playerId) : null;
+        Profession profession = resolveTutorialQuestProfession(playerId, activeQuest);
+        return profession != null ? profession.getKey() : "none";
+    }
+
+    private boolean isItemsAdderQuestHudSyncEnabled() {
+        return questsSettingsConfig != null
+                && questsSettingsConfig.getBoolean("quests.itemsadder-sync.enabled", true)
+                && getServer().getPluginManager().getPlugin("ItemsAdder") != null;
+    }
+
+    private int getItemsAdderQuestHudMaxSteps() {
+        if (questsSettingsConfig == null) {
+            return 10;
+        }
+        return Math.max(1, questsSettingsConfig.getInt("quests.itemsadder-sync.max-steps", 10));
+    }
+
+    private String getItemsAdderQuestHudStepStatName() {
+        if (questsSettingsConfig == null) {
+            return "terra_quest_steps";
+        }
+        return questsSettingsConfig.getString("quests.itemsadder-sync.step-stat", "terra_quest_steps");
+    }
+
+    private void syncTutorialQuestHud(Player player, boolean force) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        if (!isItemsAdderQuestHudSyncEnabled()) {
+            return;
+        }
+
+        UUID playerId = player.getUniqueId();
+        String questId = getTutorialQuestId(playerId);
+        int percent = getTutorialQuestPercent(playerId);
+        int maxSteps = getItemsAdderQuestHudMaxSteps();
+        int steps = getTutorialQuestSteps(playerId);
+        boolean hasQuest = !questId.isBlank();
+
+        boolean questChanged = !questId.equals(tutorialQuestHudIdCache.getOrDefault(playerId, ""));
+        boolean percentChanged = percent != tutorialQuestHudPercentCache.getOrDefault(playerId, -1);
+        boolean stepChanged = steps != tutorialQuestHudStepCache.getOrDefault(playerId, -1);
+        if (!force && !questChanged && !percentChanged && !stepChanged) {
+            return;
+        }
+
+        tutorialQuestHudIdCache.put(playerId, questId);
+        tutorialQuestHudPercentCache.put(playerId, percent);
+        tutorialQuestHudStepCache.put(playerId, steps);
+
+        syncItemsAdderPlayerStat(player, getItemsAdderQuestHudStepStatName(), steps);
+    }
+
+    private void syncItemsAdderPlayerStat(Player player, String statName, int value) {
+        if (player == null || statName == null || statName.isBlank()) {
+            return;
+        }
+        getServer().dispatchCommand(
+                getServer().getConsoleSender(),
+                "iaplayerstat write " + player.getName() + " " + statName + " " + value + " true"
+        );
     }
 
     private void reloadFurnaceSessions() {
@@ -14357,6 +15531,7 @@ public final class Testproject extends JavaPlugin {
         saveResourceIfMissing("settings/stability.yml");
         saveResourceIfMissing("settings/merchant.yml");
         saveResourceIfMissing("settings/territories.yml");
+        saveResourceIfMissing("settings/quests.yml");
         for (Profession profession : Profession.values()) {
             saveResourceIfMissing("jobs/" + profession.getKey() + ".yml");
         }
@@ -14379,6 +15554,7 @@ public final class Testproject extends JavaPlugin {
         stabilitySettingsFile = new File(getDataFolder(), "settings/stability.yml");
         merchantSettingsFile = new File(getDataFolder(), "settings/merchant.yml");
         territorySettingsFile = new File(getDataFolder(), "settings/territories.yml");
+        questsSettingsFile = new File(getDataFolder(), "settings/quests.yml");
         blockValuesConfig = loadCustomConfig(blockValuesFile, "economy/block-values.yml");
         jobsConfig = loadCustomConfig(jobsFile, "jobs/config.yml");
         coreSettingsConfig = loadCustomConfig(coreSettingsFile, "settings/core.yml");
@@ -14386,6 +15562,7 @@ public final class Testproject extends JavaPlugin {
         stabilitySettingsConfig = loadCustomConfig(stabilitySettingsFile, "settings/stability.yml");
         merchantSettingsConfig = loadCustomConfig(merchantSettingsFile, "settings/merchant.yml");
         territorySettingsConfig = loadCustomConfig(territorySettingsFile, "settings/territories.yml");
+        questsSettingsConfig = loadCustomConfig(questsSettingsFile, "settings/quests.yml");
         professionFiles.clear();
         professionConfigs.clear();
         for (Profession profession : Profession.values()) {

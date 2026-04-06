@@ -1,0 +1,91 @@
+quests:
+  sidebar:
+    enabled: false
+    title: "&6Terra Guide"
+  itemsadder-sync:
+    enabled: false
+    step-stat: terra_quest_steps
+    max-steps: 10
+  no-active:
+    title: "&7No active quest"
+    objective: "&7Explore Terra"
+    hint: ""
+  starter:
+    list:
+      choose_profession:
+        order: 10
+        enabled: true
+        type: select_profession
+        title: "&6Choose Your Path"
+        objective: "Choose your first profession"
+        hint: "Use /jobs"
+      first_profession_xp:
+        order: 20
+        enabled: true
+        type: earn_profession_xp
+        target: 1
+        title: "&6Get Started"
+        objective: "Earn your first %profession% XP"
+        hint: "Work in your chosen job"
+      miner_momentum:
+        order: 30
+        enabled: true
+        profession: miner
+        type: earn_profession_xp
+        target: 120
+        title: "&6Find Your Rhythm"
+        objective: "Reach %target% Miner XP"
+        hint: "Mine stone and ores to build momentum"
+      lumberjack_momentum:
+        order: 30
+        enabled: true
+        profession: lumberjack
+        type: earn_profession_xp
+        target: 120
+        title: "&6Find Your Rhythm"
+        objective: "Reach %target% Lumberjack XP"
+        hint: "Chop trees and keep replanting"
+      farmer_momentum:
+        order: 30
+        enabled: true
+        profession: farmer
+        type: earn_profession_xp
+        target: 120
+        title: "&6Find Your Rhythm"
+        objective: "Reach %target% Farmer XP"
+        hint: "Farm, till, plant, and harvest crops"
+      builder_momentum:
+        order: 30
+        enabled: true
+        profession: builder
+        type: earn_profession_xp
+        target: 90
+        title: "&6Find Your Rhythm"
+        objective: "Reach %target% Builder XP"
+        hint: "Place and shape builder blocks"
+      blacksmith_momentum:
+        order: 30
+        enabled: true
+        profession: blacksmith
+        type: earn_profession_xp
+        target: 90
+        title: "&6Find Your Rhythm"
+        objective: "Reach %target% Blacksmith XP"
+        hint: "Smelt, forge, and work at anvils"
+      join_country:
+        order: 40
+        enabled: true
+        type: join_country
+        title: "&6Find Allies"
+        objective: "Join a country"
+        hint: "Use /country list"
+      contribute_country:
+        order: 50
+        enabled: true
+        type: contribute_country
+        target: 1
+        title: "&6Pull Your Weight"
+        objective: "Contribute to your country"
+        hint: "Use /country deposit or /country contribute"
+  general:
+    list: {}

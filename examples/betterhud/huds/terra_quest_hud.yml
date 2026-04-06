@@ -1,0 +1,10 @@
+terra_quest_hud:
+  layouts:
+    1:
+      name: terra_quest_layout
+      gui:
+        x: 0
+        y: 0
+      pixel:
+        x: 12
+        y: 12

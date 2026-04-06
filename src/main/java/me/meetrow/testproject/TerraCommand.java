@@ -249,6 +249,14 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handleMaintenanceCommand(sender, args);
         }
 
+        if (args[0].equalsIgnoreCase("quests")) {
+            return handleQuestsCommand(sender, args);
+        }
+
+        if (args[0].equalsIgnoreCase("questdebug")) {
+            return handleQuestDebugCommand(sender, args);
+        }
+
         if (args[0].equalsIgnoreCase("reload")) {
             plugin.reloadTerra();
             sender.sendMessage(plugin.getMessage("terra.reload"));
@@ -277,6 +285,31 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         }
 
         sendUsage(sender, page);
+        return true;
+    }
+
+    private boolean handleQuestsCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can open the quest admin GUI.", NamedTextColor.RED));
+            return true;
+        }
+        plugin.openQuestAdminMenu(player);
+        return true;
+    }
+
+    private boolean handleQuestDebugCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can use quest debug.", NamedTextColor.RED));
+            return true;
+        }
+        UUID playerId = player.getUniqueId();
+        sender.sendMessage(Component.text("Quest debug:", NamedTextColor.GOLD));
+        sender.sendMessage(Component.text("Active: " + plugin.hasActiveTutorialQuest(playerId), NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Quest ID: " + plugin.getTutorialQuestId(playerId), NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Title: " + plugin.getTutorialQuestTitle(playerId), NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Progress: " + plugin.getTutorialQuestProgressText(playerId), NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Percent: " + plugin.getTutorialQuestPercent(playerId), NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Profession: " + plugin.getTutorialQuestProfessionKey(playerId), NamedTextColor.YELLOW));
         return true;
     }
 
@@ -2792,6 +2825,8 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         }
 
         entries.add(new HelpEntry("/terra reload", "Reload Terra configs.", ignored -> true));
+        entries.add(new HelpEntry("/terra quests", "Open the quest admin GUI.", ignored -> sender instanceof Player));
+        entries.add(new HelpEntry("/terra questdebug", "Show the active quest debug info.", ignored -> sender instanceof Player));
         entries.add(new HelpEntry("/terra hardrestart", "Queue the hard restart flow.", ignored -> true));
         entries.add(new HelpEntry("/terra blockdelay <enable|disable>", "Toggle block delay.", ignored -> true));
         entries.add(new HelpEntry("/terra blockdelay time set <seconds>", "Set the block delay time.", ignored -> true));

@@ -1,0 +1,37 @@
+info:
+  namespace: terrahud
+
+font_images:
+  quest_progress_positive:
+    suggest_in_command: false
+    path: font/hud/quest_progress/positive.png
+    y_position: -92
+  quest_progress_half:
+    suggest_in_command: false
+    path: font/hud/quest_progress/half.png
+    y_position: -92
+  quest_progress_negative:
+    suggest_in_command: false
+    path: font/hud/quest_progress/negative.png
+    y_position: -92
+
+huds:
+  quest_progress:
+    enabled: true
+    show:
+      auto: true
+      creative: true
+      underwater: true
+      riding: true
+    type: STATUS
+    x_position_pixels: -178
+    direction: RIGHT
+    value:
+      player_stat_name: terra_quest_steps
+      start: 0
+      min: 0
+      max: 10
+    images:
+      positive: terrahud:quest_progress_positive
+      half: terrahud:quest_progress_half
+      negative: terrahud:quest_progress_negative

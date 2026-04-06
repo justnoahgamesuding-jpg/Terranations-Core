@@ -283,6 +283,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
         }
         plugin.withdrawBalance(player.getUniqueId(), amount);
         plugin.depositCountryBalance(country, amount);
+        plugin.handleTutorialCountryContribution(player);
         player.sendMessage(plugin.getMessage("country.economy.deposit-success", plugin.placeholders(
                 "country", country.getName(),
                 "money", plugin.formatMoney(amount),
@@ -314,6 +315,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(plugin.getMessage("country.economy.contribute-failed"));
             return true;
         }
+        plugin.handleTutorialCountryContribution(player);
         player.sendMessage(plugin.getMessage("country.economy.contribute-success", plugin.placeholders(
                 "country", country.getName(),
                 "resources", String.valueOf(plugin.getCountryResources(country))
