@@ -6,12 +6,10 @@ import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
-import org.bukkit.permissions.Permissible;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.lang.reflect.Method;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -158,8 +156,8 @@ public final class ItemsAdderTopStatusHud {
     private String replaceItemsAdderFontImages(Player player, String text) {
         try {
             Class<?> wrapperClass = Class.forName("dev.lone.itemsadder.api.FontImages.FontImageWrapper");
-            Method replace = wrapperClass.getMethod("replaceFontImages", Permissible.class, String.class);
-            Object result = replace.invoke(null, player, text);
+            Method replace = wrapperClass.getMethod("replaceFontImages", String.class);
+            Object result = replace.invoke(null, text);
             return result instanceof String resultText ? resultText : text;
         } catch (ReflectiveOperationException | LinkageError exception) {
             return text;
