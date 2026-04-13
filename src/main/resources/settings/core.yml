@@ -87,6 +87,8 @@ resource-pack:
   # Leave empty unless you calculate a SHA-1 hash for the zip.
   sha1: ""
   delay-ticks: 40
+  # Keep this true when BetterHud sends the HUD pack. Minecraft only keeps one server pack active.
+  skip-when-betterhud-present: true
 
 # Custom server join and leave broadcast formatting.
 join-leave-messages:

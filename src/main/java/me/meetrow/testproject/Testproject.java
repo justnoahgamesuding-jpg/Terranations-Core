@@ -1209,6 +1209,9 @@ public final class Testproject extends JavaPlugin {
         if (player == null || coreSettingsConfig == null || !coreSettingsConfig.getBoolean("resource-pack.enabled", false)) {
             return false;
         }
+        if (isResourcePackSuppressedByBetterHud()) {
+            return false;
+        }
         String url = coreSettingsConfig.getString("resource-pack.url", "").trim();
         if (url.isBlank()) {
             return false;
@@ -1230,6 +1233,12 @@ public final class Testproject extends JavaPlugin {
 
     public boolean isResourcePackDeliveryEnabled() {
         return coreSettingsConfig != null && coreSettingsConfig.getBoolean("resource-pack.enabled", false);
+    }
+
+    public boolean isResourcePackSuppressedByBetterHud() {
+        return coreSettingsConfig != null
+                && coreSettingsConfig.getBoolean("resource-pack.skip-when-betterhud-present", true)
+                && getServer().getPluginManager().getPlugin("BetterHud") != null;
     }
 
     public String getConfiguredResourcePackUrl() {
@@ -12299,6 +12308,7 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("resource-pack.url", "");
         getConfig().addDefault("resource-pack.sha1", "");
         getConfig().addDefault("resource-pack.delay-ticks", 40L);
+        getConfig().addDefault("resource-pack.skip-when-betterhud-present", true);
         getConfig().addDefault("join-leave-messages.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.interval-minutes", 5);
