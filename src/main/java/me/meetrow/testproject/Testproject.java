@@ -12317,13 +12317,13 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("itemsadder-top-status.location-panel-token", ":top_status_location_panel:");
         getConfig().addDefault("itemsadder-top-status.job-panel-token", ":top_status_job_panel:");
         getConfig().addDefault("itemsadder-top-status.money-panel-token", ":top_status_money_panel:");
-        getConfig().addDefault("itemsadder-top-status.location-offset-token", ":offset_-100:");
-        getConfig().addDefault("itemsadder-top-status.job-offset-token", ":offset_-100:");
-        getConfig().addDefault("itemsadder-top-status.money-offset-token", ":offset_-82:");
+        getConfig().addDefault("itemsadder-top-status.location-offset-token", ":offset_-112:");
+        getConfig().addDefault("itemsadder-top-status.job-offset-token", ":offset_-118:");
+        getConfig().addDefault("itemsadder-top-status.money-offset-token", ":offset_-78:");
         getConfig().addDefault("itemsadder-top-status.format",
-                "%location_panel%%location_offset%&7LOC &f%location%:offset_12:"
-                        + "%job_panel%%job_offset%&7JOB &f%job% &7Lv.%level%:offset_12:"
-                        + "%money_panel%%money_offset%&7$ &f%money%");
+                "%location_panel%%location_offset%&f⌖ %location%:offset_14:"
+                        + "%job_panel%%job_offset%&a⚒ %job% &7Lv.%level%:offset_14:"
+                        + "%money_panel%%money_offset%&6☀ &f%money%");
         getConfig().addDefault("itemsadder-top-status.wilderness-label", "Wilderness");
         getConfig().addDefault("itemsadder-top-status.no-job-label", "No Job");
         getConfig().addDefault("itemsadder-top-status.max-location-chars", 12);
