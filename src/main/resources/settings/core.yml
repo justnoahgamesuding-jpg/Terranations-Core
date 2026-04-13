@@ -89,14 +89,13 @@ resource-pack:
   delay-ticks: 40
 
 # Top-center ItemsAdder status HUD.
-# Uses ItemsAdder font images for the visual panel and a bossbar text channel for placement.
+# Uses ItemsAdder font images for the visual panel and a title overlay for placement.
 itemsadder-top-status:
   enabled: true
   # If true, the HUD waits until ItemsAdder is installed.
   require-itemsadder: true
   update-ticks: 20
-  # Keep this at 0.0 so the vanilla bossbar fill is minimized.
-  bar-progress: 0.0
+  title-stay-ticks: 30
   panel-token: ":top_status_panel:"
   content-offset-token: ":offset_-248:"
   location-panel-token: ":top_status_location_panel:"

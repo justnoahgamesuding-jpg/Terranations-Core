@@ -39,7 +39,7 @@ itemsadder-top-status:
   enabled: true
   require-itemsadder: true
   update-ticks: 20
-  bar-progress: 0.0
+  title-stay-ticks: 30
   panel-token: ":top_status_panel:"
   content-offset-token: ":offset_-248:"
   location-panel-token: ":top_status_location_panel:"

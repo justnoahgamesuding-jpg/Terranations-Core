@@ -12311,7 +12311,7 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("itemsadder-top-status.enabled", true);
         getConfig().addDefault("itemsadder-top-status.require-itemsadder", true);
         getConfig().addDefault("itemsadder-top-status.update-ticks", 20L);
-        getConfig().addDefault("itemsadder-top-status.bar-progress", 0.0D);
+        getConfig().addDefault("itemsadder-top-status.title-stay-ticks", 30L);
         getConfig().addDefault("itemsadder-top-status.panel-token", ":top_status_panel:");
         getConfig().addDefault("itemsadder-top-status.content-offset-token", ":offset_-248:");
         getConfig().addDefault("itemsadder-top-status.location-panel-token", ":top_status_location_panel:");

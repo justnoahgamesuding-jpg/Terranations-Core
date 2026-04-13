@@ -1,22 +1,22 @@
 package me.meetrow.testproject;
 
 import me.clip.placeholderapi.PlaceholderAPI;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
-import org.bukkit.boss.BarColor;
-import org.bukkit.boss.BarStyle;
-import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class ItemsAdderTopStatusHud {
     private static final String CONFIG_ROOT = "itemsadder-top-status";
+    private static final LegacyComponentSerializer SECTION_SERIALIZER = LegacyComponentSerializer.legacySection();
     private static final String LEGACY_DEFAULT_FORMAT =
             "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%";
     private static final String DEFAULT_FORMAT =
@@ -25,7 +25,7 @@ public final class ItemsAdderTopStatusHud {
                     + "%money_panel%%money_offset%&6☀ &f%money%";
 
     private final Testproject plugin;
-    private final Map<UUID, BossBar> bars = new ConcurrentHashMap<>();
+    private final Set<UUID> visiblePlayers = new HashSet<>();
     private BukkitTask task;
 
     public ItemsAdderTopStatusHud(Testproject plugin) {
@@ -51,11 +51,13 @@ public final class ItemsAdderTopStatusHud {
             task.cancel();
             task = null;
         }
-        for (BossBar bar : bars.values()) {
-            bar.removeAll();
-            bar.setVisible(false);
+        for (UUID playerId : visiblePlayers) {
+            Player player = plugin.getServer().getPlayer(playerId);
+            if (player != null && player.isOnline()) {
+                player.clearTitle();
+            }
         }
-        bars.clear();
+        visiblePlayers.clear();
     }
 
     private boolean isEnabled() {
@@ -72,39 +74,20 @@ public final class ItemsAdderTopStatusHud {
             return;
         }
 
-        Set<UUID> onlineIds = new HashSet<>();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
-            onlineIds.add(player.getUniqueId());
-            BossBar bar = bars.computeIfAbsent(player.getUniqueId(), ignored -> createBar());
-            if (!bar.getPlayers().contains(player)) {
-                bar.removeAll();
-                bar.addPlayer(player);
-            }
-            bar.setTitle(plugin.colorize(buildTitle(player)));
-            bar.setProgress(getBarProgress());
-            bar.setVisible(true);
+            player.showTitle(Title.title(
+                    Component.empty(),
+                    SECTION_SERIALIZER.deserialize(plugin.colorize(buildTitle(player))),
+                    Title.Times.times(Duration.ZERO, getStayDuration(), Duration.ZERO)
+            ));
+            visiblePlayers.add(player.getUniqueId());
         }
-
-        bars.entrySet().removeIf(entry -> {
-            if (onlineIds.contains(entry.getKey())) {
-                return false;
-            }
-            BossBar bar = entry.getValue();
-            bar.removeAll();
-            bar.setVisible(false);
-            return true;
-        });
     }
 
-    private BossBar createBar() {
-        BossBar bar = plugin.getServer().createBossBar("", BarColor.WHITE, BarStyle.SOLID);
-        bar.setProgress(getBarProgress());
-        return bar;
-    }
-
-    private double getBarProgress() {
-        double progress = plugin.getConfig().getDouble(CONFIG_ROOT + ".bar-progress", 0.0D);
-        return Math.max(0.0D, Math.min(1.0D, progress));
+    private Duration getStayDuration() {
+        long updateTicks = Math.max(5L, plugin.getConfig().getLong(CONFIG_ROOT + ".update-ticks", 20L));
+        long stayTicks = Math.max(updateTicks + 10L, plugin.getConfig().getLong(CONFIG_ROOT + ".title-stay-ticks", updateTicks + 10L));
+        return Duration.ofMillis(stayTicks * 50L);
     }
 
     private String buildTitle(Player player) {
