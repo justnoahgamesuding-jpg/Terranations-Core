@@ -5,3 +5,29 @@ terra_status_panel:
 terra_status_divider:
   type: single
   file: "status/status_divider.png"
+
+terra_health_empty:
+  type: single
+  file: "status/health_empty.png"
+
+terra_health_fill:
+  type: listener
+  file: "status/health_fill.png"
+  split: 40
+  split-type: left
+  setting:
+    listener:
+      class: health
+
+terra_hunger_empty:
+  type: single
+  file: "status/hunger_empty.png"
+
+terra_hunger_fill:
+  type: listener
+  file: "status/hunger_fill.png"
+  split: 20
+  split-type: left
+  setting:
+    listener:
+      class: food

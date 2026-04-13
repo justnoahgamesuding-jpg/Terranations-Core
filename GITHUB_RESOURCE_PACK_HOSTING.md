@@ -10,12 +10,12 @@ If the pack zip is committed at the repo root, use the raw GitHub URL:
 resource-pack:
   enabled: true
   url: "https://raw.githubusercontent.com/justnoahgamesuding-jpg/Terranations-Core/main/terranations_hud_pack.zip"
-  sha1: ""
+  sha1: "f968213d85d242aeb67ad723cedada0e83dfe369"
   delay-ticks: 40
   skip-when-betterhud-present: true
 ```
 
-Leave `sha1` empty unless you calculate the zip's SHA-1 hash.
+Update `sha1` whenever you rebuild the zip.
 
 ## Important
 

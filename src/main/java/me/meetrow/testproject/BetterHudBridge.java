@@ -77,6 +77,14 @@ public final class BetterHudBridge {
                     playerId -> plugin.getTutorialQuestSteps(playerId));
             registerNumberPlaceholder(addPlaceholderMethod, numberContainer, "terra_quest_max_steps",
                     playerId -> plugin.getTutorialQuestMaxSteps());
+            registerNumberPlaceholder(addPlaceholderMethod, numberContainer, "terra_health",
+                    playerId -> plugin.getPlayerHealthRounded(playerId));
+            registerNumberPlaceholder(addPlaceholderMethod, numberContainer, "terra_max_health",
+                    playerId -> plugin.getPlayerMaxHealthRounded(playerId));
+            registerNumberPlaceholder(addPlaceholderMethod, numberContainer, "terra_food",
+                    playerId -> plugin.getPlayerFoodLevel(playerId));
+            registerNumberPlaceholder(addPlaceholderMethod, numberContainer, "terra_level",
+                    playerId -> plugin.getPlayerExperienceLevel(playerId));
 
             registerBooleanPlaceholder(addPlaceholderMethod, booleanContainer, "terra_quest_active",
                     playerId -> plugin.hasActiveTutorialQuest(playerId));

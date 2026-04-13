@@ -1271,6 +1271,29 @@ public final class Testproject extends JavaPlugin {
         return resourcePackStatuses.getOrDefault(playerId, "unknown");
     }
 
+    public int getPlayerHealthRounded(UUID playerId) {
+        Player player = playerId != null ? getServer().getPlayer(playerId) : null;
+        return player != null && player.isOnline() ? Math.max(0, (int) Math.round(player.getHealth())) : 0;
+    }
+
+    public int getPlayerMaxHealthRounded(UUID playerId) {
+        Player player = playerId != null ? getServer().getPlayer(playerId) : null;
+        if (player == null || !player.isOnline() || player.getAttribute(Attribute.GENERIC_MAX_HEALTH) == null) {
+            return 20;
+        }
+        return Math.max(1, (int) Math.round(player.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue()));
+    }
+
+    public int getPlayerFoodLevel(UUID playerId) {
+        Player player = playerId != null ? getServer().getPlayer(playerId) : null;
+        return player != null && player.isOnline() ? Math.max(0, player.getFoodLevel()) : 0;
+    }
+
+    public int getPlayerExperienceLevel(UUID playerId) {
+        Player player = playerId != null ? getServer().getPlayer(playerId) : null;
+        return player != null && player.isOnline() ? Math.max(0, player.getLevel()) : 0;
+    }
+
     private byte[] hexToBytes(String hex) {
         byte[] bytes = new byte[hex.length() / 2];
         for (int index = 0; index < bytes.length; index++) {

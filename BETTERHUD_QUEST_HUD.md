@@ -16,6 +16,10 @@ Use these Terra placeholders in BetterHud:
 - `[terra_quest_steps]`
 - `[terra_quest_max_steps]`
 - `[terra_quest_active]`
+- `[terra_health]`
+- `[terra_max_health]`
+- `[terra_food]`
+- `[terra_level]`
 
 ## Files To Copy
 
@@ -83,10 +87,11 @@ Examples:
 
 The sample styling uses layered dark text blocks to fake a smooth black panel behind the quest text. If your font pack does not render symbols like `✦` or `▸` cleanly, replace them with plain ASCII markers.
 
-The sample status HUD is anchored to the left-middle of the screen and uses vertical numeric rows:
+The sample status HUD is anchored above the hotbar and uses horizontal value bars:
 
-- `HP [health]/[max_health]`
-- `HUNGER [food]/20`
+- `[terra_health] / [terra_max_health]`
+- `[terra_food] / 20`
+- `[terra_level]`
 
 It does not use vanilla heart or hunger icons.
 
@@ -95,4 +100,4 @@ It does not use vanilla heart or hunger icons.
 - Terra now registers native BetterHud placeholders, so use bracket syntax like `[terra_quest_title_plain]`.
 - Terra already returns fallback text when no active quest exists, so the HUD will not be blank.
 - `quests.itemsadder-sync.enabled` now defaults to `false` in Terra's `settings/quests.yml`.
-- The status HUD uses BetterHud built-ins: `[health]`, `[max_health]`, and `[food]`.
+- The status HUD uses Terra placeholders for numeric values and BetterHud `health`/`food` listeners for the bar fill.
