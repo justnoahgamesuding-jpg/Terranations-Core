@@ -1,31 +1,31 @@
 package me.meetrow.testproject;
 
 import me.clip.placeholderapi.PlaceholderAPI;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.lang.reflect.Method;
-import java.time.Duration;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class ItemsAdderTopStatusHud {
     private static final String CONFIG_ROOT = "itemsadder-top-status";
-    private static final LegacyComponentSerializer SECTION_SERIALIZER = LegacyComponentSerializer.legacySection();
     private static final String LEGACY_DEFAULT_FORMAT =
             "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%";
     private static final String DEFAULT_FORMAT =
-            "%location_panel%%location_offset%&f⌖ %location%:offset_14:"
-                    + "%job_panel%%job_offset%&a⚒ %job% &7Lv.%level%:offset_14:"
-                    + "%money_panel%%money_offset%&6☀ &f%money%";
+            "%location_panel%%location_offset%&f\u2316 %location%:offset_14:"
+                    + "%job_panel%%job_offset%&a\u2692 %job% &7Lv.%level%:offset_14:"
+                    + "%money_panel%%money_offset%&6\u2600 &f%money%";
 
     private final Testproject plugin;
-    private final Set<UUID> visiblePlayers = new HashSet<>();
+    private final Map<UUID, BossBar> bars = new ConcurrentHashMap<>();
     private BukkitTask task;
 
     public ItemsAdderTopStatusHud(Testproject plugin) {
@@ -51,13 +51,11 @@ public final class ItemsAdderTopStatusHud {
             task.cancel();
             task = null;
         }
-        for (UUID playerId : visiblePlayers) {
-            Player player = plugin.getServer().getPlayer(playerId);
-            if (player != null && player.isOnline()) {
-                player.clearTitle();
-            }
+        for (BossBar bar : bars.values()) {
+            bar.removeAll();
+            bar.setVisible(false);
         }
-        visiblePlayers.clear();
+        bars.clear();
     }
 
     private boolean isEnabled() {
@@ -74,20 +72,32 @@ public final class ItemsAdderTopStatusHud {
             return;
         }
 
+        Set<UUID> onlineIds = new HashSet<>();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
-            player.showTitle(Title.title(
-                    Component.empty(),
-                    SECTION_SERIALIZER.deserialize(plugin.colorize(buildTitle(player))),
-                    Title.Times.times(Duration.ZERO, getStayDuration(), Duration.ZERO)
-            ));
-            visiblePlayers.add(player.getUniqueId());
+            onlineIds.add(player.getUniqueId());
+            BossBar bar = bars.computeIfAbsent(player.getUniqueId(), ignored -> createBar());
+            if (!bar.getPlayers().contains(player)) {
+                bar.removeAll();
+                bar.addPlayer(player);
+            }
+            bar.setTitle(plugin.colorize(buildTitle(player)));
+            bar.setProgress(1.0D);
+            bar.setVisible(true);
         }
+
+        bars.entrySet().removeIf(entry -> {
+            if (onlineIds.contains(entry.getKey())) {
+                return false;
+            }
+            BossBar bar = entry.getValue();
+            bar.removeAll();
+            bar.setVisible(false);
+            return true;
+        });
     }
 
-    private Duration getStayDuration() {
-        long updateTicks = Math.max(5L, plugin.getConfig().getLong(CONFIG_ROOT + ".update-ticks", 20L));
-        long stayTicks = Math.max(updateTicks + 10L, plugin.getConfig().getLong(CONFIG_ROOT + ".title-stay-ticks", updateTicks + 10L));
-        return Duration.ofMillis(stayTicks * 50L);
+    private BossBar createBar() {
+        return plugin.getServer().createBossBar("", BarColor.WHITE, BarStyle.SOLID);
     }
 
     private String buildTitle(Player player) {
@@ -116,7 +126,7 @@ public final class ItemsAdderTopStatusHud {
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             text = PlaceholderAPI.setPlaceholders(player, text);
         }
-        return replaceItemsAdderFontImages(player, text);
+        return replaceItemsAdderFontImages(text);
     }
 
     private String getLocationLabel(Player player) {
@@ -124,7 +134,7 @@ public final class ItemsAdderTopStatusHud {
         if (country == null) {
             return plugin.getConfig().getString(CONFIG_ROOT + ".wilderness-label", "Wilderness");
         }
-        return trimForHud(country.getName(), plugin.getConfig().getInt(CONFIG_ROOT + ".max-location-chars", 18));
+        return trimForHud(country.getName(), plugin.getConfig().getInt(CONFIG_ROOT + ".max-location-chars", 12));
     }
 
     private String getJobLabel(Player player) {
@@ -132,7 +142,7 @@ public final class ItemsAdderTopStatusHud {
         if (profession == null) {
             return plugin.getConfig().getString(CONFIG_ROOT + ".no-job-label", "No Job");
         }
-        return trimForHud(plugin.getProfessionPlainDisplayName(profession), plugin.getConfig().getInt(CONFIG_ROOT + ".max-job-chars", 14));
+        return trimForHud(plugin.getProfessionPlainDisplayName(profession), plugin.getConfig().getInt(CONFIG_ROOT + ".max-job-chars", 10));
     }
 
     private int getJobLevel(Player player) {
@@ -151,7 +161,7 @@ public final class ItemsAdderTopStatusHud {
         return value.substring(0, safeMax - 3).trim() + "...";
     }
 
-    private String replaceItemsAdderFontImages(Player player, String text) {
+    private String replaceItemsAdderFontImages(String text) {
         try {
             Class<?> wrapperClass = Class.forName("dev.lone.itemsadder.api.FontImages.FontImageWrapper");
             Method replace = wrapperClass.getMethod("replaceFontImages", String.class);

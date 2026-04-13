@@ -39,7 +39,6 @@ itemsadder-top-status:
   enabled: true
   require-itemsadder: true
   update-ticks: 20
-  title-stay-ticks: 30
   panel-token: ":top_status_panel:"
   content-offset-token: ":offset_-248:"
   location-panel-token: ":top_status_location_panel:"
@@ -65,4 +64,11 @@ The panel images are:
 examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/location_panel.png
 examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/job_panel.png
 examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/money_panel.png
+```
+
+The HUD uses the vanilla bossbar text position for top-screen placement. The ItemsAdder pack includes transparent white bossbar sprites so the vanilla white bossbar texture does not show behind the panels:
+
+```text
+examples/itemsadder/contents/terra_quest_hud/resourcepack/assets/minecraft/textures/gui/sprites/boss_bar/white_background.png
+examples/itemsadder/contents/terra_quest_hud/resourcepack/assets/minecraft/textures/gui/sprites/boss_bar/white_progress.png
 ```
