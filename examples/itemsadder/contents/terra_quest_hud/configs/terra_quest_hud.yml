@@ -17,8 +17,23 @@ font_images:
   top_status_panel:
     suggest_in_command: false
     path: font/hud/top_status/panel.png
-    scale_ratio: 24
-    y_position: 0
+    scale_ratio: 18
+    y_position: 8
+  top_status_location_panel:
+    suggest_in_command: false
+    path: font/hud/top_status/location_panel.png
+    scale_ratio: 18
+    y_position: 8
+  top_status_job_panel:
+    suggest_in_command: false
+    path: font/hud/top_status/job_panel.png
+    scale_ratio: 18
+    y_position: 8
+  top_status_money_panel:
+    suggest_in_command: false
+    path: font/hud/top_status/money_panel.png
+    scale_ratio: 18
+    y_position: 8
 
 huds:
   quest_progress:

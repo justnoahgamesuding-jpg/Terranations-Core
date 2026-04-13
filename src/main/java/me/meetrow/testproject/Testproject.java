@@ -12314,12 +12314,20 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("itemsadder-top-status.bar-progress", 0.0D);
         getConfig().addDefault("itemsadder-top-status.panel-token", ":top_status_panel:");
         getConfig().addDefault("itemsadder-top-status.content-offset-token", ":offset_-248:");
+        getConfig().addDefault("itemsadder-top-status.location-panel-token", ":top_status_location_panel:");
+        getConfig().addDefault("itemsadder-top-status.job-panel-token", ":top_status_job_panel:");
+        getConfig().addDefault("itemsadder-top-status.money-panel-token", ":top_status_money_panel:");
+        getConfig().addDefault("itemsadder-top-status.location-offset-token", ":offset_-100:");
+        getConfig().addDefault("itemsadder-top-status.job-offset-token", ":offset_-100:");
+        getConfig().addDefault("itemsadder-top-status.money-offset-token", ":offset_-82:");
         getConfig().addDefault("itemsadder-top-status.format",
-                "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%");
+                "%location_panel%%location_offset%&7LOC &f%location%:offset_12:"
+                        + "%job_panel%%job_offset%&7JOB &f%job% &7Lv.%level%:offset_12:"
+                        + "%money_panel%%money_offset%&7$ &f%money%");
         getConfig().addDefault("itemsadder-top-status.wilderness-label", "Wilderness");
         getConfig().addDefault("itemsadder-top-status.no-job-label", "No Job");
-        getConfig().addDefault("itemsadder-top-status.max-location-chars", 18);
-        getConfig().addDefault("itemsadder-top-status.max-job-chars", 14);
+        getConfig().addDefault("itemsadder-top-status.max-location-chars", 12);
+        getConfig().addDefault("itemsadder-top-status.max-job-chars", 10);
         getConfig().addDefault("join-leave-messages.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.interval-minutes", 5);

@@ -42,19 +42,27 @@ itemsadder-top-status:
   bar-progress: 0.0
   panel-token: ":top_status_panel:"
   content-offset-token: ":offset_-248:"
-  format: "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%"
+  location-panel-token: ":top_status_location_panel:"
+  job-panel-token: ":top_status_job_panel:"
+  money-panel-token: ":top_status_money_panel:"
+  location-offset-token: ":offset_-100:"
+  job-offset-token: ":offset_-100:"
+  money-offset-token: ":offset_-82:"
+  format: "%location_panel%%location_offset%&7LOC &f%location%:offset_12:%job_panel%%job_offset%&7JOB &f%job% &7Lv.%level%:offset_12:%money_panel%%money_offset%&7$ &f%money%"
   wilderness-label: "Wilderness"
   no-job-label: "No Job"
-  max-location-chars: 18
-  max-job-chars: 14
+  max-location-chars: 12
+  max-job-chars: 10
 ```
 
-If the text is not lined up on the black panel, adjust `content-offset-token`.
-Use a more negative value to move the text left, for example `:offset_-260:`.
-Use a less negative value to move the text right, for example `:offset_-236:`.
+If the text is not lined up on a black panel, adjust that panel's offset token.
+Use a more negative value to move the text left, for example `:offset_-108:`.
+Use a less negative value to move the text right, for example `:offset_-92:`.
 
-The panel image is:
+The panel images are:
 
 ```text
-examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/panel.png
+examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/location_panel.png
+examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/job_panel.png
+examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/money_panel.png
 ```

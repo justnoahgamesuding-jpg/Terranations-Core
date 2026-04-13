@@ -17,6 +17,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class ItemsAdderTopStatusHud {
     private static final String CONFIG_ROOT = "itemsadder-top-status";
+    private static final String LEGACY_DEFAULT_FORMAT =
+            "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%";
+    private static final String DEFAULT_FORMAT =
+            "%location_panel%%location_offset%&7LOC &f%location%:offset_12:"
+                    + "%job_panel%%job_offset%&7JOB &f%job% &7Lv.%level%:offset_12:"
+                    + "%money_panel%%money_offset%&7$ &f%money%";
 
     private final Testproject plugin;
     private final Map<UUID, BossBar> bars = new ConcurrentHashMap<>();
@@ -104,12 +110,21 @@ public final class ItemsAdderTopStatusHud {
     private String buildTitle(Player player) {
         String template = plugin.getConfig().getString(
                 CONFIG_ROOT + ".format",
-                "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%"
+                DEFAULT_FORMAT
         );
+        if (LEGACY_DEFAULT_FORMAT.equals(template)) {
+            template = DEFAULT_FORMAT;
+        }
 
         String text = template
                 .replace("%panel%", plugin.getConfig().getString(CONFIG_ROOT + ".panel-token", ":top_status_panel:"))
                 .replace("%offset%", plugin.getConfig().getString(CONFIG_ROOT + ".content-offset-token", ":offset_-248:"))
+                .replace("%location_panel%", plugin.getConfig().getString(CONFIG_ROOT + ".location-panel-token", ":top_status_location_panel:"))
+                .replace("%job_panel%", plugin.getConfig().getString(CONFIG_ROOT + ".job-panel-token", ":top_status_job_panel:"))
+                .replace("%money_panel%", plugin.getConfig().getString(CONFIG_ROOT + ".money-panel-token", ":top_status_money_panel:"))
+                .replace("%location_offset%", plugin.getConfig().getString(CONFIG_ROOT + ".location-offset-token", ":offset_-100:"))
+                .replace("%job_offset%", plugin.getConfig().getString(CONFIG_ROOT + ".job-offset-token", ":offset_-100:"))
+                .replace("%money_offset%", plugin.getConfig().getString(CONFIG_ROOT + ".money-offset-token", ":offset_-82:"))
                 .replace("%location%", getLocationLabel(player))
                 .replace("%job%", getJobLabel(player))
                 .replace("%level%", String.valueOf(getJobLevel(player)))
