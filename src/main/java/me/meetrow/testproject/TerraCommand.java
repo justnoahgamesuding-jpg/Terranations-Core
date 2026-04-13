@@ -257,6 +257,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handleQuestDebugCommand(sender, args);
         }
 
+        if (args[0].equalsIgnoreCase("texturepack") || args[0].equalsIgnoreCase("resourcepack")) {
+            return handleTexturePackCommand(sender, args);
+        }
+
         if (args[0].equalsIgnoreCase("reload")) {
             plugin.reloadTerra();
             sender.sendMessage(plugin.getMessage("terra.reload"));
@@ -310,6 +314,56 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Progress: " + plugin.getTutorialQuestProgressText(playerId), NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("Percent: " + plugin.getTutorialQuestPercent(playerId), NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("Profession: " + plugin.getTutorialQuestProfessionKey(playerId), NamedTextColor.YELLOW));
+        return true;
+    }
+
+    private boolean handleTexturePackCommand(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /terra texturepack <check|reload> [player|all]", NamedTextColor.RED));
+            return true;
+        }
+
+        String subcommand = args[1].toLowerCase(Locale.ROOT);
+        if (subcommand.equals("check") || subcommand.equals("status")) {
+            Player target = args.length >= 3 ? Bukkit.getPlayerExact(args[2]) : sender instanceof Player player ? player : null;
+            sender.sendMessage(Component.text("Terra texture pack:", NamedTextColor.GOLD));
+            sender.sendMessage(Component.text("Enabled: " + plugin.isResourcePackDeliveryEnabled(), NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("URL: " + displayEmpty(plugin.getConfiguredResourcePackUrl()), NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("SHA-1: " + (plugin.hasValidConfiguredResourcePackSha1() ? "valid" : "not set/invalid"), NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Delay: " + plugin.getConfiguredResourcePackDelayTicks() + " ticks", NamedTextColor.YELLOW));
+            if (target != null) {
+                sender.sendMessage(Component.text("Last status for " + target.getName() + ": "
+                        + plugin.getResourcePackStatus(target.getUniqueId()), NamedTextColor.YELLOW));
+            }
+            return true;
+        }
+
+        if (subcommand.equals("reload") || subcommand.equals("resend")) {
+            if (args.length >= 3 && args[2].equalsIgnoreCase("all")) {
+                int sent = 0;
+                for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+                    if (plugin.sendConfiguredResourcePack(onlinePlayer)) {
+                        sent++;
+                    }
+                }
+                sender.sendMessage(Component.text("Texture pack resend queued for " + sent + " player(s).", NamedTextColor.GREEN));
+                return true;
+            }
+
+            Player target = args.length >= 3 ? Bukkit.getPlayerExact(args[2]) : sender instanceof Player player ? player : null;
+            if (target == null) {
+                sender.sendMessage(Component.text("Usage: /terra texturepack reload <player|all>", NamedTextColor.RED));
+                return true;
+            }
+            if (!plugin.sendConfiguredResourcePack(target)) {
+                sender.sendMessage(Component.text("Texture pack is disabled or has no URL in core.yml.", NamedTextColor.RED));
+                return true;
+            }
+            sender.sendMessage(Component.text("Texture pack resend queued for " + target.getName() + ".", NamedTextColor.GREEN));
+            return true;
+        }
+
+        sender.sendMessage(Component.text("Usage: /terra texturepack <check|reload> [player|all]", NamedTextColor.RED));
         return true;
     }
 
@@ -2827,6 +2881,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         entries.add(new HelpEntry("/terra reload", "Reload Terra configs.", ignored -> true));
         entries.add(new HelpEntry("/terra quests", "Open the quest admin GUI.", ignored -> sender instanceof Player));
         entries.add(new HelpEntry("/terra questdebug", "Show the active quest debug info.", ignored -> sender instanceof Player));
+        entries.add(new HelpEntry("/terra texturepack <check|reload> [player|all]", "Check or resend Terra's resource pack.", ignored -> true));
         entries.add(new HelpEntry("/terra hardrestart", "Queue the hard restart flow.", ignored -> true));
         entries.add(new HelpEntry("/terra blockdelay <enable|disable>", "Toggle block delay.", ignored -> true));
         entries.add(new HelpEntry("/terra blockdelay time set <seconds>", "Set the block delay time.", ignored -> true));
@@ -3158,6 +3213,20 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         if (args[0].equalsIgnoreCase("realtimeclock")) {
             if (args.length == 2) {
                 return partialMatches(args[1], List.of("on", "off", "status", "sync"));
+            }
+            return Collections.emptyList();
+        }
+
+        if (args[0].equalsIgnoreCase("texturepack") || args[0].equalsIgnoreCase("resourcepack")) {
+            if (args.length == 2) {
+                return partialMatches(args[1], List.of("check", "status", "reload", "resend"));
+            }
+            if (args.length == 3 && List.of("check", "status", "reload", "resend").contains(args[1].toLowerCase(Locale.ROOT))) {
+                List<String> options = new ArrayList<>(getKnownPlayerNames());
+                if (args[1].equalsIgnoreCase("reload") || args[1].equalsIgnoreCase("resend")) {
+                    options.add("all");
+                }
+                return partialMatches(args[2], options);
             }
             return Collections.emptyList();
         }
@@ -3554,6 +3623,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
         }
         return matches;
+    }
+
+    private String displayEmpty(String value) {
+        return value == null || value.isBlank() ? "(empty)" : value;
     }
 
     private WorldEditPlugin getWorldEditPlugin() {

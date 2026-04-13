@@ -11,6 +11,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.bukkit.event.server.ServerListPingEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 
@@ -38,6 +39,11 @@ public final class ServerUtilityListener implements Listener {
                     "player", event.getPlayer().getName()
             ))));
         }
+    }
+
+    @EventHandler
+    public void onResourcePackStatus(PlayerResourcePackStatusEvent event) {
+        plugin.recordResourcePackStatus(event.getPlayer().getUniqueId(), event.getStatus().name());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

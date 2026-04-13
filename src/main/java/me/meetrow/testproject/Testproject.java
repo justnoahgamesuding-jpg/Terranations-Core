@@ -199,6 +199,7 @@ public final class Testproject extends JavaPlugin {
     private final Map<UUID, String> tutorialQuestHudIdCache = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> tutorialQuestHudPercentCache = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> tutorialQuestHudStepCache = new ConcurrentHashMap<>();
+    private final Map<UUID, String> resourcePackStatuses = new ConcurrentHashMap<>();
     private final List<PlayerQuestDefinition> generalQuestDefinitions = new ArrayList<>();
     private final Map<UUID, List<String>> assignedQuestIds = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> completedAssignedQuestIds = new ConcurrentHashMap<>();
@@ -1204,13 +1205,13 @@ public final class Testproject extends JavaPlugin {
         setManagedConfigValue("join-leave-messages.enabled", enabled);
     }
 
-    public void sendConfiguredResourcePack(Player player) {
+    public boolean sendConfiguredResourcePack(Player player) {
         if (player == null || coreSettingsConfig == null || !coreSettingsConfig.getBoolean("resource-pack.enabled", false)) {
-            return;
+            return false;
         }
         String url = coreSettingsConfig.getString("resource-pack.url", "").trim();
         if (url.isBlank()) {
-            return;
+            return false;
         }
         long delayTicks = Math.max(0L, coreSettingsConfig.getLong("resource-pack.delay-ticks", 40L));
         getServer().getScheduler().runTaskLater(this, () -> {
@@ -1224,6 +1225,41 @@ public final class Testproject extends JavaPlugin {
                 player.setResourcePack(url);
             }
         }, delayTicks);
+        return true;
+    }
+
+    public boolean isResourcePackDeliveryEnabled() {
+        return coreSettingsConfig != null && coreSettingsConfig.getBoolean("resource-pack.enabled", false);
+    }
+
+    public String getConfiguredResourcePackUrl() {
+        return coreSettingsConfig != null ? coreSettingsConfig.getString("resource-pack.url", "").trim() : "";
+    }
+
+    public String getConfiguredResourcePackSha1() {
+        return coreSettingsConfig != null ? coreSettingsConfig.getString("resource-pack.sha1", "").trim() : "";
+    }
+
+    public long getConfiguredResourcePackDelayTicks() {
+        return coreSettingsConfig != null ? Math.max(0L, coreSettingsConfig.getLong("resource-pack.delay-ticks", 40L)) : 40L;
+    }
+
+    public boolean hasValidConfiguredResourcePackSha1() {
+        return SHA1_PATTERN.matcher(getConfiguredResourcePackSha1()).matches();
+    }
+
+    public void recordResourcePackStatus(UUID playerId, String status) {
+        if (playerId == null || status == null || status.isBlank()) {
+            return;
+        }
+        resourcePackStatuses.put(playerId, status);
+    }
+
+    public String getResourcePackStatus(UUID playerId) {
+        if (playerId == null) {
+            return "unknown";
+        }
+        return resourcePackStatuses.getOrDefault(playerId, "unknown");
     }
 
     private byte[] hexToBytes(String hex) {
