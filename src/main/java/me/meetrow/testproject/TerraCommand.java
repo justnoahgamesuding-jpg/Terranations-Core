@@ -331,7 +331,6 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("URL: " + displayEmpty(plugin.getConfiguredResourcePackUrl()), NamedTextColor.YELLOW));
             sender.sendMessage(Component.text("SHA-1: " + (plugin.hasValidConfiguredResourcePackSha1() ? "valid" : "not set/invalid"), NamedTextColor.YELLOW));
             sender.sendMessage(Component.text("Delay: " + plugin.getConfiguredResourcePackDelayTicks() + " ticks", NamedTextColor.YELLOW));
-            sender.sendMessage(Component.text("Skipped for BetterHud: " + plugin.isResourcePackSuppressedByBetterHud(), NamedTextColor.YELLOW));
             if (target != null) {
                 sender.sendMessage(Component.text("Last status for " + target.getName() + ": "
                         + plugin.getResourcePackStatus(target.getUniqueId()), NamedTextColor.YELLOW));
@@ -357,7 +356,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             if (!plugin.sendConfiguredResourcePack(target)) {
-                sender.sendMessage(Component.text("Texture pack is disabled, skipped for BetterHud, or has no URL in core.yml.", NamedTextColor.RED));
+                sender.sendMessage(Component.text("Texture pack is disabled or has no URL in core.yml.", NamedTextColor.RED));
                 return true;
             }
             sender.sendMessage(Component.text("Texture pack resend queued for " + target.getName() + ".", NamedTextColor.GREEN));

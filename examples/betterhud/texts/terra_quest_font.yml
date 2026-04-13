@@ -1,4 +1,0 @@
-terra_quest_font:
-  merge-default-bitmap: true
-  use-unifont: false
-  include: []

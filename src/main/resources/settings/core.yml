@@ -87,8 +87,23 @@ resource-pack:
   # Leave empty unless you calculate a SHA-1 hash for the zip.
   sha1: ""
   delay-ticks: 40
-  # Keep this true when BetterHud sends the HUD pack. Minecraft only keeps one server pack active.
-  skip-when-betterhud-present: true
+
+# Top-center ItemsAdder status HUD.
+# Uses ItemsAdder font images for the visual panel and a bossbar text channel for placement.
+itemsadder-top-status:
+  enabled: true
+  # If true, the HUD waits until ItemsAdder is installed.
+  require-itemsadder: true
+  update-ticks: 20
+  # Keep this at 0.0 so the vanilla bossbar fill is minimized.
+  bar-progress: 0.0
+  panel-token: ":top_status_panel:"
+  content-offset-token: ":offset_-248:"
+  format: "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%"
+  wilderness-label: "Wilderness"
+  no-job-label: "No Job"
+  max-location-chars: 18
+  max-job-chars: 14
 
 # Custom server join and leave broadcast formatting.
 join-leave-messages:

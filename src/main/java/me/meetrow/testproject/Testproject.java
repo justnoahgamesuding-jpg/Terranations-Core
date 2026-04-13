@@ -249,6 +249,7 @@ public final class Testproject extends JavaPlugin {
     private BukkitTask countryBorderParticlesTask;
     private BukkitTask groundItemClearTask;
     private BukkitTask mobStackingTask;
+    private ItemsAdderTopStatusHud itemsAdderTopStatusHud;
     private ProfessionSelectionListener professionSelectionListener;
     private ProfessionAdminGuiListener professionAdminGuiListener;
     private JobConfigGuiListener jobConfigGuiListener;
@@ -260,7 +261,6 @@ public final class Testproject extends JavaPlugin {
     private PlaytestGuiListener playtestGuiListener;
     private StabilityGuiListener stabilityGuiListener;
     private QuestAdminGuiListener questAdminGuiListener;
-    private BetterHudBridge betterHudBridge;
     private BossBar globalXpBoostBossBar;
     private final Set<UUID> cooldownDebugPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, BossBar> breakCooldownDebugBars = new ConcurrentHashMap<>();
@@ -385,14 +385,6 @@ public final class Testproject extends JavaPlugin {
 
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new TerraPlaceholderExpansion(this).register();
-        }
-        betterHudBridge = new BetterHudBridge(this);
-        betterHudBridge.registerQuestPlaceholders();
-        if (getServer().getPluginManager().getPlugin("BetterHud") != null) {
-            getServer().getScheduler().runTask(this, () -> {
-                betterHudBridge.registerQuestPlaceholders();
-                betterHudBridge.reloadBetterHud();
-            });
         }
 
         getServer().getPluginManager().registerEvents(new BlockDelayListener(this), this);
@@ -582,6 +574,7 @@ public final class Testproject extends JavaPlugin {
         restartTerraTipsRuntime();
         restartStabilityDebugRuntime();
         restartLagReductionRuntime();
+        restartItemsAdderTopStatusHud();
         ensurePersistentActionBarTask();
         restartClimateRuntime();
         processPendingHardRestartPhase();
@@ -611,6 +604,7 @@ public final class Testproject extends JavaPlugin {
         shutdownOreVisionRuntime();
         shutdownPersistentActionBarRuntime();
         shutdownClimateRuntime();
+        stopItemsAdderTopStatusHud();
         stopTerraTipsRuntime();
         stopRealTimeClock();
         stopTraderRuntime();
@@ -1209,9 +1203,6 @@ public final class Testproject extends JavaPlugin {
         if (player == null || coreSettingsConfig == null || !coreSettingsConfig.getBoolean("resource-pack.enabled", false)) {
             return false;
         }
-        if (isResourcePackSuppressedByBetterHud()) {
-            return false;
-        }
         String url = coreSettingsConfig.getString("resource-pack.url", "").trim();
         if (url.isBlank()) {
             return false;
@@ -1233,12 +1224,6 @@ public final class Testproject extends JavaPlugin {
 
     public boolean isResourcePackDeliveryEnabled() {
         return coreSettingsConfig != null && coreSettingsConfig.getBoolean("resource-pack.enabled", false);
-    }
-
-    public boolean isResourcePackSuppressedByBetterHud() {
-        return coreSettingsConfig != null
-                && coreSettingsConfig.getBoolean("resource-pack.skip-when-betterhud-present", true)
-                && getServer().getPluginManager().getPlugin("BetterHud") != null;
     }
 
     public String getConfiguredResourcePackUrl() {
@@ -1269,29 +1254,6 @@ public final class Testproject extends JavaPlugin {
             return "unknown";
         }
         return resourcePackStatuses.getOrDefault(playerId, "unknown");
-    }
-
-    public int getPlayerHealthRounded(UUID playerId) {
-        Player player = playerId != null ? getServer().getPlayer(playerId) : null;
-        return player != null && player.isOnline() ? Math.max(0, (int) Math.round(player.getHealth())) : 0;
-    }
-
-    public int getPlayerMaxHealthRounded(UUID playerId) {
-        Player player = playerId != null ? getServer().getPlayer(playerId) : null;
-        if (player == null || !player.isOnline() || player.getAttribute(Attribute.GENERIC_MAX_HEALTH) == null) {
-            return 20;
-        }
-        return Math.max(1, (int) Math.round(player.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue()));
-    }
-
-    public int getPlayerFoodLevel(UUID playerId) {
-        Player player = playerId != null ? getServer().getPlayer(playerId) : null;
-        return player != null && player.isOnline() ? Math.max(0, player.getFoodLevel()) : 0;
-    }
-
-    public int getPlayerExperienceLevel(UUID playerId) {
-        Player player = playerId != null ? getServer().getPlayer(playerId) : null;
-        return player != null && player.isOnline() ? Math.max(0, player.getLevel()) : 0;
     }
 
     private byte[] hexToBytes(String hex) {
@@ -2564,6 +2526,19 @@ public final class Testproject extends JavaPlugin {
             }
         }
         persistentActionBarPlayers.clear();
+    }
+
+    private void restartItemsAdderTopStatusHud() {
+        if (itemsAdderTopStatusHud == null) {
+            itemsAdderTopStatusHud = new ItemsAdderTopStatusHud(this);
+        }
+        itemsAdderTopStatusHud.restart();
+    }
+
+    private void stopItemsAdderTopStatusHud() {
+        if (itemsAdderTopStatusHud != null) {
+            itemsAdderTopStatusHud.stop();
+        }
     }
 
     private void updatePersistentActionBars() {
@@ -7510,6 +7485,7 @@ public final class Testproject extends JavaPlugin {
         stopRealTimeClock();
         shutdownOreVisionRuntime();
         shutdownClimateRuntime();
+        stopItemsAdderTopStatusHud();
         stopTraderRuntime();
         stopMerchantRuntime();
         stopNpcHeadTrackingRuntime();
@@ -7531,6 +7507,7 @@ public final class Testproject extends JavaPlugin {
         restartNpcHeadTrackingRuntime();
         restartCountryBorderParticlesRuntime();
         restartLagReductionRuntime();
+        restartItemsAdderTopStatusHud();
         restartClimateRuntime();
 
         for (Player player : getServer().getOnlinePlayers()) {
@@ -12331,7 +12308,18 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("resource-pack.url", "");
         getConfig().addDefault("resource-pack.sha1", "");
         getConfig().addDefault("resource-pack.delay-ticks", 40L);
-        getConfig().addDefault("resource-pack.skip-when-betterhud-present", true);
+        getConfig().addDefault("itemsadder-top-status.enabled", true);
+        getConfig().addDefault("itemsadder-top-status.require-itemsadder", true);
+        getConfig().addDefault("itemsadder-top-status.update-ticks", 20L);
+        getConfig().addDefault("itemsadder-top-status.bar-progress", 0.0D);
+        getConfig().addDefault("itemsadder-top-status.panel-token", ":top_status_panel:");
+        getConfig().addDefault("itemsadder-top-status.content-offset-token", ":offset_-248:");
+        getConfig().addDefault("itemsadder-top-status.format",
+                "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%");
+        getConfig().addDefault("itemsadder-top-status.wilderness-label", "Wilderness");
+        getConfig().addDefault("itemsadder-top-status.no-job-label", "No Job");
+        getConfig().addDefault("itemsadder-top-status.max-location-chars", 18);
+        getConfig().addDefault("itemsadder-top-status.max-job-chars", 14);
         getConfig().addDefault("join-leave-messages.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.interval-minutes", 5);
@@ -15790,6 +15778,7 @@ public final class Testproject extends JavaPlugin {
         migrateLegacyMainConfigSection("realtime-clock");
         migrateLegacyMainConfigSection("player-presence-sounds");
         migrateLegacyMainConfigSection("resource-pack");
+        migrateLegacyMainConfigSection("itemsadder-top-status");
         migrateLegacyMainConfigSection("join-leave-messages");
         migrateLegacyMainConfigSection("lag-reduction");
         migrateLegacyMainConfigSection("country-sounds");
@@ -15885,6 +15874,8 @@ public final class Testproject extends JavaPlugin {
                 || path.startsWith("realtime-clock.")
                 || path.startsWith("player-presence-sounds.")
                 || path.startsWith("resource-pack.")
+                || path.equals("itemsadder-top-status")
+                || path.startsWith("itemsadder-top-status.")
                 || path.startsWith("join-leave-messages.")
                 || path.startsWith("lag-reduction.")
                 || path.startsWith("country-sounds.")
