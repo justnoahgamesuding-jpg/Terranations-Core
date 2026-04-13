@@ -2,39 +2,39 @@ terra_status_layout:
   images:
     1:
       name: terra_health_empty
-      x: 0
+      x: -160
       y: 16
     2:
       name: terra_health_fill
-      x: 0
+      x: -160
       y: 16
     3:
       name: terra_hunger_empty
-      x: 176
+      x: 16
       y: 16
     4:
       name: terra_hunger_fill
-      x: 176
+      x: 16
       y: 16
   texts:
     1:
       name: terra_quest_font
       pattern: "<#F05A5D>[terra_health] <#F8C6C8>HP <#F05A5D>[terra_max_health]"
-      x: 64
+      x: -88
       y: 0
       scale: 0.36
       align: center
     2:
       name: terra_quest_font
       pattern: "<#E4C044>[terra_food] <#F4E0A0>FOOD <#E4C044>20"
-      x: 240
+      x: 88
       y: 0
       scale: 0.36
       align: center
     3:
       name: terra_quest_font
       pattern: "<#A7D36C>[terra_level]"
-      x: 152
+      x: 0
       y: 18
       scale: 0.36
       align: center

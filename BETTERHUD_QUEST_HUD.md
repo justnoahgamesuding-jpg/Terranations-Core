@@ -87,7 +87,7 @@ Examples:
 
 The sample styling uses layered dark text blocks to fake a smooth black panel behind the quest text. If your font pack does not render symbols like `✦` or `▸` cleanly, replace them with plain ASCII markers.
 
-The sample status HUD is anchored above the hotbar and uses horizontal value bars:
+The sample status HUD is anchored above the hotbar and uses horizontal value bars. The HUD anchor is `gui: 50,100`, so the bar group stays centered at the bottom as the window size changes. Visual size still follows Minecraft/BetterHud GUI scale.
 
 - `[terra_health] / [terra_max_health]`
 - `[terra_food] / 20`

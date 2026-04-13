@@ -6,5 +6,5 @@ terra_status_hud:
         x: 50
         y: 100
       pixel:
-        x: -152
+        x: 0
         y: -70
