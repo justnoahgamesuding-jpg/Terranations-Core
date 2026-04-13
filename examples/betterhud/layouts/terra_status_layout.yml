@@ -5,58 +5,35 @@ terra_status_layout:
       x: 0
       y: 0
     2:
-      name: terra_health_empty
-      x: 12
-      y: 10
-    3:
-      name: terra_health_fill
-      x: 12
-      y: 10
-    4:
-      name: terra_hunger_empty
-      x: 12
-      y: 29
-    5:
-      name: terra_hunger_fill
-      x: 12
-      y: 29
-    6:
       name: terra_status_divider
-      x: 12
-      y: 23
+      x: 10
+      y: 31
   texts:
     1:
       name: terra_quest_font
       pattern: "<#F1E9DA>HP"
-      x: 5
-      y: 13
-      scale: 0.28
+      x: 13
+      y: 14
+      scale: 0.32
       align: left
     2:
       name: terra_quest_font
       pattern: "<#F6F1E8>[health]/[max_health]"
-      x: 76
+      x: 136
       y: 14
-      scale: 0.30
-      align: center
+      scale: 0.34
+      align: right
     3:
       name: terra_quest_font
-      pattern: "<#E8D9B8>FOOD"
-      x: 5
-      y: 32
-      scale: 0.24
+      pattern: "<#E8D9B8>HUNGER"
+      x: 13
+      y: 48
+      scale: 0.30
       align: left
     4:
       name: terra_quest_font
       pattern: "<#F6F1E8>[food]/20"
-      x: 76
-      y: 33
-      scale: 0.30
-      align: center
-    5:
-      name: terra_quest_font
-      pattern: "<#A7D36C>[level]"
-      x: 147
-      y: 42
-      scale: 0.30
+      x: 136
+      y: 48
+      scale: 0.34
       align: right

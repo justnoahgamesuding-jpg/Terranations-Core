@@ -3,8 +3,8 @@ terra_status_hud:
     1:
       name: terra_status_layout
       gui:
-        x: 50
-        y: 100
+        x: 0
+        y: 50
       pixel:
-        x: -108
-        y: -54
+        x: 12
+        y: -34

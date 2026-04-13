@@ -62,7 +62,7 @@ Run a full server restart after changing BetterHud files. If you only reload the
 
 ## Position
 
-The sample HUD is now anchored to the top-left using:
+The sample quest HUD is anchored to the top-left using:
 
 - HUD `gui` position `0,0`
 - pixel offset `18,18`
@@ -83,9 +83,16 @@ Examples:
 
 The sample styling uses layered dark text blocks to fake a smooth black panel behind the quest text. If your font pack does not render symbols like `✦` or `▸` cleanly, replace them with plain ASCII markers.
 
+The sample status HUD is anchored to the left-middle of the screen and uses vertical numeric rows:
+
+- `HP [health]/[max_health]`
+- `HUNGER [food]/20`
+
+It does not use vanilla heart or hunger icons.
+
 ## Notes
 
 - Terra now registers native BetterHud placeholders, so use bracket syntax like `[terra_quest_title_plain]`.
 - Terra already returns fallback text when no active quest exists, so the HUD will not be blank.
 - `quests.itemsadder-sync.enabled` now defaults to `false` in Terra's `settings/quests.yml`.
-- The status HUD uses BetterHud built-ins: `[health]`, `[max_health]`, `[food]`, and `[level]`.
+- The status HUD uses BetterHud built-ins: `[health]`, `[max_health]`, and `[food]`.
