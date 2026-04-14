@@ -3010,6 +3010,7 @@ public final class Testproject extends JavaPlugin {
             return "Forge Shard";
         }
         return switch (key.toLowerCase(Locale.ROOT)) {
+            case "admin_merge_catalyst" -> "Admin Catalyst";
             case "forge_shard" -> "Forge Shard";
             case "tempered_flux" -> "Tempered Flux";
             case "binding_thread" -> "Binding Thread";
@@ -3024,6 +3025,7 @@ public final class Testproject extends JavaPlugin {
 
     public ItemStack createRareContractMaterial(String key, int amount) {
         Material baseMaterial = switch (key == null ? "" : key.toLowerCase(Locale.ROOT)) {
+            case "admin_merge_catalyst" -> Material.NETHER_STAR;
             case "tempered_flux" -> Material.BLAZE_POWDER;
             case "binding_thread" -> Material.STRING;
             case "runic_prism" -> Material.PRISMARINE_SHARD;
@@ -3033,19 +3035,31 @@ public final class Testproject extends JavaPlugin {
         ItemStack itemStack = new ItemStack(baseMaterial, Math.max(1, amount));
         ItemMeta meta = itemStack.getItemMeta();
         if (meta != null) {
-            meta.displayName(legacyComponent(switch (key == null ? "" : key.toLowerCase(Locale.ROOT)) {
+            String normalizedKey = key == null ? "" : key.toLowerCase(Locale.ROOT);
+            meta.displayName(legacyComponent(switch (normalizedKey) {
+                case "admin_merge_catalyst" -> "&c&lAdmin Catalyst";
                 case "tempered_flux" -> "&cTempered Flux";
                 case "binding_thread" -> "&dBinding Thread";
                 case "runic_prism" -> "&bRunic Prism";
                 case "ancient_core" -> "&6Ancient Core";
                 default -> "&5Forge Shard";
             }));
-            meta.lore(List.of(
-                    legacyComponent("&7Rare contract material."),
-                    legacyComponent("&7Used in advanced forge upgrades.")
-            ));
-            meta.getPersistentDataContainer().set(rareContractMaterialKey, PersistentDataType.STRING, key == null ? "forge_shard" : key.toLowerCase(Locale.ROOT));
+            if ("admin_merge_catalyst".equals(normalizedKey)) {
+                meta.lore(List.of(
+                        legacyComponent("&7100% merge success catalyst."),
+                        legacyComponent("&7Restricted admin item.")
+                ));
+            } else {
+                meta.lore(List.of(
+                        legacyComponent("&7Rare contract material."),
+                        legacyComponent("&7Used in advanced forge upgrades.")
+                ));
+            }
+            meta.getPersistentDataContainer().set(rareContractMaterialKey, PersistentDataType.STRING, key == null ? "forge_shard" : normalizedKey);
             itemStack.setItemMeta(meta);
+        }
+        if ("admin_merge_catalyst".equalsIgnoreCase(key)) {
+            itemStack = applySoulboundTag(itemStack);
         }
         return itemStack;
     }
@@ -3064,6 +3078,9 @@ public final class Testproject extends JavaPlugin {
     public double getForgeMergeSuccessChance(ItemStack baseItem, String materialKey) {
         if (!isForgedItem(baseItem)) {
             return 0.0D;
+        }
+        if ("admin_merge_catalyst".equalsIgnoreCase(materialKey)) {
+            return 1.0D;
         }
         ForgedRarity rarity = getForgedItemRarity(baseItem);
         if (rarity == null) {

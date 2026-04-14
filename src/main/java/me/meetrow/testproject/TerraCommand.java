@@ -257,6 +257,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handleCatalystCommand(sender, args);
         }
 
+        if (args[0].equalsIgnoreCase("admincatalyst")) {
+            return handleAdminCatalystCommand(sender, args);
+        }
+
         if (args[0].equalsIgnoreCase("quests")) {
             return handleQuestsCommand(sender, args);
         }
@@ -380,6 +384,51 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Gave " + target.getName() + " " + amount + "x " + catalystName + ".", NamedTextColor.GREEN));
         if (sender != target) {
             target.sendMessage(Component.text("You received " + amount + "x " + catalystName + ".", NamedTextColor.GOLD));
+        }
+        return true;
+    }
+
+    private boolean handleAdminCatalystCommand(CommandSender sender, String[] args) {
+        if (args.length < 2 || args.length > 3) {
+            sender.sendMessage(Component.text("Usage: /terra admincatalyst <Meetrow> [amount]", NamedTextColor.RED));
+            return true;
+        }
+
+        if (!args[1].equalsIgnoreCase("Meetrow")) {
+            sender.sendMessage(Component.text("Admin Catalyst can only be given to Meetrow.", NamedTextColor.RED));
+            return true;
+        }
+
+        Player target = Bukkit.getPlayerExact("Meetrow");
+        if (target == null) {
+            sender.sendMessage(Component.text("Meetrow must be online to receive the admin catalyst.", NamedTextColor.RED));
+            return true;
+        }
+
+        int amount = 1;
+        if (args.length == 3) {
+            try {
+                amount = Integer.parseInt(args[2]);
+            } catch (NumberFormatException exception) {
+                sender.sendMessage(Component.text("Amount must be a whole number.", NamedTextColor.RED));
+                return true;
+            }
+            if (amount <= 0) {
+                sender.sendMessage(Component.text("Amount must be above 0.", NamedTextColor.RED));
+                return true;
+            }
+        }
+
+        ItemStack catalyst = plugin.createRareContractMaterial("admin_merge_catalyst", amount);
+        Map<Integer, ItemStack> leftovers = target.getInventory().addItem(catalyst);
+        if (!leftovers.isEmpty()) {
+            sender.sendMessage(Component.text("Meetrow needs enough free inventory space for the admin catalyst.", NamedTextColor.RED));
+            return true;
+        }
+
+        sender.sendMessage(Component.text("Gave Meetrow " + amount + "x Admin Catalyst.", NamedTextColor.GREEN));
+        if (sender != target) {
+            target.sendMessage(Component.text("You received " + amount + "x Admin Catalyst.", NamedTextColor.GOLD));
         }
         return true;
     }
@@ -2945,6 +2994,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         entries.add(new HelpEntry("/terra maintenance <on|off|status|add|remove|list>", "Manage maintenance mode access.", ignored -> true));
         entries.add(new HelpEntry("/terra clearinventory <player>", "Clear a player's inventory but keep the Terra Guide.", ignored -> true));
         entries.add(new HelpEntry("/terra catalyst <player> <type> [amount]", "Give forge catalysts for merge testing.", ignored -> true));
+        entries.add(new HelpEntry("/terra admincatalyst Meetrow [amount]", "Give Meetrow the 100% merge admin catalyst.", ignored -> true));
         entries.add(new HelpEntry("/terra realtimeclock <on|off|status|sync>", "Control the real-time day/night clock.", ignored -> true));
         entries.add(new HelpEntry("/terra hungerspeed <multiplier|status>", "Set the global hunger drain speed.", ignored -> true));
         entries.add(new HelpEntry("/terra stability <status|enable|disable|scan|debug|meter|radius|delay|span|supportradius|debugradius|supports|strictness>", "Manage cave-in and support rules.", ignored -> true));
@@ -3359,6 +3409,16 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             if (args.length == 4) {
                 return partialMatches(args[3], List.of("1", "5", "10", "16", "32", "64"));
+            }
+            return Collections.emptyList();
+        }
+
+        if (args[0].equalsIgnoreCase("admincatalyst")) {
+            if (args.length == 2) {
+                return partialMatches(args[1], List.of("Meetrow"));
+            }
+            if (args.length == 3) {
+                return partialMatches(args[2], List.of("1", "2", "5", "10", "16", "32", "64"));
             }
             return Collections.emptyList();
         }
