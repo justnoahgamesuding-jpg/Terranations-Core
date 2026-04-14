@@ -2842,6 +2842,8 @@ public final class Testproject extends JavaPlugin {
         if (player == null || player.getAttribute(Attribute.GENERIC_MAX_HEALTH) == null) {
             return;
         }
+        player.setHealthScaled(true);
+        player.setHealthScale(20.0D);
         double bonus = 0.0D;
         for (ItemStack armorPiece : player.getInventory().getArmorContents()) {
             bonus += getForgedArmorHealthBonus(armorPiece);
