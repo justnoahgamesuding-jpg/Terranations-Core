@@ -47,7 +47,7 @@ public class BlacksmithAnvilListener implements Listener {
     private static final int MERGE_ACTION_SLOT = 42;
     private static final int MERGE_CLOSE_SLOT = 53;
 
-    private static final int[] RECIPE_SLOTS = {2, 3, 4, 5, 6, 20, 21, 22, 23, 24, 29, 30, 31, 32};
+    private static final int[] RECIPE_SLOTS = {20, 21, 22, 23, 24, 29, 30, 31, 32, 33};
 
     private final Testproject plugin;
     private final NamespacedKey mergeUiKey;
@@ -107,6 +107,12 @@ public class BlacksmithAnvilListener implements Listener {
         }
         if (event.getSlot() == MERGE_SLOT) {
             openMergeMenu(player);
+            return;
+        }
+
+        BlacksmithCategory category = BlacksmithCategory.fromSlot(event.getSlot());
+        if (category != null) {
+            openMenu(player, category);
             return;
         }
 
@@ -209,6 +215,9 @@ public class BlacksmithAnvilListener implements Listener {
         );
 
         fillForgeLayout(inventory);
+        for (BlacksmithCategory value : BlacksmithCategory.values()) {
+            inventory.setItem(value.slot, createCategoryItem(player, value, value == category));
+        }
         inventory.setItem(NORMAL_ANVIL_SLOT, createSimpleItem(Material.ANVIL, "&fRename Anvil", List.of(
                 "&7Open a rename-only anvil.",
                 "&7No repairing or combining."
@@ -220,7 +229,7 @@ public class BlacksmithAnvilListener implements Listener {
         )));
         inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close the forge menu.")));
 
-        List<Testproject.BlacksmithRecipe> recipes = getVisibleForgeRecipes();
+        List<Testproject.BlacksmithRecipe> recipes = getRecipes(category);
         for (int i = 0; i < RECIPE_SLOTS.length && i < recipes.size(); i++) {
             inventory.setItem(RECIPE_SLOTS[i], createRecipeItem(player, recipes.get(i)));
         }
@@ -228,13 +237,15 @@ public class BlacksmithAnvilListener implements Listener {
         player.openInventory(inventory);
     }
 
-    private List<Testproject.BlacksmithRecipe> getVisibleForgeRecipes() {
+    private List<Testproject.BlacksmithRecipe> getRecipes(BlacksmithCategory category) {
         List<Testproject.BlacksmithRecipe> recipes = new ArrayList<>();
         for (Testproject.BlacksmithRecipe recipe : plugin.getBlacksmithAnvilRecipes()) {
             if (recipe.result().name().startsWith("NETHERITE_") || recipe.category().equalsIgnoreCase("netherite")) {
                 continue;
             }
-            recipes.add(recipe);
+            if (recipe.category().equalsIgnoreCase(category.key)) {
+                recipes.add(recipe);
+            }
         }
         recipes.sort((left, right) -> {
             int levelCompare = Integer.compare(left.level(), right.level());
@@ -247,13 +258,27 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private Testproject.BlacksmithRecipe getRecipeForSlot(BlacksmithCategory category, int slot) {
-        List<Testproject.BlacksmithRecipe> recipes = getVisibleForgeRecipes();
+        List<Testproject.BlacksmithRecipe> recipes = getRecipes(category);
         for (int i = 0; i < RECIPE_SLOTS.length && i < recipes.size(); i++) {
             if (RECIPE_SLOTS[i] == slot) {
                 return recipes.get(i);
             }
         }
         return null;
+    }
+
+    private ItemStack createCategoryItem(Player player, BlacksmithCategory category, boolean selected) {
+        int level = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH)
+                ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH)
+                : 0;
+        List<String> lore = new ArrayList<>();
+        lore.add("&7Show the &f" + category.display + " &7forge tier.");
+        lore.add(level >= category.requiredLevel
+                ? "&aBlacksmith quality bonus active"
+                : "&7Quality bonus starts at Lv." + category.requiredLevel);
+        lore.add("");
+        lore.add(selected ? "&eCurrently selected." : "&7Click to switch rack.");
+        return createSimpleItem(selected ? category.icon : category.selectorIcon, category.displayName(level), lore);
     }
 
     private ItemStack createRecipeItem(Player player, Testproject.BlacksmithRecipe recipe) {
@@ -332,7 +357,16 @@ public class BlacksmithAnvilListener implements Listener {
         for (int slot : new int[]{10, 11, 12, 13, 14, 15, 16, 19, 25, 28, 34}) {
             inventory.setItem(slot, gray);
         }
-        inventory.setItem(33, null);
+        inventory.setItem(20, createUiItem(Material.STONE_SWORD, "&8Stone Rack", "filler", List.of()));
+        inventory.setItem(21, createUiItem(Material.STONE_PICKAXE, "&8Stone Rack", "filler", List.of()));
+        inventory.setItem(22, createUiItem(Material.STONE_SHOVEL, "&8Stone Rack", "filler", List.of()));
+        inventory.setItem(23, createUiItem(Material.STONE_AXE, "&8Stone Rack", "filler", List.of()));
+        inventory.setItem(24, createUiItem(Material.STONE_HOE, "&8Stone Rack", "filler", List.of()));
+        inventory.setItem(29, createUiItem(Material.WOODEN_SWORD, "&8Wood Rack", "filler", List.of()));
+        inventory.setItem(30, createUiItem(Material.WOODEN_PICKAXE, "&8Wood Rack", "filler", List.of()));
+        inventory.setItem(31, createUiItem(Material.WOODEN_SHOVEL, "&8Wood Rack", "filler", List.of()));
+        inventory.setItem(32, createUiItem(Material.WOODEN_AXE, "&8Wood Rack", "filler", List.of()));
+        inventory.setItem(33, createUiItem(Material.WOODEN_HOE, "&8Wood Rack", "filler", List.of()));
     }
 
     private void openVanillaAnvil(Player player) {
@@ -450,24 +484,25 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private enum BlacksmithCategory {
-        BASICS("basics", 10, 1, Material.LEATHER_CHESTPLATE, "Basics"),
-        STONE("stone", 19, 1, Material.STONE_PICKAXE, "Stone"),
-        IRON("iron", 28, 3, Material.IRON_PICKAXE, "Iron"),
-        GOLD("gold", 37, 4, Material.GOLDEN_CHESTPLATE, "Gold"),
-        DIAMOND("diamond", 46, 7, Material.DIAMOND_PICKAXE, "Diamond"),
-        NETHERITE("netherite", 47, 10, Material.NETHERITE_CHESTPLATE, "Netherite");
+        BASICS("basics", 2, 1, Material.WOODEN_PICKAXE, Material.WOODEN_PICKAXE, "Wood"),
+        STONE("stone", 3, 1, Material.STONE_PICKAXE, Material.STONE_PICKAXE, "Stone"),
+        IRON("iron", 4, 3, Material.IRON_PICKAXE, Material.IRON_PICKAXE, "Iron"),
+        GOLD("gold", 5, 4, Material.GOLDEN_PICKAXE, Material.GOLDEN_PICKAXE, "Gold"),
+        DIAMOND("diamond", 6, 7, Material.DIAMOND_PICKAXE, Material.DIAMOND_PICKAXE, "Diamond");
 
         private final String key;
         private final int slot;
         private final int requiredLevel;
         private final Material icon;
+        private final Material selectorIcon;
         private final String display;
 
-        BlacksmithCategory(String key, int slot, int requiredLevel, Material icon, String display) {
+        BlacksmithCategory(String key, int slot, int requiredLevel, Material icon, Material selectorIcon, String display) {
             this.key = key;
             this.slot = slot;
             this.requiredLevel = requiredLevel;
             this.icon = icon;
+            this.selectorIcon = selectorIcon;
             this.display = display;
         }
 
