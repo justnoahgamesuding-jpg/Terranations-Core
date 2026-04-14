@@ -416,6 +416,7 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ClimateWeatherListener(this), this);
         getServer().getPluginManager().registerEvents(new ClimateGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new SoulboundListener(this), this);
+        getServer().getPluginManager().registerEvents(new GuidanceItemListener(this), this);
         getServer().getPluginManager().registerEvents(new ServerUtilityListener(this), this);
         professionSelectionListener = new ProfessionSelectionListener(this);
         getServer().getPluginManager().registerEvents(professionSelectionListener, this);
