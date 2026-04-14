@@ -3061,21 +3061,40 @@ public final class Testproject extends JavaPlugin {
         return meta.getPersistentDataContainer().get(rareContractMaterialKey, PersistentDataType.STRING);
     }
 
-    public double getForgeMergeSuccessChance(String materialKey) {
-        return switch (materialKey == null ? "" : materialKey.toLowerCase(Locale.ROOT)) {
-            case "tempered_flux" -> 0.28D;
-            case "binding_thread" -> 0.35D;
-            case "runic_prism" -> 0.45D;
-            case "ancient_core" -> 0.55D;
-            default -> 0.20D;
+    public double getForgeMergeSuccessChance(ItemStack baseItem, String materialKey) {
+        if (!isForgedItem(baseItem)) {
+            return 0.0D;
+        }
+        ForgedRarity rarity = getForgedItemRarity(baseItem);
+        if (rarity == null) {
+            return 0.0D;
+        }
+        int tier = getForgedDisplayLevel(baseItem);
+        double chance = 0.24D;
+        chance -= switch (rarity) {
+            case COMMON -> 0.00D;
+            case UNCOMMON -> 0.07D;
+            case RARE -> 0.15D;
+            case EPIC -> 0.24D;
+            case LEGENDARY -> 0.34D;
         };
+        chance -= Math.max(0, tier - 1) * 0.07D;
+        chance += switch (materialKey == null ? "" : materialKey.toLowerCase(Locale.ROOT)) {
+            case "forge_shard" -> 0.08D;
+            case "tempered_flux" -> 0.12D;
+            case "binding_thread" -> 0.18D;
+            case "runic_prism" -> 0.25D;
+            case "ancient_core" -> 0.33D;
+            default -> 0.00D;
+        };
+        return Math.max(0.02D, Math.min(0.72D, chance));
     }
 
     public ForgeMergeOutcome attemptForgeMergeFromInputs(ItemStack baseItem, String rareMaterialKey) {
-        if (!isForgedItem(baseItem) || getForgedDisplayLevel(baseItem) >= 5 || rareMaterialKey == null || rareMaterialKey.isBlank()) {
+        if (!isForgedItem(baseItem) || getForgedDisplayLevel(baseItem) >= 5) {
             return ForgeMergeOutcome.INVALID;
         }
-        if (ThreadLocalRandom.current().nextDouble() > getForgeMergeSuccessChance(rareMaterialKey)) {
+        if (ThreadLocalRandom.current().nextDouble() > getForgeMergeSuccessChance(baseItem, rareMaterialKey)) {
             return ForgeMergeOutcome.FAILED;
         }
 
