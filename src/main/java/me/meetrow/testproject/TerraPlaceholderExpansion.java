@@ -105,15 +105,23 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
     }
 
     private String getServerTimePlaceholder() {
-        return SERVER_TIME_FORMAT.format(LocalDateTime.now(ZoneId.systemDefault()));
+        return SERVER_TIME_FORMAT.format(LocalDateTime.now(getServerClockZoneId()));
     }
 
     private String getServerDatePlaceholder() {
-        return SERVER_DATE_FORMAT.format(LocalDateTime.now(ZoneId.systemDefault()));
+        return SERVER_DATE_FORMAT.format(LocalDateTime.now(getServerClockZoneId()));
     }
 
     private String getServerDateTimePlaceholder() {
-        return SERVER_DATETIME_FORMAT.format(LocalDateTime.now(ZoneId.systemDefault()));
+        return SERVER_DATETIME_FORMAT.format(LocalDateTime.now(getServerClockZoneId()));
+    }
+
+    private ZoneId getServerClockZoneId() {
+        try {
+            return ZoneId.of(plugin.getRealTimeClockTimezoneId());
+        } catch (Exception ignored) {
+            return ZoneId.systemDefault();
+        }
     }
 
     private ClimateSnapshot getClimateSnapshot(OfflinePlayer player) {
