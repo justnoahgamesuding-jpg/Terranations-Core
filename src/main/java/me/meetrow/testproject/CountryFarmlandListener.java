@@ -39,31 +39,6 @@ public class CountryFarmlandListener implements Listener {
             return;
         }
 
-        if (!plugin.prepareProfessionRequirement(event.getPlayer().getUniqueId(), Profession.FARMER)) {
-            event.setCancelled(true);
-            event.getPlayer().sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER),
-                    "action", "use this block",
-                    "level", "1"
-            )));
-            return;
-        }
-
-        int farmerLevel = plugin.getProfessionLevel(event.getPlayer().getUniqueId(), Profession.FARMER);
-
-        int actionRequiredLevel = originalType == Material.COARSE_DIRT
-                ? plugin.getFarmerCoarseDirtConversionRequiredLevel()
-                : plugin.getFarmerFarmlandCreationRequiredLevel();
-        if (farmerLevel < actionRequiredLevel) {
-            event.setCancelled(true);
-            event.getPlayer().sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER),
-                    "action", originalType == Material.COARSE_DIRT ? "convert coarse dirt" : "create farmland",
-                    "level", String.valueOf(actionRequiredLevel)
-            )));
-            return;
-        }
-
         if (originalType != Material.COARSE_DIRT) {
             Country country = plugin.getCountryAt(clickedBlock.getLocation());
             if (country != null && country.hasTerritory()) {
@@ -85,6 +60,9 @@ public class CountryFarmlandListener implements Listener {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             Material updatedType = targetBlock.getType();
             if (originalType == Material.COARSE_DIRT && updatedType == Material.DIRT) {
+                if (!plugin.meetsProfessionRequirement(event.getPlayer().getUniqueId(), Profession.FARMER)) {
+                    return;
+                }
                 int awardedXp = plugin.rewardProfessionXp(event.getPlayer(), Profession.FARMER, plugin.getFarmerCoarseDirtConversionXp());
                 if (awardedXp > 0) {
                     event.getPlayer().sendMessage(plugin.getMessage("rewards.farmer.till-xp", plugin.placeholders(
@@ -95,6 +73,9 @@ public class CountryFarmlandListener implements Listener {
                 return;
             }
             if (updatedType == Material.FARMLAND) {
+                if (!plugin.meetsProfessionRequirement(event.getPlayer().getUniqueId(), Profession.FARMER)) {
+                    return;
+                }
                 int awardedXp = plugin.rewardProfessionXp(event.getPlayer(), Profession.FARMER, plugin.getFarmerFarmlandCreationXp());
                 if (awardedXp > 0) {
                     event.getPlayer().sendMessage(plugin.getMessage("rewards.farmer.till-xp", plugin.placeholders(
@@ -110,27 +91,6 @@ public class CountryFarmlandListener implements Listener {
     public void onPlayerUseWaterBucket(PlayerBucketEmptyEvent event) {
         if (event.getBucket() != Material.WATER_BUCKET) {
             return;
-        }
-        if (plugin.bypassesProfessionRestrictions(event.getPlayer().getUniqueId())) {
-            return;
-        }
-
-        if (!plugin.prepareProfessionRequirement(event.getPlayer().getUniqueId(), Profession.FARMER)) {
-            event.setCancelled(true);
-            event.getPlayer().sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER),
-                    "action", "use this item",
-                    "level", "1"
-            )));
-            return;
-        }
-
-        if (plugin.getProfessionLevel(event.getPlayer().getUniqueId(), Profession.FARMER) < plugin.getFarmerWaterBucketRequiredLevel()) {
-            event.setCancelled(true);
-            event.getPlayer().sendMessage(plugin.getMessage("profession.farmer.water-bucket-locked", plugin.placeholders(
-                    "level", String.valueOf(plugin.getFarmerWaterBucketRequiredLevel()),
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER)
-            )));
         }
     }
 

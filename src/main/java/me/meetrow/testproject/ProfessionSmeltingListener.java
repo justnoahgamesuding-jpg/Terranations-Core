@@ -38,7 +38,9 @@ public class ProfessionSmeltingListener implements Listener {
     public void onBlockDropItem(BlockDropItemEvent event) {
         Player player = event.getPlayer();
         Profession requiredProfession = plugin.getRequiredProfessionForBlock(event.getBlockState().getType());
-        Profession profession = plugin.resolveProfessionForRequirement(player.getUniqueId(), requiredProfession);
+        Profession profession = requiredProfession != null && plugin.meetsProfessionRequirement(player.getUniqueId(), requiredProfession)
+                ? requiredProfession
+                : null;
         List<ItemStack> collectedDrops = new ArrayList<>();
         boolean doubled = false;
 
@@ -89,7 +91,7 @@ public class ProfessionSmeltingListener implements Listener {
         if (killer == null || plugin.bypassesProfessionRestrictions(killer.getUniqueId())) {
             return;
         }
-        if (!plugin.prepareProfessionRequirement(killer.getUniqueId(), Profession.FARMER)) {
+        if (!plugin.meetsProfessionRequirement(killer.getUniqueId(), Profession.FARMER)) {
             return;
         }
 
@@ -124,15 +126,6 @@ public class ProfessionSmeltingListener implements Listener {
             return;
         }
 
-        if (event.getInventory().getType() == InventoryType.SMOKER
-                && plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.FARMER)
-                && plugin.getProfessionLevel(player.getUniqueId(), Profession.FARMER) < plugin.getFarmerSmokerRequiredLevel()) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.farmer.smoker-locked", plugin.placeholders(
-                    "level", String.valueOf(plugin.getFarmerSmokerRequiredLevel()),
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER)
-            )));
-        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -160,17 +153,6 @@ public class ProfessionSmeltingListener implements Listener {
         }
         if (access == Testproject.FurnaceAccessResult.EXPIRED) {
             plugin.clearFurnaceSession(location);
-            return;
-        }
-
-        if (inventoryType == InventoryType.SMOKER
-                && plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.FARMER)
-                && plugin.getProfessionLevel(player.getUniqueId(), Profession.FARMER) < plugin.getFarmerSmokerRequiredLevel()) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.farmer.smoker-locked", plugin.placeholders(
-                    "level", String.valueOf(plugin.getFarmerSmokerRequiredLevel()),
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER)
-            )));
             return;
         }
 
@@ -279,7 +261,7 @@ public class ProfessionSmeltingListener implements Listener {
             return;
         }
 
-        if (plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.BLACKSMITH)) {
+        if (plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.BLACKSMITH)) {
             int blacksmithXp = plugin.getBlacksmithSmeltXp(currentItem.getType()) * amount;
             blacksmithXp = plugin.rewardProfessionXp(player, Profession.BLACKSMITH, blacksmithXp);
             if (blacksmithXp > 0) {
@@ -301,7 +283,7 @@ public class ProfessionSmeltingListener implements Listener {
             return;
         }
 
-        if (plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
+        if (plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
             int farmerXp = plugin.getFarmerCookingXp(currentItem.getType()) * amount;
             farmerXp = plugin.rewardProfessionXp(player, Profession.FARMER, farmerXp);
             if (farmerXp > 0) {
@@ -353,53 +335,6 @@ public class ProfessionSmeltingListener implements Listener {
     private void enforceInputRestrictions(Player player, ItemStack moving, InventoryType inventoryType, org.bukkit.event.Cancellable event) {
         if (moving == null || moving.getType().isAir()) {
             return;
-        }
-
-        if (plugin.isSmeltableOre(moving.getType())) {
-            if (!plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.BLACKSMITH)
-                    && !plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.MINER)) {
-                event.setCancelled(true);
-                player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.BLACKSMITH),
-                        "action", "use this block",
-                        "level", "1"
-                )));
-            }
-            return;
-        }
-
-        if (!plugin.isCookableFood(moving.getType())) {
-            return;
-        }
-
-        if (!plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER),
-                    "action", "use this block",
-                    "level", "1"
-            )));
-            return;
-        }
-
-        int requiredLevel = plugin.getFarmerCookingLevel(moving.getType());
-        if (plugin.getProfessionLevel(player.getUniqueId(), Profession.FARMER) < requiredLevel) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.farmer.cooking-locked", plugin.placeholders(
-                    "item", plugin.formatMaterialName(moving.getType()),
-                    "level", String.valueOf(requiredLevel),
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER)
-            )));
-            return;
-        }
-
-        if (inventoryType == InventoryType.SMOKER
-                && plugin.getProfessionLevel(player.getUniqueId(), Profession.FARMER) < plugin.getFarmerSmokerRequiredLevel()) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.farmer.smoker-locked", plugin.placeholders(
-                    "level", String.valueOf(plugin.getFarmerSmokerRequiredLevel()),
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER)
-            )));
         }
     }
 

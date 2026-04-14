@@ -5,7 +5,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
@@ -39,62 +38,27 @@ public class ProfessionCraftListener implements Listener {
             return;
         }
 
+        if (!plugin.tryConsumeSharedActionCooldown(player)) {
+            event.setCancelled(true);
+            return;
+        }
+
         if (plugin.isFarmerCraftFood(resultType)) {
-            if (!plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
-                event.setCancelled(true);
-                player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                        "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER),
-                        "action", "use this item",
-                        "level", "1"
-                )));
-                return;
-            }
-
-            int requiredLevel = plugin.getFarmerCraftLevel(resultType);
-            if (plugin.getProfessionLevel(player.getUniqueId(), Profession.FARMER) < requiredLevel) {
-                event.setCancelled(true);
-                player.sendMessage(plugin.getMessage("profession.farmer.craft-locked", plugin.placeholders(
-                        "item", plugin.formatMaterialName(resultType),
-                        "level", String.valueOf(requiredLevel),
-                        "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER)
-                )));
-                return;
-            }
-
-            int craftedAmount = getCraftedAmount(event, result);
-            int awardedXp = plugin.rewardProfessionXp(player, Profession.FARMER, plugin.getFarmerCraftXp(resultType) * craftedAmount);
-            if (awardedXp > 0) {
-                player.sendMessage(plugin.getMessage("rewards.farmer.craft-xp", plugin.placeholders(
-                        "xp", String.valueOf(awardedXp),
-                        "amount", String.valueOf(craftedAmount),
-                        "item", plugin.formatMaterialName(resultType)
-                )));
+            if (plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
+                int craftedAmount = getCraftedAmount(event, result);
+                int awardedXp = plugin.rewardProfessionXp(player, Profession.FARMER, plugin.getFarmerCraftXp(resultType) * craftedAmount);
+                if (awardedXp > 0) {
+                    player.sendMessage(plugin.getMessage("rewards.farmer.craft-xp", plugin.placeholders(
+                            "xp", String.valueOf(awardedXp),
+                            "amount", String.valueOf(craftedAmount),
+                            "item", plugin.formatMaterialName(resultType)
+                    )));
+                }
             }
             return;
         }
 
         if (!plugin.isBlacksmithCraft(resultType) || plugin.isForgeManagedEquipment(resultType)) {
-            return;
-        }
-
-        int requiredLevel = plugin.getBlacksmithRequiredLevel(resultType);
-        if (requiredLevel > 0 && !plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.BLACKSMITH)) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.BLACKSMITH),
-                    "action", "use this item",
-                    "level", "1"
-            )));
-            return;
-        }
-
-        if (requiredLevel > 0 && plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH) < requiredLevel) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.blacksmith.level-locked", plugin.placeholders(
-                    "item", plugin.formatMaterialName(resultType),
-                    "level", String.valueOf(requiredLevel),
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.BLACKSMITH)
-            )));
             return;
         }
 

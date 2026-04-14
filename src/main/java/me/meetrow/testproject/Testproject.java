@@ -2636,16 +2636,7 @@ public final class Testproject extends JavaPlugin {
     }
 
     public boolean canCraftBlacksmithRecipe(UUID playerId, BlacksmithRecipe recipe) {
-        if (recipe == null) {
-            return false;
-        }
-        if (recipe.level() <= 0 || isPublicBlacksmithRecipe(recipe)) {
-            return true;
-        }
-        if (!canUseAdvancedBlacksmithForge(playerId)) {
-            return false;
-        }
-        return getProfessionLevel(playerId, Profession.BLACKSMITH) >= recipe.level();
+        return recipe != null;
     }
 
     public ItemStack createForgedEquipment(Player player, BlacksmithRecipe recipe) {
@@ -7898,7 +7889,6 @@ public final class Testproject extends JavaPlugin {
 
     public int getMinerBreakCooldownSeconds(UUID playerId) {
         int baseCooldown = getBlockDelaySeconds();
-        int totalProfessionReduction = getTotalProfessionCooldownReductionSeconds(playerId);
         int minerReduction = 0;
         if (hasProfession(playerId, Profession.MINER)) {
             int level = getProfessionLevel(playerId, Profession.MINER);
@@ -7912,7 +7902,7 @@ public final class Testproject extends JavaPlugin {
         }
         Country country = getPlayerCountry(playerId);
         int countryReduction = getCountryMinerCooldownReduction(country);
-        return Math.max(3, baseCooldown - totalProfessionReduction - minerReduction - countryReduction);
+        return Math.max(3, baseCooldown - minerReduction - countryReduction);
     }
 
     public int getBuilderPlaceCooldownSeconds(UUID playerId) {
@@ -7926,12 +7916,33 @@ public final class Testproject extends JavaPlugin {
         return Math.max(0, Math.min(getMinerBreakCooldownSeconds(playerId), getBuilderPlaceCooldownSeconds(playerId)));
     }
 
-    private int getTotalProfessionCooldownReductionSeconds(UUID playerId) {
-        int reduction = 0;
-        for (Profession profession : getOwnedProfessions(playerId)) {
-            reduction += Math.max(0, getProfessionLevel(playerId, profession) - 1);
+    public long getSharedActionCooldownEnd(UUID playerId) {
+        return Math.max(getBreakCooldownEnd(playerId), getPlaceCooldownEnd(playerId));
+    }
+
+    public boolean tryConsumeSharedActionCooldown(Player player) {
+        if (player == null || hasBlockDelayBypass(player.getUniqueId()) || !isBlockDelayEnabled()) {
+            return true;
         }
-        return reduction;
+
+        UUID playerId = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long cooldownEnd = getSharedActionCooldownEnd(playerId);
+        if (cooldownEnd > now) {
+            long lastMessageTime = Math.max(getLastBreakCooldownMessageTime(playerId), getLastPlaceCooldownMessageTime(playerId));
+            if (now - lastMessageTime >= 2000L) {
+                long secondsLeft = (long) Math.ceil((cooldownEnd - now) / 1000.0D);
+                player.sendMessage(colorize("&cAction cooldown: &f" + secondsLeft + "s"));
+                setLastBreakCooldownMessageTime(playerId, now);
+                setLastPlaceCooldownMessageTime(playerId, now);
+            }
+            return false;
+        }
+
+        long nextCooldown = now + (Math.max(0, getSharedActionCooldownSeconds(playerId)) * 1000L);
+        setBreakCooldown(playerId, nextCooldown);
+        setPlaceCooldown(playerId, nextCooldown);
+        return true;
     }
 
     public boolean canMinerBreak(Material material, int level) {

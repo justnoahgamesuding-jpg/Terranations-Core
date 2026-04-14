@@ -27,21 +27,12 @@ public class BlockDelayListener implements Listener {
             return;
         }
 
-        boolean bypassProfessionRestrictions = plugin.bypassesProfessionRestrictions(player.getUniqueId());
-
         boolean awardBreakRewards = plugin.shouldAwardBreakRewards(player, event.getBlock());
         Material material = event.getBlock().getType();
         Profession requiredProfession = plugin.getRequiredProfessionForBlock(material);
-        Profession actionProfession = plugin.resolveProfessionForRequirement(player.getUniqueId(), requiredProfession);
-        if (!bypassProfessionRestrictions && requiredProfession != null && !plugin.meetsProfessionRequirement(player.getUniqueId(), requiredProfession)) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.block-job-required", plugin.placeholders(
-                    "block", plugin.formatMaterialName(material),
-                    "profession", plugin.getProfessionPlainDisplayName(requiredProfession),
-                    "level", String.valueOf(plugin.getRequiredProfessionLevelForBlock(requiredProfession, material))
-            )));
-            return;
-        }
+        Profession actionProfession = requiredProfession != null && plugin.meetsProfessionRequirement(player.getUniqueId(), requiredProfession)
+                ? requiredProfession
+                : null;
 
         if (plugin.isFarmerCrop(material) && !isHoe(player.getInventory().getItemInMainHand())) {
             event.setCancelled(true);
@@ -60,19 +51,6 @@ public class BlockDelayListener implements Listener {
             )));
             return;
         }
-        if (!bypassProfessionRestrictions && requiredProfession != null && plugin.meetsProfessionRequirement(player.getUniqueId(), requiredProfession)) {
-            int level = plugin.getProfessionLevel(player.getUniqueId(), requiredProfession);
-            if (!plugin.canProfessionBreak(player.getUniqueId(), requiredProfession, material, level)) {
-                event.setCancelled(true);
-                player.sendMessage(plugin.getMessage("profession.block-level-locked", plugin.placeholders(
-                        "block", plugin.formatMaterialName(material),
-                        "level", String.valueOf(plugin.getRequiredProfessionLevelForBlock(requiredProfession, material)),
-                        "profession", plugin.getProfessionPlainDisplayName(requiredProfession)
-                )));
-                return;
-            }
-        }
-
         if (actionProfession != null) {
             plugin.noteProfessionAction(player.getUniqueId(), actionProfession);
         }
@@ -99,15 +77,12 @@ public class BlockDelayListener implements Listener {
         BlockReward reward = plugin.getBlockReward(material);
         int xpAward = 0;
 
-        if (requiredProfession != null && plugin.meetsProfessionRequirement(player.getUniqueId(), requiredProfession)) {
-            int level = plugin.getProfessionLevel(player.getUniqueId(), requiredProfession);
-            xpAward = plugin.getProfessionBlockXp(requiredProfession, material, level);
-            if (requiredProfession == Profession.FARMER && plugin.isFarmerCrop(material) && !fullyGrownCrop) {
+        if (actionProfession != null) {
+            int level = plugin.getProfessionLevel(player.getUniqueId(), actionProfession);
+            xpAward = plugin.getProfessionBlockXp(actionProfession, material, level);
+            if (actionProfession == Profession.FARMER && plugin.isFarmerCrop(material) && !fullyGrownCrop) {
                 xpAward = Math.min(xpAward, 1);
             }
-            xpAward = plugin.rewardProfessionXp(player, requiredProfession, xpAward);
-        } else if (actionProfession != null) {
-            xpAward = reward.xp();
             xpAward = plugin.rewardProfessionXp(player, actionProfession, xpAward);
         }
 
@@ -115,17 +90,19 @@ public class BlockDelayListener implements Listener {
             return;
         }
 
-        boolean paidMoney = false;
         if (reward.money() > 0.0D && plugin.hasEconomy() && plugin.areBlockMoneyRewardsEnabled()) {
             double rewardMoney = reward.money()
                     * plugin.getCountryPassiveMoneyMultiplier(plugin.getPlayerCountry(player.getUniqueId()));
             plugin.depositBalance(player.getUniqueId(), rewardMoney);
-            paidMoney = true;
             player.sendMessage(plugin.getMessage("rewards.break.money-and-xp", plugin.placeholders(
                     "xp", String.valueOf(xpAward),
                     "money", plugin.formatMoney(rewardMoney),
                     "block", plugin.formatMaterialName(material)
             )));
+            return;
+        }
+
+        if (xpAward <= 0) {
             return;
         }
 
@@ -206,15 +183,6 @@ public class BlockDelayListener implements Listener {
         }
         plugin.noteSuccessfulBlockAction(player.getUniqueId(), breakAction);
         return true;
-    }
-
-    private boolean isMinerTool(ItemStack itemStack) {
-        if (itemStack == null) {
-            return false;
-        }
-
-        String materialName = itemStack.getType().name();
-        return materialName.endsWith("_PICKAXE") || materialName.endsWith("_SHOVEL");
     }
 
     private RequiredTool getRequiredTool(Material material) {

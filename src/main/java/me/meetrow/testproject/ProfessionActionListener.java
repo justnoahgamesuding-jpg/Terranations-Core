@@ -31,42 +31,6 @@ public class ProfessionActionListener implements Listener {
         }
         Material material = event.getBlockPlaced().getType();
 
-        if (isFarmerPlantable(material) && !plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER),
-                    "action", "use this block",
-                    "level", "1"
-            )));
-            return;
-        }
-
-        Profession requiredProfession = plugin.getRequiredProfessionForBlock(material);
-        if (requiredProfession == Profession.BUILDER && !plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.BUILDER)) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.BUILDER),
-                    "action", "use this block",
-                    "level", "1"
-            )));
-            return;
-        }
-
-        if (requiredProfession == Profession.BUILDER && plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.BUILDER)) {
-            if (plugin.getProfessionLevel(player.getUniqueId(), Profession.BUILDER) < plugin.getBuilderPlaceRequiredLevel()) {
-                event.setCancelled(true);
-                player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                        "profession", plugin.getProfessionPlainDisplayName(Profession.BUILDER),
-                        "action", "place builder blocks",
-                        "level", String.valueOf(plugin.getBuilderPlaceRequiredLevel())
-                )));
-                return;
-            }
-            int xp = plugin.getProfessionBlockXp(Profession.BUILDER, material, plugin.getProfessionLevel(player.getUniqueId(), Profession.BUILDER));
-            plugin.rewardProfessionXp(player, Profession.BUILDER, xp > 0 ? xp : plugin.getBuilderPlaceXp());
-            return;
-        }
-
         if (isClimateSapling(material) && plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.LUMBERJACK)
                 && plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.LUMBERJACK)
                 && plugin.rollInstantGrowProc(player.getUniqueId(), Profession.LUMBERJACK)) {
@@ -74,15 +38,6 @@ public class ProfessionActionListener implements Listener {
         }
 
         if (isFarmerPlantable(material) && plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
-            if (plugin.getProfessionLevel(player.getUniqueId(), Profession.FARMER) < plugin.getFarmerPlantRequiredLevel()) {
-                event.setCancelled(true);
-                player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                        "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER),
-                        "action", "plant crops",
-                        "level", String.valueOf(plugin.getFarmerPlantRequiredLevel())
-                )));
-                return;
-            }
             double xp = plugin.getFarmerPlantXp();
             int awardedXp = plugin.rewardFractionalProfessionXp(player, Profession.FARMER, xp);
             if (awardedXp > 0) {
@@ -113,22 +68,13 @@ public class ProfessionActionListener implements Listener {
         if (plugin.bypassesProfessionRestrictions(player.getUniqueId())) {
             return;
         }
-        if (!plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
-            return;
-        }
 
         Block clickedBlock = event.getClickedBlock();
         if (!isFarmerBonemealTarget(clickedBlock)) {
             return;
         }
 
-        if (plugin.getProfessionLevel(player.getUniqueId(), Profession.FARMER) < plugin.getFarmerBonemealRequiredLevel()) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER),
-                    "action", "use bonemeal",
-                    "level", String.valueOf(plugin.getFarmerBonemealRequiredLevel())
-            )));
+        if (!plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
             return;
         }
 
