@@ -33,14 +33,15 @@ public final class TerraGuideListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
         if (event.getAction() != Action.RIGHT_CLICK_AIR
                 && event.getAction() != Action.RIGHT_CLICK_BLOCK
-                && event.getAction() != Action.LEFT_CLICK_AIR) {
+                && event.getAction() != Action.LEFT_CLICK_AIR
+                && event.getAction() != Action.LEFT_CLICK_BLOCK) {
             return;
         }
         if (!plugin.isGuidanceItem(event.getItem())) {
