@@ -2827,14 +2827,49 @@ public final class Testproject extends JavaPlugin {
         if (material == null || rarity == null) {
             return null;
         }
-        if (rarity == ForgedRarity.LEGENDARY && material.name().endsWith("_PICKAXE")) {
-            return "Ore Surge: Fortune III for 30s";
+        String name = material.name();
+        if (name.endsWith("_PICKAXE")) {
+            return switch (rarity) {
+                case LEGENDARY -> "Ore Surge: Fortune III for 30s";
+                case EPIC -> "Deep Cut: higher ore yield chance";
+                case RARE -> "Fine Edge: steadier mining";
+                default -> "Forged mining quality";
+            };
         }
-        if (rarity == ForgedRarity.EPIC && material.name().endsWith("_PICKAXE")) {
-            return "Deep Cut: stronger ore yields";
+        if (name.endsWith("_SWORD")) {
+            return switch (rarity) {
+                case LEGENDARY -> "Battle Rhythm: Strength I burst on hit";
+                case EPIC -> "Edge Flow: Speed burst on hit";
+                case RARE -> "Duel Focus: sharper combat uptime";
+                default -> "Forged combat quality";
+            };
         }
-        if (rarity == ForgedRarity.RARE && material.name().endsWith("_PICKAXE")) {
-            return "Fine Edge: steadier mining";
+        if (name.endsWith("_AXE")) {
+            return switch (rarity) {
+                case LEGENDARY -> "Timber Rush: Haste II after chopping logs";
+                case EPIC -> "Heavy Swing: stronger chop uptime";
+                case RARE -> "Woodcaller: steadier lumber flow";
+                default -> "Forged chop quality";
+            };
+        }
+        if (name.endsWith("_HOE")) {
+            return switch (rarity) {
+                case LEGENDARY -> "Harvest Bloom: crop speed burst";
+                case EPIC -> "Field Step: speed after harvest";
+                case RARE -> "Green Thumb: smoother harvest rhythm";
+                default -> "Forged harvest quality";
+            };
+        }
+        if (name.endsWith("_HELMET")
+                || name.endsWith("_CHESTPLATE")
+                || name.endsWith("_LEGGINGS")
+                || name.endsWith("_BOOTS")) {
+            return switch (rarity) {
+                case LEGENDARY -> "Bulwark: Resistance burst when struck";
+                case EPIC -> "Guardstep: Speed burst when struck";
+                case RARE -> "Iron Will: steadier defense";
+                default -> "Forged defense quality";
+            };
         }
         return "Forged quality bonus";
     }
