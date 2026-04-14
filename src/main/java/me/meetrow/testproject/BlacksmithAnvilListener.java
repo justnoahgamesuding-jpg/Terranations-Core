@@ -324,16 +324,15 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private void fillForgeLayout(Inventory inventory) {
-        ItemStack filler = createUiItem(Material.GRAY_STAINED_GLASS_PANE, "&7", "filler", List.of());
-        ItemStack border = createUiItem(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "&7", "filler", List.of());
+        ItemStack black = createUiItem(Material.BLACK_STAINED_GLASS_PANE, "&8", "filler", List.of());
+        ItemStack gray = createUiItem(Material.GRAY_STAINED_GLASS_PANE, "&7", "filler", List.of());
         for (int slot = 0; slot < inventory.getSize(); slot++) {
-            inventory.setItem(slot, filler);
+            inventory.setItem(slot, black);
         }
-        for (int slot : new int[]{0, 1, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 25, 26, 27, 28, 33, 34, 35, 36, 37, 39, 40, 41, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52}) {
-            inventory.setItem(slot, border);
+        for (int slot : new int[]{10, 11, 12, 13, 14, 15, 16, 19, 25, 28, 34}) {
+            inventory.setItem(slot, gray);
         }
-        inventory.setItem(15, createUiItem(Material.WOODEN_SWORD, "&8Rack", "filler", List.of()));
-        inventory.setItem(16, createUiItem(Material.WOODEN_PICKAXE, "&8Rack", "filler", List.of()));
+        inventory.setItem(33, null);
     }
 
     private void openVanillaAnvil(Player player) {
