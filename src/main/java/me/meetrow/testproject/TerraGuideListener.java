@@ -70,7 +70,6 @@ public final class TerraGuideListener implements Listener {
         switch (((TerraGuideHolder) holder).page()) {
             case MAIN -> handleMainClick(player, event.getSlot());
             case STATS -> handleBackClose(player, event.getSlot());
-            case SKILLS -> handleSkillsClick(player, event.getSlot());
             case CONTRACTS -> handleContractsClick(player, event.getSlot());
         }
     }
@@ -88,11 +87,10 @@ public final class TerraGuideListener implements Listener {
 
         Country country = plugin.getPlayerCountry(player.getUniqueId());
         boolean canManageCountry = plugin.canManageCountry(country, player.getUniqueId()) || player.hasPermission(Testproject.COUNTRY_ADMIN_PERMISSION) || player.isOp();
-        boolean oreSenseUnlocked = plugin.hasOreSenseUnlocked(player.getUniqueId());
 
         inventory.setItem(4, createItem(Material.NETHER_STAR, "&6Terra Guide", List.of(
                 "&7Your hub for progression, guidance,",
-                "&7countries, jobs, and contracts."
+                "&7countries, jobs, and personal stats."
         )));
         inventory.setItem(10, createItem(Material.PLAYER_HEAD, "&bPlayer Stats", List.of(
                 "&7View your current progression summary."
@@ -101,15 +99,9 @@ public final class TerraGuideListener implements Listener {
                 "&7Open your job selection and",
                 "&7profession progression menu."
         )));
-        inventory.setItem(14, createItem(Material.EXPERIENCE_BOTTLE, "&ePersonal Skills", List.of(
-                "&7Spend skill points on permanent",
-                "&7bonuses and utility unlocks.",
-                "",
-                "&7Available points: &f" + plugin.getPersonalSkillPoints(player.getUniqueId())
-        )));
-        inventory.setItem(16, createItem(Material.WRITABLE_BOOK, "&6Contracts", List.of(
-                "&7Track your active quest,",
-                "&7current work order, and trade loops."
+        inventory.setItem(14, createItem(Material.WRITABLE_BOOK, "&6Contracts", List.of(
+                "&7Track your active quest and",
+                "&7future personal work systems."
         )));
         inventory.setItem(28, createItem(Material.BLUE_BANNER, country != null ? "&9Country Dashboard" : "&9Country Browser", List.of(
                 country != null ? "&7Open your player country dashboard." : "&7Browse and join server countries."
@@ -120,10 +112,6 @@ public final class TerraGuideListener implements Listener {
                     "&7country leaders and admins."
             )));
         }
-        inventory.setItem(40, createItem(Material.SPYGLASS, oreSenseUnlocked ? "&bOre Sense" : "&7Ore Sense Locked", List.of(
-                oreSenseUnlocked ? "&7Click to toggle your personal ore vision." : "&7Unlock this in Personal Skills first.",
-                oreSenseUnlocked ? "&7Status: &f" + (plugin.isOreVisionEnabled(player.getUniqueId()) ? "Enabled" : "Disabled") : "&8Requires the Ore Sense skill."
-        )));
         inventory.setItem(CLOSE_SLOT, createItem(Material.BARRIER, "&cClose", List.of("&7Close the Terra Guide.")));
 
         player.openInventory(inventory);
@@ -149,8 +137,7 @@ public final class TerraGuideListener implements Listener {
         inventory.setItem(4, createItem(Material.PLAYER_HEAD, "&b" + player.getName(), List.of(
                 "&7Country: &f" + (country != null ? country.getName() : "None"),
                 "&7Balance: &f$" + plugin.formatMoney(plugin.getBalance(player)),
-                "&7Trader reputation: &f" + plugin.formatTraderReputation(plugin.getTraderReputation(playerId)),
-                "&7Skill points: &f" + plugin.getPersonalSkillPoints(playerId)
+                "&7Trader reputation: &f" + plugin.formatTraderReputation(plugin.getTraderReputation(playerId))
         )));
         inventory.setItem(20, createItem(activeProfession != null ? activeProfession.getIcon() : Material.BARRIER, "&aActive Profession", List.of(
                 "&7Current: &f" + (activeProfession != null ? plugin.getProfessionPlainDisplayName(activeProfession) : "None"),
@@ -167,59 +154,24 @@ public final class TerraGuideListener implements Listener {
         player.openInventory(inventory);
     }
 
-    private void openSkillsMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(new TerraGuideHolder(GuidePage.SKILLS), GUI_SIZE, plugin.legacyComponent("&8Personal Skills"));
-        fillEmpty(inventory);
-
-        UUID playerId = player.getUniqueId();
-        inventory.setItem(4, createItem(Material.EXPERIENCE_BOTTLE, "&6Skill Points", List.of(
-                "&7Available: &f" + plugin.getPersonalSkillPoints(playerId),
-                "&7Next point from playtime: &f" + plugin.formatLongDurationWords(plugin.getPersonalSkillPointPlaytimeRemainingMillis(playerId))
-        )));
-
-        int[] slots = {19, 20, 21, 22, 23, 24, 25, 31};
-        PersonalSkill[] skills = PersonalSkill.values();
-        for (int i = 0; i < skills.length && i < slots.length; i++) {
-            PersonalSkill skill = skills[i];
-            int currentLevel = plugin.getPersonalSkillLevel(playerId, skill);
-            List<String> lore = new ArrayList<>(skill.getDescriptionLines());
-            lore.add("");
-            lore.add("&7Level: &f" + currentLevel + "&7/&f" + skill.getMaxLevel());
-            if (currentLevel >= skill.getMaxLevel()) {
-                lore.add("&aMaxed.");
-            } else {
-                lore.add("&eClick to spend 1 skill point.");
-            }
-            inventory.setItem(slots[i], createItem(skill.getIcon(), "&b" + skill.getDisplayName(), lore));
-        }
-
-        inventory.setItem(BACK_SLOT, createItem(Material.ARROW, "&eBack", List.of("&7Return to the main guide menu.")));
-        inventory.setItem(CLOSE_SLOT, createItem(Material.BARRIER, "&cClose", List.of("&7Close the Terra Guide.")));
-        player.openInventory(inventory);
-    }
-
     private void openContractsMenu(Player player) {
         Inventory inventory = Bukkit.createInventory(new TerraGuideHolder(GuidePage.CONTRACTS), GUI_SIZE, plugin.legacyComponent("&8Work Contracts"));
         fillEmpty(inventory);
 
         UUID playerId = player.getUniqueId();
-        PersonalWorkOrder workOrder = plugin.getOrCreatePersonalWorkOrder(playerId);
         inventory.setItem(4, createItem(Material.WRITABLE_BOOK, "&6Active Quest", List.of(
                 "&7Title: &f" + plugin.getTutorialQuestTitlePlain(playerId),
                 "&7Objective: &f" + plugin.getTutorialQuestObjectivePlain(playerId),
                 plugin.getTutorialQuestHintPlain(playerId).isBlank() ? "&7Hint: &fNone" : "&7Hint: &f" + plugin.getTutorialQuestHintPlain(playerId),
                 "&7Progress: &f" + plugin.getTutorialQuestProgressText(playerId)
         )));
-
-        if (workOrder != null) {
-            List<String> lore = new ArrayList<>();
-            lore.add("&7Profession: &f" + plugin.getProfessionPlainDisplayName(workOrder.getProfession()));
-            lore.add("&7Progress: &f" + workOrder.getProgressXp() + "&7/&f" + workOrder.getTargetXp() + " XP");
-            lore.add("&7Reward: &f$" + plugin.formatMoney(workOrder.getRewardMoney()) + " &7+ &f" + workOrder.getRewardSkillPoints() + " point(s)");
-            lore.add("");
-            lore.add(workOrder.isComplete() ? "&aClick to claim and generate the next order." : "&7Keep working in this profession.");
-            inventory.setItem(20, createItem(workOrder.getProfession().getIcon(), workOrder.isComplete() ? "&aWork Order Ready" : "&ePersonal Work Order", lore));
-        }
+        inventory.setItem(20, createItem(Material.CLOCK, "&eContracts Rework Pending", List.of(
+                "&7The old skill tree contract loop",
+                "&7has been removed.",
+                "",
+                "&7This page will be rebuilt around",
+                "&7job-based contracts next."
+        )));
 
         inventory.setItem(BACK_SLOT, createItem(Material.ARROW, "&eBack", List.of("&7Return to the main guide menu.")));
         inventory.setItem(CLOSE_SLOT, createItem(Material.BARRIER, "&cClose", List.of("&7Close the Terra Guide.")));
@@ -231,8 +183,7 @@ public final class TerraGuideListener implements Listener {
         switch (slot) {
             case 10 -> openStatsMenu(player);
             case 12 -> plugin.openProfessionMenu(player);
-            case 14 -> openSkillsMenu(player);
-            case 16 -> openContractsMenu(player);
+            case 14 -> openContractsMenu(player);
             case 28 -> {
                 if (country != null) {
                     plugin.openCountryMenu(player);
@@ -245,61 +196,14 @@ public final class TerraGuideListener implements Listener {
                     plugin.openCountryAdminMenu(player, country);
                 }
             }
-            case 40 -> {
-                if (!plugin.hasOreSenseUnlocked(player.getUniqueId())) {
-                    player.sendMessage(plugin.colorize("&cUnlock Ore Sense in Personal Skills first."));
-                    return;
-                }
-                boolean enabled = plugin.toggleOreVision(player);
-                player.sendMessage(plugin.colorize(enabled ? "&aOre Sense enabled." : "&eOre Sense disabled."));
-                openMainMenu(player);
-            }
             case CLOSE_SLOT -> player.closeInventory();
             default -> {
             }
         }
     }
 
-    private void handleSkillsClick(Player player, int slot) {
-        if (handleBackClose(player, slot)) {
-            return;
-        }
-        PersonalSkill skill = switch (slot) {
-            case 19 -> PersonalSkill.HEARTY;
-            case 20 -> PersonalSkill.XP_MASTERY;
-            case 21 -> PersonalSkill.COOLDOWN_MASTERY;
-            case 22 -> PersonalSkill.TRADER_INSTINCT;
-            case 23 -> PersonalSkill.MERCHANT_HAGGLER;
-            case 24 -> PersonalSkill.HARVEST_MASTERY;
-            case 25 -> PersonalSkill.GREEN_THUMB;
-            case 31 -> PersonalSkill.ORE_SENSE;
-            default -> null;
-        };
-        if (skill == null) {
-            return;
-        }
-        if (!plugin.upgradePersonalSkill(player, skill)) {
-            player.sendMessage(plugin.colorize("&cYou cannot upgrade that skill right now."));
-        } else {
-            player.sendMessage(plugin.colorize("&aUpgraded &f" + skill.getDisplayName() + "&a."));
-        }
-        openSkillsMenu(player);
-    }
-
     private void handleContractsClick(Player player, int slot) {
-        if (handleBackClose(player, slot)) {
-            return;
-        }
-        switch (slot) {
-            case 20 -> {
-                if (!plugin.claimPersonalWorkOrder(player)) {
-                    player.sendMessage(plugin.colorize("&cThat work order is not ready yet."));
-                }
-                openContractsMenu(player);
-            }
-            default -> {
-            }
-        }
+        handleBackClose(player, slot);
     }
 
     private boolean handleBackClose(Player player, int slot) {
@@ -336,7 +240,6 @@ public final class TerraGuideListener implements Listener {
     private enum GuidePage {
         MAIN,
         STATS,
-        SKILLS,
         CONTRACTS
     }
 

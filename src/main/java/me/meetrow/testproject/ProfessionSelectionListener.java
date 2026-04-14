@@ -151,7 +151,6 @@ public class ProfessionSelectionListener implements Listener {
             }
 
             plugin.ensurePlayerGuidanceItem(player);
-            plugin.applyPersonalSkillEffects(player);
             Profession primaryProfession = plugin.getPrimaryProfession(player.getUniqueId());
             if (primaryProfession != null) {
                 plugin.grantProfessionStarterKit(player.getUniqueId(), primaryProfession);
