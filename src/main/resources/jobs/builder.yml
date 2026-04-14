@@ -7,7 +7,7 @@ player-cap: 10
 progression:
   max-level: 15
   base-xp: 100
-  xp-multiplier: 1.7
+  xp-multiplier: 1.75
   cooldown-reduction-seconds-per-level: 1
   level-up-money-base: 18.0
   level-up-money-multiplier: 1.12
