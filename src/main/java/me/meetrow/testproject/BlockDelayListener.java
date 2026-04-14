@@ -55,7 +55,7 @@ public class BlockDelayListener implements Listener {
             plugin.noteProfessionAction(player.getUniqueId(), actionProfession);
         }
 
-        int cooldownSeconds = plugin.getSharedActionCooldownSeconds(player.getUniqueId());
+        int cooldownSeconds = plugin.getActionCooldownSeconds(player.getUniqueId(), actionProfession);
         if (!handleAction(player, event, cooldownSeconds, true)) {
             return;
         }
@@ -94,11 +94,16 @@ public class BlockDelayListener implements Listener {
             double rewardMoney = reward.money()
                     * plugin.getCountryPassiveMoneyMultiplier(plugin.getPlayerCountry(player.getUniqueId()));
             plugin.depositBalance(player.getUniqueId(), rewardMoney);
-            player.sendMessage(plugin.getMessage("rewards.break.money-and-xp", plugin.placeholders(
-                    "xp", String.valueOf(xpAward),
-                    "money", plugin.formatMoney(rewardMoney),
-                    "block", plugin.formatMaterialName(material)
-            )));
+            if (xpAward > 0) {
+                player.sendMessage(plugin.getMessage("rewards.break.money-and-xp", plugin.placeholders(
+                        "xp", String.valueOf(xpAward),
+                        "money", plugin.formatMoney(rewardMoney),
+                        "block", plugin.formatMaterialName(material)
+                )));
+            } else {
+                player.sendMessage(plugin.colorize("&aYou earned &f$" + plugin.formatMoney(rewardMoney)
+                        + "&a for breaking &f" + plugin.formatMaterialName(material) + "&a."));
+            }
             return;
         }
 
@@ -131,7 +136,7 @@ public class BlockDelayListener implements Listener {
             return;
         }
 
-        int placeCooldownSeconds = plugin.getSharedActionCooldownSeconds(event.getPlayer().getUniqueId());
+        int placeCooldownSeconds = plugin.getActionCooldownSeconds(event.getPlayer().getUniqueId(), null);
         if (!handleAction(event.getPlayer(), event, placeCooldownSeconds, false)) {
             return;
         }

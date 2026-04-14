@@ -60,6 +60,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -2642,6 +2643,7 @@ public final class Testproject extends JavaPlugin {
     public ItemStack createForgedEquipment(Player player, BlacksmithRecipe recipe) {
         ItemStack itemStack = applyUsageRequirementLore(new ItemStack(recipe.result(), recipe.amount()));
         if (!isForgeManagedEquipment(recipe.result())) {
+            refreshVisibleDurability(itemStack);
             return itemStack;
         }
 
@@ -2660,18 +2662,72 @@ public final class Testproject extends JavaPlugin {
         meta.getPersistentDataContainer().set(forgedItemKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, itemLevel);
         meta.getPersistentDataContainer().set(forgedRarityKey, PersistentDataType.STRING, rarity.name());
+        applyForgedItemDisplay(itemStack, meta, recipe.result(), rarity, itemLevel);
+        itemStack.setItemMeta(meta);
+        return itemStack;
+    }
+
+    private void applyForgedItemDisplay(ItemStack itemStack, ItemMeta meta, Material material, ForgedRarity rarity, int itemLevel) {
+        if (itemStack == null || meta == null || material == null || rarity == null) {
+            return;
+        }
+        int displayLevel = Math.max(1, Math.min(5, itemLevel));
         meta.displayName(legacyComponent("&8[" + rarity.getColor()
-                + formatMaterialName(recipe.result()) + " " + toRomanNumeral(Math.max(1, Math.min(5, itemLevel))) + "&8]"));
+                + formatMaterialName(material) + " " + toRomanNumeral(displayLevel) + "&8]"));
 
         List<Component> lore = new ArrayList<>();
         lore.add(legacyComponent("&7Tier: " + rarity.getColor() + rarity.getDisplayName()));
-        lore.add(legacyComponent("&7Durability: &f" + getForgedDurabilityProtectionPercent(rarity, itemLevel)));
-        String perkLine = getForgedPerkLore(recipe.result(), rarity);
+        lore.add(legacyComponent("&7Durability: &f" + getVisibleRemainingDurability(itemStack)));
+        String perkLine = getForgedPerkLore(material, rarity);
         lore.add(legacyComponent("&7Perk: &f" + (perkLine != null ? perkLine : "None")));
         meta.lore(lore);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+    }
+
+    public void refreshVisibleDurability(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().isAir() || itemStack.getType().getMaxDurability() <= 0) {
+            return;
+        }
+
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+
+        if (isForgedItem(itemStack)) {
+            ForgedRarity rarity = getForgedItemRarity(itemStack);
+            if (rarity == null) {
+                return;
+            }
+            applyForgedItemDisplay(itemStack, meta, itemStack.getType(), rarity, getForgedDisplayLevel(itemStack));
+            itemStack.setItemMeta(meta);
+            return;
+        }
+
+        List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+        Component durabilityLine = legacyComponent("&7Durability: &f" + getVisibleRemainingDurability(itemStack));
+        boolean replaced = false;
+        for (int i = 0; i < lore.size(); i++) {
+            if (plainText(lore.get(i)).startsWith("Durability:")) {
+                lore.set(i, durabilityLine);
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced) {
+            lore.add(durabilityLine);
+        }
+        meta.lore(lore);
         itemStack.setItemMeta(meta);
-        return itemStack;
+    }
+
+    public int getVisibleRemainingDurability(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().getMaxDurability() <= 0) {
+            return 0;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        int damage = meta instanceof Damageable damageable ? Math.max(0, damageable.getDamage()) : 0;
+        return Math.max(0, itemStack.getType().getMaxDurability() - damage);
     }
 
     private int rollForgedItemLevel(UUID playerId, int recipeLevel, int blacksmithLevel) {
@@ -2955,7 +3011,9 @@ public final class Testproject extends JavaPlugin {
         }
         return switch (key.toLowerCase(Locale.ROOT)) {
             case "forge_shard" -> "Forge Shard";
+            case "tempered_flux" -> "Tempered Flux";
             case "binding_thread" -> "Binding Thread";
+            case "runic_prism" -> "Runic Prism";
             case "ancient_core" -> "Ancient Core";
             default -> Arrays.stream(key.replace('_', ' ').split(" "))
                     .filter(part -> !part.isBlank())
@@ -2966,7 +3024,9 @@ public final class Testproject extends JavaPlugin {
 
     public ItemStack createRareContractMaterial(String key, int amount) {
         Material baseMaterial = switch (key == null ? "" : key.toLowerCase(Locale.ROOT)) {
+            case "tempered_flux" -> Material.BLAZE_POWDER;
             case "binding_thread" -> Material.STRING;
+            case "runic_prism" -> Material.PRISMARINE_SHARD;
             case "ancient_core" -> Material.PRISMARINE_CRYSTALS;
             default -> Material.AMETHYST_SHARD;
         };
@@ -2974,18 +3034,151 @@ public final class Testproject extends JavaPlugin {
         ItemMeta meta = itemStack.getItemMeta();
         if (meta != null) {
             meta.displayName(legacyComponent(switch (key == null ? "" : key.toLowerCase(Locale.ROOT)) {
+                case "tempered_flux" -> "&cTempered Flux";
                 case "binding_thread" -> "&dBinding Thread";
+                case "runic_prism" -> "&bRunic Prism";
                 case "ancient_core" -> "&6Ancient Core";
                 default -> "&5Forge Shard";
             }));
             meta.lore(List.of(
                     legacyComponent("&7Rare contract material."),
-                    legacyComponent("&7Reserved for future custom items.")
+                    legacyComponent("&7Used in advanced forge upgrades.")
             ));
             meta.getPersistentDataContainer().set(rareContractMaterialKey, PersistentDataType.STRING, key == null ? "forge_shard" : key.toLowerCase(Locale.ROOT));
             itemStack.setItemMeta(meta);
         }
         return itemStack;
+    }
+
+    public String getRareContractMaterialKey(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return null;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null) {
+            return null;
+        }
+        return meta.getPersistentDataContainer().get(rareContractMaterialKey, PersistentDataType.STRING);
+    }
+
+    public double getForgeMergeSuccessChance(String materialKey) {
+        return switch (materialKey == null ? "" : materialKey.toLowerCase(Locale.ROOT)) {
+            case "tempered_flux" -> 0.28D;
+            case "binding_thread" -> 0.35D;
+            case "runic_prism" -> 0.45D;
+            case "ancient_core" -> 0.55D;
+            default -> 0.20D;
+        };
+    }
+
+    public ForgeMergeOutcome attemptForgeMerge(Player player, String rareMaterialKey) {
+        if (player == null || !hasProfession(player.getUniqueId(), Profession.BLACKSMITH)) {
+            return ForgeMergeOutcome.INVALID;
+        }
+        ItemStack target = player.getInventory().getItemInMainHand();
+        if (!isForgedItem(target) || getForgedDisplayLevel(target) >= 5) {
+            return ForgeMergeOutcome.INVALID;
+        }
+        if (rareMaterialKey == null || rareMaterialKey.isBlank()) {
+            return ForgeMergeOutcome.INVALID;
+        }
+        if (countMatchingForgeMergeItems(player, target) < 10) {
+            return ForgeMergeOutcome.INVALID;
+        }
+        if (!hasRareContractMaterial(player, rareMaterialKey, 1)) {
+            return ForgeMergeOutcome.INVALID;
+        }
+
+        ItemStack upgradedItem = target.clone();
+        removeMatchingForgeItems(player, target, 10);
+        removeRareContractMaterial(player, rareMaterialKey, 1);
+
+        if (ThreadLocalRandom.current().nextDouble() > getForgeMergeSuccessChance(rareMaterialKey)) {
+            return ForgeMergeOutcome.FAILED;
+        }
+
+        ItemMeta meta = upgradedItem.getItemMeta();
+        if (meta == null) {
+            return ForgeMergeOutcome.INVALID;
+        }
+        int nextLevel = Math.min(5, getForgedDisplayLevel(upgradedItem) + 1);
+        meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, nextLevel);
+        upgradedItem.setItemMeta(meta);
+        refreshVisibleDurability(upgradedItem);
+        if (player.getInventory().getItemInMainHand().getType().isAir()) {
+            player.getInventory().setItemInMainHand(upgradedItem);
+        } else {
+            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(upgradedItem);
+            for (ItemStack leftover : leftovers.values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+            }
+        }
+        return ForgeMergeOutcome.SUCCESS;
+    }
+
+    public boolean hasRareContractMaterial(Player player, String rareMaterialKey, int amount) {
+        if (player == null || rareMaterialKey == null || amount <= 0) {
+            return false;
+        }
+        int total = 0;
+        for (ItemStack itemStack : player.getInventory().getContents()) {
+            if (rareMaterialKey.equalsIgnoreCase(getRareContractMaterialKey(itemStack))) {
+                total += itemStack.getAmount();
+                if (total >= amount) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void removeRareContractMaterial(Player player, String rareMaterialKey, int amount) {
+        int remaining = amount;
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length && remaining > 0; i++) {
+            ItemStack itemStack = contents[i];
+            if (!rareMaterialKey.equalsIgnoreCase(getRareContractMaterialKey(itemStack))) {
+                continue;
+            }
+            int taken = Math.min(remaining, itemStack.getAmount());
+            itemStack.setAmount(itemStack.getAmount() - taken);
+            remaining -= taken;
+            if (itemStack.getAmount() <= 0) {
+                contents[i] = null;
+            }
+        }
+        player.getInventory().setContents(contents);
+    }
+
+    private int countMatchingForgeMergeItems(Player player, ItemStack target) {
+        if (player == null || target == null) {
+            return 0;
+        }
+        int total = 0;
+        for (ItemStack itemStack : player.getInventory().getContents()) {
+            if (itemStack != null && itemStack.getType() == target.getType() && isForgedItem(itemStack)) {
+                total += itemStack.getAmount();
+            }
+        }
+        return total;
+    }
+
+    private void removeMatchingForgeItems(Player player, ItemStack target, int amount) {
+        int remaining = amount;
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length && remaining > 0; i++) {
+            ItemStack itemStack = contents[i];
+            if (itemStack == null || itemStack.getType() != target.getType() || !isForgedItem(itemStack)) {
+                continue;
+            }
+            int taken = Math.min(remaining, itemStack.getAmount());
+            itemStack.setAmount(itemStack.getAmount() - taken);
+            remaining -= taken;
+            if (itemStack.getAmount() <= 0) {
+                contents[i] = null;
+            }
+        }
+        player.getInventory().setContents(contents);
     }
 
     private JobContract generateJobContractOffer(UUID playerId, Profession profession, long cycle) {
@@ -3093,11 +3286,17 @@ public final class Testproject extends JavaPlugin {
     }
 
     private String getJobContractRareMaterialKey(int seed, int level) {
-        if (level >= 9 && seed % 5 == 0) {
+        if (level >= 10 && seed % 7 == 0) {
             return "ancient_core";
         }
-        if (level >= 5 && seed % 3 == 0) {
+        if (level >= 8 && seed % 5 == 0) {
+            return "runic_prism";
+        }
+        if (level >= 6 && seed % 4 == 0) {
             return "binding_thread";
+        }
+        if (level >= 4 && seed % 3 == 0) {
+            return "tempered_flux";
         }
         return "forge_shard";
     }
@@ -7916,11 +8115,26 @@ public final class Testproject extends JavaPlugin {
         return Math.max(0, Math.min(getMinerBreakCooldownSeconds(playerId), getBuilderPlaceCooldownSeconds(playerId)));
     }
 
+    public int getActionCooldownSeconds(UUID playerId, Profession actionProfession) {
+        if (actionProfession == null || playerId == null || !hasProfession(playerId, actionProfession)) {
+            return Math.max(0, getBlockDelaySeconds());
+        }
+        return switch (actionProfession) {
+            case MINER -> getMinerBreakCooldownSeconds(playerId);
+            case BUILDER -> getBuilderPlaceCooldownSeconds(playerId);
+            default -> Math.max(0, getBlockDelaySeconds());
+        };
+    }
+
     public long getSharedActionCooldownEnd(UUID playerId) {
         return Math.max(getBreakCooldownEnd(playerId), getPlaceCooldownEnd(playerId));
     }
 
     public boolean tryConsumeSharedActionCooldown(Player player) {
+        return tryConsumeSharedActionCooldown(player, null);
+    }
+
+    public boolean tryConsumeSharedActionCooldown(Player player, Profession actionProfession) {
         if (player == null || hasBlockDelayBypass(player.getUniqueId()) || !isBlockDelayEnabled()) {
             return true;
         }
@@ -7939,7 +8153,7 @@ public final class Testproject extends JavaPlugin {
             return false;
         }
 
-        long nextCooldown = now + (Math.max(0, getSharedActionCooldownSeconds(playerId)) * 1000L);
+        long nextCooldown = now + (Math.max(0, getActionCooldownSeconds(playerId, actionProfession)) * 1000L);
         setBreakCooldown(playerId, nextCooldown);
         setPlaceCooldown(playerId, nextCooldown);
         return true;
@@ -18550,6 +18764,12 @@ public final class Testproject extends JavaPlugin {
             int slot,
             LinkedHashMap<Material, Integer> ingredients
     ) {
+    }
+
+    public enum ForgeMergeOutcome {
+        SUCCESS,
+        FAILED,
+        INVALID
     }
 
     private enum HardRestartPhase {

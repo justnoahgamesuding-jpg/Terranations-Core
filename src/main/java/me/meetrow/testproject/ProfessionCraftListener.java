@@ -38,12 +38,11 @@ public class ProfessionCraftListener implements Listener {
             return;
         }
 
-        if (!plugin.tryConsumeSharedActionCooldown(player)) {
-            event.setCancelled(true);
-            return;
-        }
-
         if (plugin.isFarmerCraftFood(resultType)) {
+            if (!plugin.tryConsumeSharedActionCooldown(player, plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.FARMER) ? Profession.FARMER : null)) {
+                event.setCancelled(true);
+                return;
+            }
             if (plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
                 int craftedAmount = getCraftedAmount(event, result);
                 int awardedXp = plugin.rewardProfessionXp(player, Profession.FARMER, plugin.getFarmerCraftXp(resultType) * craftedAmount);
@@ -59,6 +58,11 @@ public class ProfessionCraftListener implements Listener {
         }
 
         if (!plugin.isBlacksmithCraft(resultType) || plugin.isForgeManagedEquipment(resultType)) {
+            return;
+        }
+
+        if (!plugin.tryConsumeSharedActionCooldown(player, plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.BLACKSMITH) ? Profession.BLACKSMITH : null)) {
+            event.setCancelled(true);
             return;
         }
 

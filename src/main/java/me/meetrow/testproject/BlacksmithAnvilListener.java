@@ -29,6 +29,7 @@ public class BlacksmithAnvilListener implements Listener {
     private static final int INFO_SLOT = 4;
     private static final int NORMAL_ANVIL_SLOT = 48;
     private static final int CLOSE_SLOT = 50;
+    private static final int MERGE_SLOT = 52;
     private static final int CATEGORY_INFO_SLOT = 49;
     private static final int[] RECIPE_SLOTS = {
             11, 12, 13, 14, 15, 16, 17,
@@ -63,6 +64,10 @@ public class BlacksmithAnvilListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
+        if (event.getView().getTopInventory().getHolder() instanceof MergeMenuHolder) {
+            handleMergeMenuClick(event, player);
+            return;
+        }
         if (!(event.getView().getTopInventory().getHolder() instanceof BlacksmithMenuHolder holder)) {
             return;
         }
@@ -78,6 +83,10 @@ public class BlacksmithAnvilListener implements Listener {
         }
         if (event.getSlot() == NORMAL_ANVIL_SLOT) {
             openVanillaAnvil(player);
+            return;
+        }
+        if (event.getSlot() == MERGE_SLOT) {
+            openMergeMenu(player);
             return;
         }
 
@@ -102,7 +111,7 @@ public class BlacksmithAnvilListener implements Listener {
             )));
             return;
         }
-        if (!plugin.tryConsumeSharedActionCooldown(player)) {
+        if (!plugin.tryConsumeSharedActionCooldown(player, plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH) ? Profession.BLACKSMITH : null)) {
             return;
         }
 
@@ -117,10 +126,14 @@ public class BlacksmithAnvilListener implements Listener {
                 ? plugin.rewardProfessionXp(player, Profession.BLACKSMITH, recipe.xp())
                 : 0;
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1.0F, 1.1F);
-        player.sendMessage(plugin.getMessage("profession.blacksmith.anvil-crafted", plugin.placeholders(
-                "item", plugin.formatMaterialName(recipe.result()),
-                "xp", String.valueOf(awardedXp)
-        )));
+        if (awardedXp > 0) {
+            player.sendMessage(plugin.getMessage("profession.blacksmith.anvil-crafted", plugin.placeholders(
+                    "item", plugin.formatMaterialName(recipe.result()),
+                    "xp", String.valueOf(awardedXp)
+            )));
+        } else {
+            player.sendMessage(plugin.colorize("&aForged &f" + plugin.formatMaterialName(recipe.result()) + "&a."));
+        }
         openMenu(player, holder.category());
     }
 
@@ -151,6 +164,12 @@ public class BlacksmithAnvilListener implements Listener {
         inventory.setItem(NORMAL_ANVIL_SLOT, createSimpleItem(Material.ANVIL, "&bUse Normal Anvil", List.of(
                 "&7Open a normal anvil screen for",
                 "&7repairing, renaming, or combining."
+        )));
+        inventory.setItem(MERGE_SLOT, createSimpleItem(Material.NETHER_STAR, "&6Forge Merge", List.of(
+                "&7Blacksmith-only upgrade forge.",
+                "&7Consume 10 forged copies and",
+                "&71 rare material for one risky",
+                "&7tier upgrade attempt."
         )));
         inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close the forge menu.")));
 
@@ -302,6 +321,124 @@ public class BlacksmithAnvilListener implements Listener {
         player.openInventory(anvilInventory);
     }
 
+    private void openMergeMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(new MergeMenuHolder(), 27, plugin.legacyComponent("&8Forge Merge"));
+        ItemStack filler = createSimpleItem(Material.GRAY_STAINED_GLASS_PANE, "&7", List.of());
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            inventory.setItem(slot, filler);
+        }
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        boolean validTarget = plugin.isForgedItem(heldItem) && plugin.getForgedDisplayLevel(heldItem) < 5;
+        inventory.setItem(10, validTarget ? heldItem.clone() : createSimpleItem(Material.BARRIER, "&cHold a forged item", List.of(
+                "&7Hold the forged tool or armor piece",
+                "&7you want to upgrade in your main hand.",
+                "&7It must be below Tier V."
+        )));
+        inventory.setItem(12, createSimpleItem(Material.ANVIL, "&7Merge Rules", List.of(
+                "&710 forged copies of the same item",
+                "&71 rare material",
+                "&7Success upgrades the held item by 1 tier",
+                "&cFailure destroys all inputs"
+        )));
+        inventory.setItem(14, createSimpleItem(Material.BOOK, "&7Status", List.of(
+                plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH) ? "&aBlacksmith access active" : "&cBlacksmith only",
+                validTarget ? "&aHeld item ready" : "&cHeld item invalid",
+                "&7Matching copies: &f" + countHeldItemCopies(player)
+        )));
+        inventory.setItem(18, createMergeMaterialButton("forge_shard", "&5Forge Shard"));
+        inventory.setItem(19, createMergeMaterialButton("tempered_flux", "&cTempered Flux"));
+        inventory.setItem(20, createMergeMaterialButton("binding_thread", "&dBinding Thread"));
+        inventory.setItem(21, createMergeMaterialButton("runic_prism", "&bRunic Prism"));
+        inventory.setItem(22, createMergeMaterialButton("ancient_core", "&6Ancient Core"));
+        inventory.setItem(26, createSimpleItem(Material.ARROW, "&7Back", List.of("&7Return to the forge board.")));
+        player.openInventory(inventory);
+    }
+
+    private void handleMergeMenuClick(InventoryClickEvent event, Player player) {
+        event.setCancelled(true);
+        if (event.getClickedInventory() == null || event.getClickedInventory().getType() == InventoryType.PLAYER) {
+            return;
+        }
+        if (event.getSlot() == 26) {
+            openMenu(player, BlacksmithCategory.BASICS);
+            return;
+        }
+
+        String materialKey = switch (event.getSlot()) {
+            case 18 -> "forge_shard";
+            case 19 -> "tempered_flux";
+            case 20 -> "binding_thread";
+            case 21 -> "runic_prism";
+            case 22 -> "ancient_core";
+            default -> null;
+        };
+        if (materialKey == null) {
+            return;
+        }
+        if (!plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH)) {
+            player.sendMessage(plugin.colorize("&cOnly blacksmiths can use the merge forge."));
+            return;
+        }
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        if (!plugin.isForgedItem(heldItem)) {
+            player.sendMessage(plugin.colorize("&cHold a forged item in your main hand first."));
+            return;
+        }
+        if (plugin.getForgedDisplayLevel(heldItem) >= 5) {
+            player.sendMessage(plugin.colorize("&cThat item is already at Tier V."));
+            return;
+        }
+        if (countHeldItemCopies(player) < 10) {
+            player.sendMessage(plugin.colorize("&cYou need 10 forged copies of that item to attempt a merge."));
+            return;
+        }
+        if (!plugin.hasRareContractMaterial(player, materialKey, 1)) {
+            player.sendMessage(plugin.colorize("&cYou need " + plugin.formatRareContractMaterialName(materialKey) + " to attempt that merge."));
+            return;
+        }
+        if (!plugin.tryConsumeSharedActionCooldown(player, Profession.BLACKSMITH)) {
+            return;
+        }
+
+        Testproject.ForgeMergeOutcome outcome = plugin.attemptForgeMerge(player, materialKey);
+        if (outcome == Testproject.ForgeMergeOutcome.INVALID) {
+            player.sendMessage(plugin.colorize("&cThe merge could not be completed."));
+            return;
+        }
+
+        if (outcome == Testproject.ForgeMergeOutcome.SUCCESS) {
+            player.sendMessage(plugin.colorize("&6Merge success. &aYour forged item advanced to a higher tier."));
+            player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.1F);
+        } else {
+            player.sendMessage(plugin.colorize("&cMerge failed. &7The forged copies and rare material were destroyed."));
+            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.9F, 0.8F);
+        }
+        openMergeMenu(player);
+    }
+
+    private int countHeldItemCopies(Player player) {
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        if (!plugin.isForgedItem(heldItem)) {
+            return 0;
+        }
+        int total = 0;
+        for (ItemStack itemStack : player.getInventory().getContents()) {
+            if (itemStack != null && itemStack.getType() == heldItem.getType() && plugin.isForgedItem(itemStack)) {
+                total += itemStack.getAmount();
+            }
+        }
+        return total;
+    }
+
+    private ItemStack createMergeMaterialButton(String materialKey, String displayName) {
+        return createSimpleItem(Material.NETHER_STAR, displayName, List.of(
+                "&7Success chance: &f" + (int) Math.round(plugin.getForgeMergeSuccessChance(materialKey) * 100.0D) + "%",
+                "&7Cost: &f10 forged copies",
+                "&7      &f1x " + plugin.formatRareContractMaterialName(materialKey),
+                "&cFailure destroys all inputs."
+        ));
+    }
+
     private ItemStack createSimpleItem(Material material, String displayName, List<String> loreLines) {
         ItemStack itemStack = new ItemStack(material);
         ItemMeta itemMeta = itemStack.getItemMeta();
@@ -316,6 +453,13 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private record BlacksmithMenuHolder(BlacksmithCategory category) implements BlacksmithInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record MergeMenuHolder() implements BlacksmithInventoryHolder {
         @Override
         public Inventory getInventory() {
             return null;

@@ -32,21 +32,21 @@ public class ForgedEquipmentListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerItemDamage(PlayerItemDamageEvent event) {
         ItemStack itemStack = event.getItem();
-        if (!plugin.isForgedItem(itemStack)) {
-            return;
+        if (plugin.isForgedItem(itemStack)) {
+            ForgedRarity rarity = plugin.getForgedItemRarity(itemStack);
+            int itemLevel = plugin.getForgedDisplayLevel(itemStack);
+            int protectionPercent = plugin.getForgedDurabilityProtectionPercent(rarity, itemLevel);
+            if (ThreadLocalRandom.current().nextInt(100) < protectionPercent) {
+                event.setCancelled(true);
+            }
         }
-
-        ForgedRarity rarity = plugin.getForgedItemRarity(itemStack);
-        int itemLevel = plugin.getForgedDisplayLevel(itemStack);
-        int protectionPercent = plugin.getForgedDurabilityProtectionPercent(rarity, itemLevel);
-        if (ThreadLocalRandom.current().nextInt(100) < protectionPercent) {
-            event.setCancelled(true);
-        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> plugin.refreshVisibleDurability(itemStack));
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         plugin.refreshForgedArmorHealth(event.getPlayer());
+        refreshInventoryDurability(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -57,14 +57,20 @@ public class ForgedEquipmentListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player player) {
-            plugin.getServer().getScheduler().runTask(plugin, () -> plugin.refreshForgedArmorHealth(player));
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                plugin.refreshForgedArmorHealth(player);
+                refreshInventoryDurability(player);
+            });
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onInventoryDrag(InventoryDragEvent event) {
         if (event.getWhoClicked() instanceof Player player) {
-            plugin.getServer().getScheduler().runTask(plugin, () -> plugin.refreshForgedArmorHealth(player));
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                plugin.refreshForgedArmorHealth(player);
+                refreshInventoryDurability(player);
+            });
         }
     }
 
@@ -72,6 +78,7 @@ public class ForgedEquipmentListener implements Listener {
     public void onInventoryClose(InventoryCloseEvent event) {
         if (event.getPlayer() instanceof Player player) {
             plugin.refreshForgedArmorHealth(player);
+            refreshInventoryDurability(player);
         }
     }
 
@@ -264,5 +271,18 @@ public class ForgedEquipmentListener implements Listener {
             }
         }
         return amount;
+    }
+
+    private void refreshInventoryDurability(Player player) {
+        if (player == null) {
+            return;
+        }
+        for (ItemStack itemStack : player.getInventory().getContents()) {
+            plugin.refreshVisibleDurability(itemStack);
+        }
+        for (ItemStack armorPiece : player.getInventory().getArmorContents()) {
+            plugin.refreshVisibleDurability(armorPiece);
+        }
+        plugin.refreshVisibleDurability(player.getInventory().getItemInOffHand());
     }
 }
