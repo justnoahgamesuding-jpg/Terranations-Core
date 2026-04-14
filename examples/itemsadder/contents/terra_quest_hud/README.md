@@ -15,7 +15,7 @@ What goes where:
 
 - `textures/font/hud/top_status/` keeps the source panel images with the content config.
 - `resourcepack/assets/terrahud/textures/font/hud/top_status/` is the runtime namespace path ItemsAdder actually reads for `terrahud:*` font images.
-- `resourcepack/assets/minecraft/` contains vanilla overrides such as boss bar, hotbar, hearts, hunger, XP bar, and custom font files.
+- `resourcepack/assets/minecraft/` contains vanilla overrides such as boss bar, hotbar, hearts, hunger, and XP bar.
 
 Do not duplicate these files into:
 

@@ -14,5 +14,3 @@ Zip the contents of this folder so the zip root contains:
 Do not zip the parent `terranations_hud_pack` folder itself.
 
 For Minecraft 1.21.1, `pack_format` is set to `34`.
-
-Custom font setup lives in `assets/minecraft/font/README.md`. The pack currently overrides the default Minecraft font with `assets/minecraft/font/zephyreg.ttf`.
