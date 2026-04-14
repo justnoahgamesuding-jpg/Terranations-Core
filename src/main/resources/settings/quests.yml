@@ -2,10 +2,6 @@ quests:
   sidebar:
     enabled: false
     title: "&6Terra Guide"
-  itemsadder-sync:
-    enabled: false
-    step-stat: terra_quest_steps
-    max-steps: 10
   no-active:
     title: "&7No active quest"
     objective: "&7Explore Terra"

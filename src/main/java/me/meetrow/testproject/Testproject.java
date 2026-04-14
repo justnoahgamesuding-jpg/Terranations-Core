@@ -14535,9 +14535,7 @@ public final class Testproject extends JavaPlugin {
     }
 
     private boolean isItemsAdderQuestHudSyncEnabled() {
-        return questsSettingsConfig != null
-                && questsSettingsConfig.getBoolean("quests.itemsadder-sync.enabled", true)
-                && getServer().getPluginManager().getPlugin("ItemsAdder") != null;
+        return false;
     }
 
     private int getItemsAdderQuestHudMaxSteps() {
@@ -14558,39 +14556,11 @@ public final class Testproject extends JavaPlugin {
         if (player == null || !player.isOnline()) {
             return;
         }
-        if (!isItemsAdderQuestHudSyncEnabled()) {
-            return;
-        }
 
-        UUID playerId = player.getUniqueId();
-        String questId = getTutorialQuestId(playerId);
-        int percent = getTutorialQuestPercent(playerId);
-        int maxSteps = getItemsAdderQuestHudMaxSteps();
-        int steps = getTutorialQuestSteps(playerId);
-        boolean hasQuest = !questId.isBlank();
-
-        boolean questChanged = !questId.equals(tutorialQuestHudIdCache.getOrDefault(playerId, ""));
-        boolean percentChanged = percent != tutorialQuestHudPercentCache.getOrDefault(playerId, -1);
-        boolean stepChanged = steps != tutorialQuestHudStepCache.getOrDefault(playerId, -1);
-        if (!force && !questChanged && !percentChanged && !stepChanged) {
-            return;
-        }
-
-        tutorialQuestHudIdCache.put(playerId, questId);
-        tutorialQuestHudPercentCache.put(playerId, percent);
-        tutorialQuestHudStepCache.put(playerId, steps);
-
-        syncItemsAdderPlayerStat(player, getItemsAdderQuestHudStepStatName(), steps);
-    }
-
-    private void syncItemsAdderPlayerStat(Player player, String statName, int value) {
-        if (player == null || statName == null || statName.isBlank()) {
-            return;
-        }
-        getServer().dispatchCommand(
-                getServer().getConsoleSender(),
-                "iaplayerstat write " + player.getName() + " " + statName + " " + value + " true"
-        );
+        // ItemsAdder quest HUD stat sync is no longer used.
+        tutorialQuestHudIdCache.remove(player.getUniqueId());
+        tutorialQuestHudPercentCache.remove(player.getUniqueId());
+        tutorialQuestHudStepCache.remove(player.getUniqueId());
     }
 
     private void reloadFurnaceSessions() {
