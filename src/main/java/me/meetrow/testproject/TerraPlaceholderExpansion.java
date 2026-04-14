@@ -43,8 +43,10 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
             case "balance" -> getBalancePlaceholder(player);
             case "xp" -> String.valueOf(player.getPlayer() != null ? player.getPlayer().getTotalExperience() : 0);
             case "player_country" -> getPlayerCountryPlaceholder(player);
+            case "player_country_level" -> getPlayerCountryLevelPlaceholder(player);
             case "player_countrytag" -> getPlayerCountryTagPlaceholder(player);
             case "current_country" -> getCurrentCountryPlaceholder(player);
+            case "current_country_level" -> getCurrentCountryLevelPlaceholder(player);
             case "profession" -> getProfessionPlaceholder(player);
             case "current_job" -> getProfessionPlaceholder(player);
             case "profession_display" -> getProfessionDisplayPlaceholder(player);
@@ -107,6 +109,27 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
         }
 
         return country.getName();
+    }
+
+    private String getPlayerCountryLevelPlaceholder(OfflinePlayer player) {
+        Country country = plugin.getPlayerCountry(player.getUniqueId());
+        if (country == null) {
+            return "0";
+        }
+        return String.valueOf(country.getLevel());
+    }
+
+    private String getCurrentCountryLevelPlaceholder(OfflinePlayer player) {
+        if (player.getPlayer() == null) {
+            return "0";
+        }
+
+        Country country = plugin.getCountryAt(player.getPlayer().getLocation());
+        if (country == null) {
+            return "0";
+        }
+
+        return String.valueOf(country.getLevel());
     }
 
     private String getPlayerCountryTagPlaceholder(OfflinePlayer player) {
