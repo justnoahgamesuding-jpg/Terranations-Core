@@ -29,6 +29,7 @@ skill-tree:
       branch: "Production"
       icon: BONE_MEAL
       slot: 19
+      cost: 2
       secondary-allowed: true
       description:
         - "Adds extra instant-growth chance."
@@ -37,6 +38,7 @@ skill-tree:
       branch: "Production"
       icon: WHEAT
       slot: 20
+      cost: 3
       secondary-allowed: true
       requires: [ fast_growth ]
       description:
@@ -46,6 +48,7 @@ skill-tree:
       branch: "Production"
       icon: HAY_BLOCK
       slot: 21
+      cost: 4
       requires: [ double_harvest ]
       description:
         - "Adds another 10% extra harvest yield chance."
@@ -54,6 +57,7 @@ skill-tree:
       branch: "Cooking"
       icon: BREAD
       slot: 23
+      cost: 2
       secondary-allowed: true
       description:
         - "Planned meal crafting branch."
@@ -62,6 +66,7 @@ skill-tree:
       branch: "Cooking"
       icon: COOKED_BEEF
       slot: 24
+      cost: 3
       requires: [ basic_meals ]
       description:
         - "Planned stronger food utility."
@@ -70,6 +75,7 @@ skill-tree:
       branch: "Survival"
       icon: GOLDEN_CARROT
       slot: 28
+      cost: 2
       secondary-allowed: true
       description:
         - "Planned farming sustain node."
@@ -78,6 +84,7 @@ skill-tree:
       branch: "Survival"
       icon: LEATHER_BOOTS
       slot: 29
+      cost: 3
       requires: [ no_hunger_drain ]
       description:
         - "Planned climate resilience node."
@@ -86,6 +93,7 @@ skill-tree:
       branch: "Fishing"
       icon: FISHING_ROD
       slot: 31
+      cost: 4
       requires: [ double_harvest ]
       description:
         - "Farmer level 5 unlock fantasy branch."

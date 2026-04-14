@@ -13,6 +13,7 @@ public final class ProfessionSkillNode {
     private final String branch;
     private final Material icon;
     private final int slot;
+    private final int cost;
     private final boolean secondaryAllowed;
     private final List<String> descriptionLines;
     private final List<String> requirements;
@@ -22,6 +23,7 @@ public final class ProfessionSkillNode {
                                String branch,
                                Material icon,
                                int slot,
+                               int cost,
                                boolean secondaryAllowed,
                                List<String> descriptionLines,
                                List<String> requirements) {
@@ -30,6 +32,7 @@ public final class ProfessionSkillNode {
         this.branch = branch;
         this.icon = icon;
         this.slot = slot;
+        this.cost = cost;
         this.secondaryAllowed = secondaryAllowed;
         this.descriptionLines = List.copyOf(descriptionLines);
         this.requirements = List.copyOf(requirements);
@@ -53,6 +56,10 @@ public final class ProfessionSkillNode {
 
     public int getSlot() {
         return slot;
+    }
+
+    public int getCost() {
+        return cost;
     }
 
     public boolean isSecondaryAllowed() {
@@ -79,6 +86,7 @@ public final class ProfessionSkillNode {
             icon = Material.PAPER;
         }
         int slot = Math.max(0, section.getInt("slot", 0));
+        int cost = Math.max(1, section.getInt("cost", 2));
         boolean secondaryAllowed = section.getBoolean("secondary-allowed", false);
         List<String> description = new ArrayList<>(section.getStringList("description"));
         List<String> requirements = new ArrayList<>();
@@ -93,6 +101,7 @@ public final class ProfessionSkillNode {
                 branch,
                 icon,
                 slot,
+                cost,
                 secondaryAllowed,
                 description,
                 requirements

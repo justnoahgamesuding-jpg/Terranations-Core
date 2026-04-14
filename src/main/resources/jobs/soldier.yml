@@ -24,6 +24,7 @@ skill-tree:
       branch: "Combat"
       icon: IRON_SWORD
       slot: 19
+      cost: 2
       secondary-allowed: true
       description:
         - "Planned melee combat branch."
@@ -32,6 +33,7 @@ skill-tree:
       branch: "Defense"
       icon: SHIELD
       slot: 23
+      cost: 3
       description:
         - "Planned defensive formation branch."
     territory_control:
@@ -39,6 +41,7 @@ skill-tree:
       branch: "Control"
       icon: RED_BANNER
       slot: 28
+      cost: 4
       description:
         - "Planned country warfare support branch."
 

@@ -29,6 +29,7 @@ skill-tree:
       branch: "Speed"
       icon: SUGAR
       slot: 19
+      cost: 2
       secondary-allowed: true
       description:
         - "Foundation speed node for lumber work."
@@ -37,6 +38,7 @@ skill-tree:
       branch: "Speed"
       icon: IRON_AXE
       slot: 20
+      cost: 3
       secondary-allowed: true
       requires: [ fast_chop ]
       description:
@@ -46,6 +48,7 @@ skill-tree:
       branch: "Speed"
       icon: CLOCK
       slot: 21
+      cost: 4
       requires: [ chain_chop ]
       description:
         - "Planned active speed burst."
@@ -54,6 +57,7 @@ skill-tree:
       branch: "Area"
       icon: OAK_LOG
       slot: 23
+      cost: 2
       description:
         - "Planned full-tree break specialization."
     wide_swing:
@@ -61,6 +65,7 @@ skill-tree:
       branch: "Area"
       icon: STONE_AXE
       slot: 24
+      cost: 3
       requires: [ tree_feller ]
       description:
         - "Planned multi-log breaking."
@@ -69,6 +74,7 @@ skill-tree:
       branch: "Survival"
       icon: ANVIL
       slot: 28
+      cost: 2
       secondary-allowed: true
       description:
         - "Planned durability efficiency passive."
@@ -77,6 +83,7 @@ skill-tree:
       branch: "Survival"
       icon: BREAD
       slot: 29
+      cost: 3
       secondary-allowed: true
       requires: [ durable_axe ]
       description:
@@ -86,6 +93,7 @@ skill-tree:
       branch: "Survival"
       icon: OAK_SAPLING
       slot: 30
+      cost: 4
       requires: [ energy_saver ]
       description:
         - "Adds extra instant-regrowth chance."

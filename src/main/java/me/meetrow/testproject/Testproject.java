@@ -1995,7 +1995,7 @@ public final class Testproject extends JavaPlugin {
         if (profession.equals(getSecondaryProfession(playerId)) && !node.isSecondaryAllowed()) {
             return false;
         }
-        if (getAvailableProfessionSkillPoints(playerId, profession) <= 0) {
+        if (getAvailableProfessionSkillPoints(playerId, profession) < node.getCost()) {
             return false;
         }
         for (String requirement : node.getRequirements()) {

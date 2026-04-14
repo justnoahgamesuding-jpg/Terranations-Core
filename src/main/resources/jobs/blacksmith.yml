@@ -28,6 +28,7 @@ skill-tree:
       branch: "Quality"
       icon: IRON_PICKAXE
       slot: 19
+      cost: 2
       secondary-allowed: true
       description:
         - "Planned durability quality branch."
@@ -36,6 +37,7 @@ skill-tree:
       branch: "Quality"
       icon: DIAMOND_CHESTPLATE
       slot: 20
+      cost: 3
       requires: [ reinforced_tools ]
       description:
         - "Planned premium crafted item branch."
@@ -44,6 +46,7 @@ skill-tree:
       branch: "Production"
       icon: CRAFTING_TABLE
       slot: 23
+      cost: 2
       secondary-allowed: true
       description:
         - "Planned mass-production branch."
@@ -52,6 +55,7 @@ skill-tree:
       branch: "Production"
       icon: BLAST_FURNACE
       slot: 24
+      cost: 3
       requires: [ bulk_crafting ]
       description:
         - "Planned furnace throughput bonus."
@@ -60,6 +64,7 @@ skill-tree:
       branch: "Efficiency"
       icon: COAL
       slot: 28
+      cost: 2
       secondary-allowed: true
       description:
         - "Planned smelting fuel efficiency."
@@ -68,6 +73,7 @@ skill-tree:
       branch: "Efficiency"
       icon: IRON_INGOT
       slot: 29
+      cost: 3
       requires: [ fuel_saver ]
       description:
         - "Planned higher-yield refinement branch."

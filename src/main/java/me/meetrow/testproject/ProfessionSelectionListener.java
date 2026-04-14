@@ -548,6 +548,7 @@ public class ProfessionSelectionListener implements Listener {
         boolean unlockable = plugin.canUnlockProfessionSkillNode(player.getUniqueId(), profession, node);
         List<String> lore = new ArrayList<>();
         lore.add("&7Branch: &f" + node.getBranch());
+        lore.add("&7Cost: &f" + node.getCost() + " point(s)");
         for (String line : node.getDescriptionLines()) {
             lore.add("&7" + line);
         }
@@ -567,7 +568,7 @@ public class ProfessionSelectionListener implements Listener {
             lore.add("&aUnlocked.");
         } else if (unlockable) {
             lore.add("");
-            lore.add("&eClick to unlock.");
+            lore.add("&eClick to unlock for " + node.getCost() + " point(s).");
         } else {
             lore.add("");
             lore.add("&7Locked.");

@@ -26,6 +26,7 @@ skill-tree:
       branch: "Market"
       icon: EMERALD
       slot: 19
+      cost: 2
       secondary-allowed: true
       description:
         - "Increase trader quest payout and XP by 8%."
@@ -34,6 +35,7 @@ skill-tree:
       branch: "Market"
       icon: GOLD_INGOT
       slot: 20
+      cost: 3
       secondary-allowed: true
       requires: [ better_prices_i ]
       description:
@@ -43,6 +45,7 @@ skill-tree:
       branch: "Market"
       icon: PAPER
       slot: 21
+      cost: 4
       requires: [ better_prices_ii ]
       description:
         - "Planned broader market fee reduction."
@@ -51,6 +54,7 @@ skill-tree:
       branch: "Logistics"
       icon: CHEST_MINECART
       slot: 23
+      cost: 2
       secondary-allowed: true
       description:
         - "Reduce merchant trade cooldown by 2.5 seconds."
@@ -59,6 +63,7 @@ skill-tree:
       branch: "Logistics"
       icon: BARREL
       slot: 24
+      cost: 3
       secondary-allowed: true
       requires: [ logistics_i ]
       description:
@@ -68,6 +73,7 @@ skill-tree:
       branch: "Logistics"
       icon: ENDER_CHEST
       slot: 25
+      cost: 4
       requires: [ logistics_ii ]
       description:
         - "Planned shared logistics feature."
@@ -76,6 +82,7 @@ skill-tree:
       branch: "Risk"
       icon: BLACK_DYE
       slot: 28
+      cost: 2
       description:
         - "Planned risky trade route feature."
     smuggling_bonus:
@@ -83,6 +90,7 @@ skill-tree:
       branch: "Risk"
       icon: HOPPER
       slot: 29
+      cost: 3
       requires: [ black_market ]
       description:
         - "Planned contraband reward bonus."
