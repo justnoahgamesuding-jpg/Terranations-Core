@@ -241,6 +241,7 @@ public final class CustomScoreboard {
         int jobXp = profession != null ? plugin.getProfessionXp(player.getUniqueId(), profession) : 0;
         int jobXpRequired = profession != null ? plugin.getProfessionXpRequired(player.getUniqueId(), profession) : 0;
         LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+        String jobColor = expandHexColors(plugin.getConfig().getString(CONFIG_ROOT + ".job-name-color", "&f"));
         String resolved = text
                 .replace("%player%", player.getName())
                 .replace("%display_name%", player.getDisplayName())
@@ -248,6 +249,7 @@ public final class CustomScoreboard {
                 .replace("%country%", country != null ? country.getName() : "None")
                 .replace("%country_tag%", country != null ? country.getTag() : "")
                 .replace("%country_level%", country != null ? String.valueOf(country.getLevel()) : "0")
+                .replace("%job_color%", jobColor)
                 .replace("%job%", profession != null ? plugin.getProfessionPlainDisplayName(profession) : "No Job")
                 .replace("%job_level%", profession != null ? String.valueOf(plugin.getProfessionLevel(player.getUniqueId(), profession)) : "0")
                 .replace("%job_xp%", String.valueOf(jobXp))
