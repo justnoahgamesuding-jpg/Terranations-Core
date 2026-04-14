@@ -96,16 +96,12 @@ realtime-clock:
   worlds: []
 
 # ---------------------------------------------------------------------------
-# HUD And Resource Pack
+# HUD
 # ---------------------------------------------------------------------------
 
-resource-pack:
-  enabled: false
-  # Direct HTTPS URL to a zip. GitHub raw URLs work for small packs.
-  url: ""
-  # Leave empty unless you calculate a SHA-1 hash for the zip.
-  sha1: ""
-  delay-ticks: 40
+# Resource pack delivery is handled through ItemsAdder for this project.
+# Copy the content pack into plugins/ItemsAdder/contents/terra_quest_hud
+# and run /iazip instead of configuring a standalone Terra resource-pack URL.
 
 server-list-motd:
   enabled: true

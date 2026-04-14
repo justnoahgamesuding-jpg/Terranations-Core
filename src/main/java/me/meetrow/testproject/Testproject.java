@@ -124,7 +124,6 @@ public final class Testproject extends JavaPlugin {
     private static final boolean DEFAULT_PLAYTEST_PVP = false;
     private static final boolean DEFAULT_PLAYTEST_KEEP_COUNTRY_DATA = false;
     private static final boolean DEFAULT_PLAYTEST_SAVE_PLAYER_PROGRESSION = false;
-    private static final Pattern SHA1_PATTERN = Pattern.compile("^[a-fA-F0-9]{40}$");
     private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("(?i)&?#([0-9a-f]{6})");
     private static final int SCOREBOARD_CONFIG_VERSION = 7;
     private static final DateTimeFormatter PLAYTEST_DATE_FORMAT =
@@ -203,7 +202,6 @@ public final class Testproject extends JavaPlugin {
     private final Map<UUID, String> tutorialQuestHudIdCache = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> tutorialQuestHudPercentCache = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> tutorialQuestHudStepCache = new ConcurrentHashMap<>();
-    private final Map<UUID, String> resourcePackStatuses = new ConcurrentHashMap<>();
     private final List<PlayerQuestDefinition> generalQuestDefinitions = new ArrayList<>();
     private final Map<UUID, List<String>> assignedQuestIds = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> completedAssignedQuestIds = new ConcurrentHashMap<>();
@@ -1206,72 +1204,6 @@ public final class Testproject extends JavaPlugin {
 
     public void setJoinLeaveMessagesEnabled(boolean enabled) {
         setManagedConfigValue("join-leave-messages.enabled", enabled);
-    }
-
-    public boolean sendConfiguredResourcePack(Player player) {
-        if (player == null || coreSettingsConfig == null || !coreSettingsConfig.getBoolean("resource-pack.enabled", false)) {
-            return false;
-        }
-        String url = coreSettingsConfig.getString("resource-pack.url", "").trim();
-        if (url.isBlank()) {
-            return false;
-        }
-        long delayTicks = Math.max(0L, coreSettingsConfig.getLong("resource-pack.delay-ticks", 40L));
-        getServer().getScheduler().runTaskLater(this, () -> {
-            if (!player.isOnline()) {
-                return;
-            }
-            String sha1 = coreSettingsConfig.getString("resource-pack.sha1", "").trim();
-            if (SHA1_PATTERN.matcher(sha1).matches()) {
-                player.setResourcePack(url, hexToBytes(sha1));
-            } else {
-                player.setResourcePack(url);
-            }
-        }, delayTicks);
-        return true;
-    }
-
-    public boolean isResourcePackDeliveryEnabled() {
-        return coreSettingsConfig != null && coreSettingsConfig.getBoolean("resource-pack.enabled", false);
-    }
-
-    public String getConfiguredResourcePackUrl() {
-        return coreSettingsConfig != null ? coreSettingsConfig.getString("resource-pack.url", "").trim() : "";
-    }
-
-    public String getConfiguredResourcePackSha1() {
-        return coreSettingsConfig != null ? coreSettingsConfig.getString("resource-pack.sha1", "").trim() : "";
-    }
-
-    public long getConfiguredResourcePackDelayTicks() {
-        return coreSettingsConfig != null ? Math.max(0L, coreSettingsConfig.getLong("resource-pack.delay-ticks", 40L)) : 40L;
-    }
-
-    public boolean hasValidConfiguredResourcePackSha1() {
-        return SHA1_PATTERN.matcher(getConfiguredResourcePackSha1()).matches();
-    }
-
-    public void recordResourcePackStatus(UUID playerId, String status) {
-        if (playerId == null || status == null || status.isBlank()) {
-            return;
-        }
-        resourcePackStatuses.put(playerId, status);
-    }
-
-    public String getResourcePackStatus(UUID playerId) {
-        if (playerId == null) {
-            return "unknown";
-        }
-        return resourcePackStatuses.getOrDefault(playerId, "unknown");
-    }
-
-    private byte[] hexToBytes(String hex) {
-        byte[] bytes = new byte[hex.length() / 2];
-        for (int index = 0; index < bytes.length; index++) {
-            int position = index * 2;
-            bytes[index] = (byte) Integer.parseInt(hex.substring(position, position + 2), 16);
-        }
-        return bytes;
     }
 
     public boolean isMaintenanceModeEnabled() {
@@ -12377,10 +12309,6 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("player-presence-sounds.leave-sound", "BLOCK_AMETHYST_CLUSTER_BREAK");
         getConfig().addDefault("player-presence-sounds.sound-volume", 0.6D);
         getConfig().addDefault("player-presence-sounds.sound-pitch", 1.2D);
-        getConfig().addDefault("resource-pack.enabled", false);
-        getConfig().addDefault("resource-pack.url", "");
-        getConfig().addDefault("resource-pack.sha1", "");
-        getConfig().addDefault("resource-pack.delay-ticks", 40L);
         getConfig().addDefault("server-list-motd.enabled", true);
         getConfig().addDefault("server-list-motd.change-interval", 25);
         getConfig().addDefault("server-list-motd.frames", getDefaultServerMotdFrames());
@@ -15899,7 +15827,6 @@ public final class Testproject extends JavaPlugin {
         migrateLegacyMainConfigSection("npc-head-tracking");
         migrateLegacyMainConfigSection("realtime-clock");
         migrateLegacyMainConfigSection("player-presence-sounds");
-        migrateLegacyMainConfigSection("resource-pack");
         migrateLegacyMainConfigSection("server-list-motd");
         migrateLegacyMainConfigSection("health-hotbar");
         migrateLegacyMainConfigSection("custom-scoreboard");
@@ -16002,7 +15929,6 @@ public final class Testproject extends JavaPlugin {
                 || path.startsWith("npc-head-tracking.")
                 || path.startsWith("realtime-clock.")
                 || path.startsWith("player-presence-sounds.")
-                || path.startsWith("resource-pack.")
                 || path.equals("server-list-motd")
                 || path.startsWith("server-list-motd.")
                 || path.equals("health-hotbar")

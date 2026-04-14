@@ -1,32 +1,11 @@
-# GitHub Resource Pack Hosting
+# Resource Pack Delivery
 
-Terra can send a resource-pack URL to players on join using `plugins/testproject/settings/core.yml`.
+This project no longer uses Terra Core's standalone `resource-pack` config section.
 
-## Recommended GitHub URL
+Use ItemsAdder for pack generation and delivery instead:
 
-If the pack zip is committed at the repo root, use the raw GitHub URL:
+1. Copy `examples/itemsadder/contents/terra_quest_hud` into `plugins/ItemsAdder/contents/terra_quest_hud`
+2. Run `/iazip`
+3. Let ItemsAdder host and send the generated pack
 
-```yml
-resource-pack:
-  enabled: true
-  url: "https://raw.githubusercontent.com/justnoahgamesuding-jpg/Terranations-Core/main/terranations_hud_pack.zip"
-  sha1: "ba00c90c4b03138fc42b131bb2f0e3e921ec9d96"
-  delay-ticks: 40
-```
-
-Update `sha1` whenever you rebuild the zip.
-
-## Important
-
-- The URL must be direct HTTPS to a `.zip`.
-- The zip must contain `pack.mcmeta` and `assets/` at the top level.
-- After changing the file in GitHub, Minecraft may cache the old pack if the URL stays the same. Updating `sha1` or changing the file name is the cleanest cache-bust.
-- Restart the server after editing `core.yml`.
-
-## Current Pack
-
-The ready-to-upload pack is:
-
-- `terranations_hud_pack.zip`
-
-If you commit and push it to GitHub, the raw URL above should work.
+The zip files in the repository root are optional build artifacts for manual testing or external hosting, but Terra Core itself no longer reads a `resource-pack.url` or `resource-pack.sha1` from `core.yml`.
