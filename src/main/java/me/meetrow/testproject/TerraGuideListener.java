@@ -120,14 +120,6 @@ public final class TerraGuideListener implements Listener {
                     "&7country leaders and admins."
             )));
         }
-        inventory.setItem(32, createItem(Material.EMERALD, "&aTrader Routes", List.of(
-                "&7Open the current trader contracts",
-                "&7and route reputation interface."
-        )));
-        inventory.setItem(34, createItem(Material.CHEST, "&6Merchant", List.of(
-                "&7Open the active merchant menu.",
-                "&7Cooldown: &f" + plugin.formatLongDurationWords(plugin.getMerchantTradeCooldownRemainingMillisPublic(player.getUniqueId()))
-        )));
         inventory.setItem(40, createItem(Material.SPYGLASS, oreSenseUnlocked ? "&bOre Sense" : "&7Ore Sense Locked", List.of(
                 oreSenseUnlocked ? "&7Click to toggle your personal ore vision." : "&7Unlock this in Personal Skills first.",
                 oreSenseUnlocked ? "&7Status: &f" + (plugin.isOreVisionEnabled(player.getUniqueId()) ? "Enabled" : "Disabled") : "&8Requires the Ore Sense skill."
@@ -212,9 +204,6 @@ public final class TerraGuideListener implements Listener {
 
         UUID playerId = player.getUniqueId();
         PersonalWorkOrder workOrder = plugin.getOrCreatePersonalWorkOrder(playerId);
-        DynamicTraderState traderState = plugin.getActiveTraderState();
-        TraderPlayerQuest traderQuest = plugin.getTraderQuest(playerId, traderState);
-
         inventory.setItem(4, createItem(Material.WRITABLE_BOOK, "&6Active Quest", List.of(
                 "&7Title: &f" + plugin.getTutorialQuestTitlePlain(playerId),
                 "&7Objective: &f" + plugin.getTutorialQuestObjectivePlain(playerId),
@@ -231,27 +220,6 @@ public final class TerraGuideListener implements Listener {
             lore.add(workOrder.isComplete() ? "&aClick to claim and generate the next order." : "&7Keep working in this profession.");
             inventory.setItem(20, createItem(workOrder.getProfession().getIcon(), workOrder.isComplete() ? "&aWork Order Ready" : "&ePersonal Work Order", lore));
         }
-
-        if (traderQuest != null) {
-            inventory.setItem(24, createItem(traderQuest.getRequestedMaterial(), "&aActive Trader Contract", List.of(
-                    "&7Profession: &f" + plugin.getProfessionPlainDisplayName(traderQuest.getProfession()),
-                    "&7Deliver: &f" + traderQuest.getRequestedAmount() + " " + plugin.formatMaterialName(traderQuest.getRequestedMaterial()),
-                    "&7Reward: &f$" + plugin.formatMoney(traderQuest.getRewardMoney()) + " &7| &f" + traderQuest.getRewardXp() + " XP",
-                    "&7Reputation: &f" + plugin.formatTraderReputation(traderQuest.getRewardReputation()),
-                    "&eClick to open the trader menu."
-            )));
-        } else {
-            inventory.setItem(24, createItem(Material.EMERALD, "&6Trader Contract", List.of(
-                    "&7No active trader contract.",
-                    "&eClick to open the trader menu."
-            )));
-        }
-
-        inventory.setItem(28, createItem(Material.CHEST, "&6Merchant Loop", List.of(
-                "&7Current merchant cooldown:",
-                "&f" + plugin.formatLongDurationWords(plugin.getMerchantTradeCooldownRemainingMillisPublic(playerId)),
-                "&eClick to open the merchant."
-        )));
 
         inventory.setItem(BACK_SLOT, createItem(Material.ARROW, "&eBack", List.of("&7Return to the main guide menu.")));
         inventory.setItem(CLOSE_SLOT, createItem(Material.BARRIER, "&cClose", List.of("&7Close the Terra Guide.")));
@@ -277,8 +245,6 @@ public final class TerraGuideListener implements Listener {
                     plugin.openCountryAdminMenu(player, country);
                 }
             }
-            case 32 -> plugin.openTraderMenu(player);
-            case 34 -> plugin.openMerchantMenu(player);
             case 40 -> {
                 if (!plugin.hasOreSenseUnlocked(player.getUniqueId())) {
                     player.sendMessage(plugin.colorize("&cUnlock Ore Sense in Personal Skills first."));
@@ -331,8 +297,6 @@ public final class TerraGuideListener implements Listener {
                 }
                 openContractsMenu(player);
             }
-            case 24 -> plugin.openTraderMenu(player);
-            case 28 -> plugin.openMerchantMenu(player);
             default -> {
             }
         }
