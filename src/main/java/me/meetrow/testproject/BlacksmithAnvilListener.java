@@ -36,12 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BlacksmithAnvilListener implements Listener {
     private static final String RENAME_ANVIL_TITLE = "Rename Anvil";
     private static final int GUI_SIZE = 54;
-    private static final int INFO_SLOT = 4;
-    private static final int FORGE_STATUS_SLOT = 7;
-    private static final int NORMAL_ANVIL_SLOT = 48;
-    private static final int CLOSE_SLOT = 50;
-    private static final int MERGE_SLOT = 52;
-    private static final int CATEGORY_INFO_SLOT = 49;
+    private static final int NORMAL_ANVIL_SLOT = 42;
+    private static final int CLOSE_SLOT = 53;
+    private static final int MERGE_SLOT = 38;
 
     private static final int MERGE_GUI_SIZE = 54;
     private static final int[] MERGE_INPUT_SLOTS = {2, 3, 4, 5, 6, 20, 21, 22, 23, 24};
@@ -50,11 +47,7 @@ public class BlacksmithAnvilListener implements Listener {
     private static final int MERGE_ACTION_SLOT = 42;
     private static final int MERGE_CLOSE_SLOT = 53;
 
-    private static final int[] RECIPE_SLOTS = {
-            11, 12, 13, 14, 15, 16, 17,
-            20, 21, 22, 23, 24, 25, 26,
-            29, 30, 31, 32, 33, 34, 35
-    };
+    private static final int[] RECIPE_SLOTS = {2, 3, 4, 5, 6, 20, 21, 22, 23, 24, 29, 30, 31, 32};
 
     private final Testproject plugin;
     private final NamespacedKey mergeUiKey;
@@ -336,12 +329,11 @@ public class BlacksmithAnvilListener implements Listener {
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             inventory.setItem(slot, filler);
         }
-        for (int slot : new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 18, 27, 36, 45, 46, 47, 51, 53}) {
+        for (int slot : new int[]{0, 1, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 25, 26, 27, 28, 33, 34, 35, 36, 37, 39, 40, 41, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52}) {
             inventory.setItem(slot, border);
         }
-        for (int slot : new int[]{37, 38, 39, 40, 41, 42, 43, 44, 48, 49, 50, 52}) {
-            inventory.setItem(slot, border);
-        }
+        inventory.setItem(15, createUiItem(Material.WOODEN_SWORD, "&8Rack", "filler", List.of()));
+        inventory.setItem(16, createUiItem(Material.WOODEN_PICKAXE, "&8Rack", "filler", List.of()));
     }
 
     private void openVanillaAnvil(Player player) {
