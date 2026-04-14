@@ -696,8 +696,9 @@ public class BlacksmithAnvilListener implements Listener {
             player.sendMessage(plugin.colorize("&cAll 10 input items must match item, tier, and rarity."));
             return;
         }
-        if (plugin.getForgedDisplayLevel(inputs[0]) >= 5) {
-            player.sendMessage(plugin.colorize("&cThat item is already at Tier V."));
+        if (plugin.getForgedDisplayLevel(inputs[0]) >= 5
+                && plugin.getNextForgedRarity(plugin.getForgedItemRarity(inputs[0])) == null) {
+            player.sendMessage(plugin.colorize("&cThat item is already at the maximum rarity."));
             return;
         }
         ItemStack catalyst = inventory.getItem(MERGE_RARE_SLOT);
@@ -872,12 +873,17 @@ public class BlacksmithAnvilListener implements Listener {
         double chance = plugin.getForgeMergeSuccessChance(first, rareKey);
         ItemStack preview = first.clone();
         preview.setAmount(1);
+        boolean rarityUpgrade = plugin.getForgedDisplayLevel(first) >= 5;
+        ForgedRarity currentRarity = plugin.getForgedItemRarity(first);
+        ForgedRarity nextRarity = plugin.getNextForgedRarity(currentRarity);
         preview.editMeta(meta -> meta.lore(List.of(
                 plugin.legacyComponent("&7Current Tier: &f" + plugin.toRomanNumeral(plugin.getForgedDisplayLevel(first))),
-                plugin.legacyComponent("&7Next Tier: &f" + plugin.toRomanNumeral(Math.min(5, plugin.getForgedDisplayLevel(first) + 1))),
-                plugin.legacyComponent("&7Rarity: &f" + plugin.getForgedItemRarity(first).getDisplayName()),
+                plugin.legacyComponent(rarityUpgrade
+                        ? "&7Next Rarity: &f" + (nextRarity != null ? nextRarity.getDisplayName() : "Max")
+                        : "&7Next Tier: &f" + plugin.toRomanNumeral(Math.min(5, plugin.getForgedDisplayLevel(first) + 1))),
+                plugin.legacyComponent("&7Rarity: &f" + currentRarity.getDisplayName()),
                 plugin.legacyComponent("&7Success: &f" + formatPercent(chance)),
-                plugin.legacyComponent("&eClick to merge.")
+                plugin.legacyComponent(rarityUpgrade ? "&eClick to promote rarity." : "&eClick to merge.")
         )));
         inventory.setItem(MERGE_PREVIEW_SLOT, preview);
     }

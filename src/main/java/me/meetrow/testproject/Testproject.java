@@ -2848,6 +2848,19 @@ public final class Testproject extends JavaPlugin {
         return Math.max(1, Math.min(5, getForgedItemLevel(itemStack)));
     }
 
+    public ForgedRarity getNextForgedRarity(ForgedRarity rarity) {
+        if (rarity == null) {
+            return null;
+        }
+        return switch (rarity) {
+            case COMMON -> ForgedRarity.UNCOMMON;
+            case UNCOMMON -> ForgedRarity.RARE;
+            case RARE -> ForgedRarity.EPIC;
+            case EPIC -> ForgedRarity.LEGENDARY;
+            case LEGENDARY -> null;
+        };
+    }
+
     public String toRomanNumeral(int value) {
         return switch (Math.max(1, Math.min(5, value))) {
             case 1 -> "I";
@@ -3108,7 +3121,15 @@ public final class Testproject extends JavaPlugin {
     }
 
     public ForgeMergeOutcome attemptForgeMergeFromInputs(ItemStack baseItem, String rareMaterialKey) {
-        if (!isForgedItem(baseItem) || getForgedDisplayLevel(baseItem) >= 5) {
+        if (!isForgedItem(baseItem)) {
+            return ForgeMergeOutcome.INVALID;
+        }
+        int currentLevel = getForgedDisplayLevel(baseItem);
+        ForgedRarity currentRarity = getForgedItemRarity(baseItem);
+        if (currentRarity == null) {
+            return ForgeMergeOutcome.INVALID;
+        }
+        if (currentLevel >= 5 && getNextForgedRarity(currentRarity) == null) {
             return ForgeMergeOutcome.INVALID;
         }
         if (ThreadLocalRandom.current().nextDouble() > getForgeMergeSuccessChance(baseItem, rareMaterialKey)) {
@@ -3119,8 +3140,17 @@ public final class Testproject extends JavaPlugin {
         if (meta == null) {
             return ForgeMergeOutcome.INVALID;
         }
-        int nextLevel = Math.min(5, getForgedDisplayLevel(baseItem) + 1);
-        meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, nextLevel);
+        if (currentLevel >= 5) {
+            ForgedRarity nextRarity = getNextForgedRarity(currentRarity);
+            if (nextRarity == null) {
+                return ForgeMergeOutcome.INVALID;
+            }
+            meta.getPersistentDataContainer().set(forgedRarityKey, PersistentDataType.STRING, nextRarity.name());
+            meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, 1);
+        } else {
+            int nextLevel = Math.min(5, currentLevel + 1);
+            meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, nextLevel);
+        }
         baseItem.setItemMeta(meta);
         refreshVisibleDurability(baseItem);
         return ForgeMergeOutcome.SUCCESS;
