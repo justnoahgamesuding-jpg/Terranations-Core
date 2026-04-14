@@ -28,14 +28,18 @@ import java.util.Map;
 public class BlacksmithAnvilListener implements Listener {
     private static final int GUI_SIZE = 54;
     private static final int INFO_SLOT = 4;
+    private static final int FORGE_STATUS_SLOT = 7;
     private static final int NORMAL_ANVIL_SLOT = 48;
     private static final int CLOSE_SLOT = 50;
     private static final int MERGE_SLOT = 52;
     private static final int CATEGORY_INFO_SLOT = 49;
-    private static final int[] MERGE_INPUT_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21};
-    private static final int MERGE_RARE_SLOT = 23;
-    private static final int MERGE_ACTION_SLOT = 25;
-    private static final int MERGE_BACK_SLOT = 26;
+    private static final int MERGE_GUI_SIZE = 54;
+    private static final int[] MERGE_INPUT_SLOTS = {19, 20, 21, 22, 23, 24, 28, 29, 30, 31};
+    private static final int MERGE_RARE_SLOT = 25;
+    private static final int MERGE_PREVIEW_SLOT = 33;
+    private static final int MERGE_ACTION_SLOT = 49;
+    private static final int MERGE_BACK_SLOT = 45;
+    private static final int MERGE_CLOSE_SLOT = 53;
     private static final int[] RECIPE_SLOTS = {
             11, 12, 13, 14, 15, 16, 17,
             20, 21, 22, 23, 24, 25, 26,
@@ -177,25 +181,25 @@ public class BlacksmithAnvilListener implements Listener {
                 plugin.legacyComponent(plugin.getBlacksmithAnvilGuiTitle())
         );
 
-        fillBaseLayout(inventory);
+        fillForgeLayout(inventory);
         for (BlacksmithCategory value : BlacksmithCategory.values()) {
             inventory.setItem(value.slot, createCategoryItem(player, value, value == category));
         }
         inventory.setItem(INFO_SLOT, createInfoItem(player, category));
+        inventory.setItem(FORGE_STATUS_SLOT, createForgeStatusItem(player));
         inventory.setItem(CATEGORY_INFO_SLOT, createSimpleItem(Material.CHAIN, "&6Forge Controls", List.of(
-                "&7Left side: forge tiers",
-                "&7Center: recipe board",
-                "&7Bottom: utility actions"
+                "&7Top row: recipe categories",
+                "&7Center: available forge recipes",
+                "&7Bottom: merge, anvil, and exit"
         )));
         inventory.setItem(NORMAL_ANVIL_SLOT, createSimpleItem(Material.ANVIL, "&bUse Normal Anvil", List.of(
-                "&7Open a normal anvil screen for",
-                "&7repairing, renaming, or combining."
+                "&7Open vanilla repair and rename.",
+                "&7This skips the custom forge flow."
         )));
         inventory.setItem(MERGE_SLOT, createSimpleItem(Material.NETHER_STAR, "&6Forge Merge", List.of(
-                "&7Blacksmith-only upgrade forge.",
-                "&7Consume 10 forged copies and",
-                "&71 rare material for one risky",
-                "&7tier upgrade attempt."
+                "&7Open the upgrade workstation.",
+                "&7Use forged duplicates plus a catalyst",
+                "&7to risk a higher tier result."
         )));
         inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close the forge menu.")));
 
@@ -232,14 +236,28 @@ public class BlacksmithAnvilListener implements Listener {
         boolean blacksmith = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH);
         int level = blacksmith ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH) : 0;
         return createSimpleItem(Material.BLAST_FURNACE, "&6Blacksmith Forge", List.of(
-                "&7Tier board: &f" + category.display,
-                "&7Forge access: &f" + (blacksmith ? "Blacksmith Lv." + level : "Public Smithing"),
+                "&7Selected Category: &f" + category.display,
+                "&7Forge Access: &f" + (blacksmith ? "Blacksmith Lv." + level : "Public Smithing"),
                 "",
-                "&7Everyone can forge every listed recipe.",
-                "&7Blacksmiths roll stronger tiers,",
-                "&7better durability, and better perks.",
-                "&7Materials are taken directly from",
-                "&7your inventory."
+                "&7Everyone can craft the recipes shown.",
+                "&7Blacksmiths get faster forge actions,",
+                "&7better rarity rolls, and better tiers."
+        ));
+    }
+
+    private ItemStack createForgeStatusItem(Player player) {
+        boolean blacksmith = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH);
+        int level = blacksmith ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH) : 0;
+        int cooldown = plugin.getActionCooldownSeconds(player.getUniqueId(), blacksmith ? Profession.BLACKSMITH : null);
+        return createSimpleItem(Material.SMITHING_TABLE, "&eForge Status", List.of(
+                "&7Role: &f" + (blacksmith ? "Blacksmith" : "Crafter"),
+                "&7Level: &f" + (blacksmith ? level : "-"),
+                "&7Action Cooldown: &f" + cooldown + "s",
+                "",
+                "&7Blacksmith bonuses affect:",
+                "&7- forge speed",
+                "&7- forged tier chance",
+                "&7- forged rarity chance"
         ));
     }
 
@@ -248,13 +266,13 @@ public class BlacksmithAnvilListener implements Listener {
                 ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH)
                 : 0;
         List<String> lore = new ArrayList<>();
-        lore.add("&7Recipe tier: &f" + category.display);
+        lore.add("&7Recipe Group: &f" + category.display);
         lore.add("&7Access: &aOpen to everyone");
         lore.add(level >= category.requiredLevel
-                ? "&aBlacksmith bonus tier active"
-                : "&7Blacksmith bonus starts at Lv." + category.requiredLevel);
+                ? "&aBonus quality active"
+                : "&7Bonus quality starts at Lv." + category.requiredLevel);
         lore.add("");
-        lore.add(selected ? "&eCurrently selected." : "&7Click to view recipes.");
+        lore.add(selected ? "&eCurrently selected." : "&7Click to show these recipes.");
         Material material = selected ? Material.ORANGE_STAINED_GLASS_PANE : category.icon;
         return createSimpleItem(material, category.displayName(level), lore);
     }
@@ -264,23 +282,23 @@ public class BlacksmithAnvilListener implements Listener {
         boolean blacksmith = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH);
         int level = blacksmith ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH) : 0;
         List<String> lore = new ArrayList<>();
-        lore.add("&7Required level: &f" + recipe.level());
+        lore.add("&7Recipe Level: &f" + recipe.level());
         lore.add("&7Craft XP: &f" + recipe.xp());
         if (plugin.isForgeManagedEquipment(recipe.result())) {
-            lore.add("&7Result: &fRolled tier + rarity");
+            lore.add("&7Output: &fRolled tier + rarity");
         }
         lore.add("");
-        lore.add("&eIngredients:");
+        lore.add("&eMaterials");
         for (Map.Entry<Material, Integer> entry : recipe.ingredients().entrySet()) {
-            lore.add("&7- &f" + entry.getValue() + "x " + plugin.formatMaterialName(entry.getKey()));
+            lore.add("&8• &f" + entry.getValue() + "x " + plugin.formatMaterialName(entry.getKey()));
         }
         lore.add("");
         if (blacksmith) {
             lore.add(level >= recipe.level()
-                    ? "&aBlacksmith bonus quality active."
+                    ? "&aBlacksmith quality bonus active."
                     : "&7Better rolls unlock at Blacksmith Lv." + recipe.level() + ".");
         } else {
-            lore.add("&7Blacksmiths get better rolls on this recipe.");
+            lore.add("&7Blacksmiths get better rolls here.");
         }
         Material icon = unlocked ? recipe.result() : Material.RED_STAINED_GLASS_PANE;
         String name = "&f" + plugin.formatMaterialName(recipe.result());
@@ -326,19 +344,18 @@ public class BlacksmithAnvilListener implements Listener {
                 || material == Material.DAMAGED_ANVIL;
     }
 
-    private void fillBaseLayout(Inventory inventory) {
+    private void fillForgeLayout(Inventory inventory) {
         ItemStack filler = createSimpleItem(Material.GRAY_STAINED_GLASS_PANE, "&7", List.of());
         ItemStack border = createSimpleItem(Material.BLACK_STAINED_GLASS_PANE, "&8", List.of());
+        ItemStack panel = createSimpleItem(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "&7", List.of());
         for (int slot = 0; slot < inventory.getSize(); slot++) {
-            if (inventory.getItem(slot) == null) {
-                inventory.setItem(slot, filler);
-            }
+            inventory.setItem(slot, filler);
         }
-        for (int slot : new int[]{0, 1, 2, 3, 5, 6, 7, 8, 9, 18, 27, 36, 45, 46, 47, 51, 52, 53}) {
+        for (int slot : new int[]{0, 1, 2, 3, 5, 6, 8, 9, 18, 27, 36, 45, 46, 47, 51, 53}) {
             inventory.setItem(slot, border);
         }
         for (int slot : new int[]{10, 19, 28, 37, 38, 39, 40, 41, 42, 43, 44}) {
-            inventory.setItem(slot, createSimpleItem(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "&7", List.of()));
+            inventory.setItem(slot, panel);
         }
     }
 
@@ -348,39 +365,41 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private void openMergeMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(new MergeMenuHolder(), 27, plugin.legacyComponent("&8Forge Merge"));
-        ItemStack filler = createSimpleItem(Material.GRAY_STAINED_GLASS_PANE, "&7", List.of());
-        for (int slot = 0; slot < inventory.getSize(); slot++) {
-            inventory.setItem(slot, filler);
-        }
+        Inventory inventory = Bukkit.createInventory(new MergeMenuHolder(), MERGE_GUI_SIZE, plugin.legacyComponent("&8Forge Merge"));
+        fillMergeLayout(inventory);
         for (int slot : MERGE_INPUT_SLOTS) {
             inventory.setItem(slot, null);
         }
         inventory.setItem(MERGE_RARE_SLOT, null);
-        inventory.setItem(12, createSimpleItem(Material.ANVIL, "&7Merge Rules", List.of(
-                "&710 forged copies of the same item",
-                "&71 rare material",
-                "&7Put the 10 forged items into the slots",
-                "&7Place 1 rare material in the catalyst slot",
-                "&7Success upgrades one result by 1 tier",
-                "&cFailure destroys all inputs"
+        inventory.setItem(4, createSimpleItem(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&6Forge Merge Workstation", List.of(
+                "&710 forged duplicates",
+                "&71 catalyst material",
+                "&7One result upgraded on success",
+                "&cAll inputs destroyed on failure"
         )));
-        inventory.setItem(18, createSimpleItem(Material.BOOK, "&7Status", List.of(
+        inventory.setItem(7, createSimpleItem(Material.SMITHING_TABLE, "&eMerge Status", List.of(
                 plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH) ? "&aBlacksmith access active" : "&cBlacksmith only",
-                "&7Input slots: &f10 forged copies",
-                "&7Catalyst slot: &f1 rare material"
+                "&7Place the forged duplicates in the",
+                "&7central grid, then add a catalyst."
         )));
-        inventory.setItem(22, createSimpleItem(Material.NETHER_STAR, "&dCatalyst Slot", List.of(
-                "&7Place one forge material here:",
-                "&7Forge Shard, Tempered Flux,",
-                "&7Binding Thread, Runic Prism,",
-                "&7or Ancient Core."
+        inventory.setItem(16, createSimpleItem(Material.AMETHYST_SHARD, "&dCatalyst", List.of(
+                "&7Accepted materials:",
+                "&8• &fForge Shard",
+                "&8• &fTempered Flux",
+                "&8• &fBinding Thread",
+                "&8• &fRunic Prism",
+                "&8• &fAncient Core"
+        )));
+        inventory.setItem(MERGE_PREVIEW_SLOT, createSimpleItem(Material.ANVIL, "&7Result Preview", List.of(
+                "&7After a successful merge, one item",
+                "&7returns at the next tier."
         )));
         inventory.setItem(MERGE_ACTION_SLOT, createSimpleItem(Material.ANVIL, "&6Merge", List.of(
-                "&7Attempt the forge merge.",
+                "&7Attempt the forge merge now.",
                 "&cFailure destroys all inputs."
         )));
         inventory.setItem(MERGE_BACK_SLOT, createSimpleItem(Material.ARROW, "&7Back", List.of("&7Return to the forge board.")));
+        inventory.setItem(MERGE_CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close and return items.")));
         player.openInventory(inventory);
     }
 
@@ -394,6 +413,11 @@ public class BlacksmithAnvilListener implements Listener {
         }
 
         int slot = event.getSlot();
+        if (slot == MERGE_CLOSE_SLOT) {
+            event.setCancelled(true);
+            player.closeInventory();
+            return;
+        }
         if (slot == MERGE_BACK_SLOT) {
             event.setCancelled(true);
             returnMergeInputs(player, event.getView().getTopInventory());
@@ -405,7 +429,7 @@ public class BlacksmithAnvilListener implements Listener {
             runMergeAttempt(player, event.getView().getTopInventory());
             return;
         }
-        if (slot == 12 || slot == 18 || slot == 22) {
+        if (slot == 4 || slot == 7 || slot == 16 || slot == MERGE_PREVIEW_SLOT) {
             event.setCancelled(true);
             return;
         }
@@ -509,6 +533,7 @@ public class BlacksmithAnvilListener implements Listener {
                     return;
                 }
             }
+            updateMergePreview(event.getView().getTopInventory());
             return;
         }
         if (!isMergeInputSlot(slot)) {
@@ -526,9 +551,11 @@ public class BlacksmithAnvilListener implements Listener {
                 event.setCancelled(true);
                 player.sendMessage(plugin.colorize("&cAll forge merge inputs must be the same item type."));
             }
+            updateMergePreview(event.getView().getTopInventory());
             return;
         }
         if (current != null && !current.getType().isAir()) {
+            updateMergePreview(event.getView().getTopInventory());
             return;
         }
     }
@@ -563,6 +590,10 @@ public class BlacksmithAnvilListener implements Listener {
 
         Testproject.ForgeMergeOutcome outcome = plugin.attemptForgeMergeFromInputs(inputs[0], rareKey);
         clearMergeInventory(inventory);
+        inventory.setItem(MERGE_PREVIEW_SLOT, createSimpleItem(Material.ANVIL, "&7Result Preview", List.of(
+                "&7After a successful merge, one item",
+                "&7returns at the next tier."
+        )));
         if (outcome == Testproject.ForgeMergeOutcome.SUCCESS) {
             Map<Integer, ItemStack> leftovers = player.getInventory().addItem(inputs[0]);
             for (ItemStack leftover : leftovers.values()) {
@@ -670,5 +701,56 @@ public class BlacksmithAnvilListener implements Listener {
         } else {
             source.setItem(sourceSlot, sourceItem);
         }
+        updateMergePreview(target);
+    }
+
+    private void fillMergeLayout(Inventory inventory) {
+        ItemStack filler = createSimpleItem(Material.GRAY_STAINED_GLASS_PANE, "&7", List.of());
+        ItemStack border = createSimpleItem(Material.BLACK_STAINED_GLASS_PANE, "&8", List.of());
+        ItemStack panel = createSimpleItem(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "&7", List.of());
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            inventory.setItem(slot, filler);
+        }
+        for (int slot : new int[]{0, 1, 2, 3, 5, 6, 8, 9, 17, 18, 26, 27, 35, 36, 37, 38, 39, 41, 42, 43, 44, 46, 47, 48, 50, 51, 52}) {
+            inventory.setItem(slot, border);
+        }
+        for (int slot : new int[]{10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24, 28, 29, 30, 31, 32, 33, 40}) {
+            inventory.setItem(slot, panel);
+        }
+    }
+
+    private void updateMergePreview(Inventory inventory) {
+        if (inventory == null) {
+            return;
+        }
+        ItemStack[] inputs = getMergeInputs(inventory);
+        ItemStack catalyst = inventory.getItem(MERGE_RARE_SLOT);
+        String rareKey = plugin.getRareContractMaterialKey(catalyst);
+        if (inputs.length == 0) {
+            inventory.setItem(MERGE_PREVIEW_SLOT, createSimpleItem(Material.ANVIL, "&7Result Preview", List.of(
+                    "&7Place forged duplicates into the grid",
+                    "&7to preview the merge output."
+            )));
+            return;
+        }
+        ItemStack first = inputs[0];
+        if (!allSameForgedType(inputs)) {
+            inventory.setItem(MERGE_PREVIEW_SLOT, createSimpleItem(Material.BARRIER, "&cInvalid Merge", List.of(
+                    "&7All 10 input items must be",
+                    "&7the same forged item type."
+            )));
+            return;
+        }
+        ItemStack preview = first.clone();
+        preview.setAmount(1);
+        if (plugin.getForgedDisplayLevel(preview) < 5) {
+            preview.editMeta(meta -> meta.lore(List.of(
+                    plugin.legacyComponent("&7Current Tier: &f" + plugin.toRomanNumeral(plugin.getForgedDisplayLevel(first))),
+                    plugin.legacyComponent("&7Next Tier: &f" + plugin.toRomanNumeral(Math.min(5, plugin.getForgedDisplayLevel(first) + 1))),
+                    plugin.legacyComponent("&7Catalyst: &f" + (rareKey != null ? plugin.formatRareContractMaterialName(rareKey) : "Missing")),
+                    plugin.legacyComponent("&7Success: &f" + (rareKey != null ? (int) Math.round(plugin.getForgeMergeSuccessChance(rareKey) * 100.0D) + "%" : "--"))
+            )));
+        }
+        inventory.setItem(MERGE_PREVIEW_SLOT, preview);
     }
 }
