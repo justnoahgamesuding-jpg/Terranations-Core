@@ -33,22 +33,9 @@ public class ProfessionCraftListener implements Listener {
             return;
         }
 
-        if (plugin.isBlacksmithForgeRecipe(resultType) && !plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.BLACKSMITH)) {
+        if (plugin.isBlacksmithForgeRecipe(resultType) || plugin.isForgeManagedEquipment(resultType)) {
             event.setCancelled(true);
-            int requiredLevel = plugin.getBlacksmithRequiredLevel(resultType);
-            player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.BLACKSMITH),
-                    "action", "use this item",
-                    "level", String.valueOf(Math.max(1, requiredLevel))
-            )));
-            return;
-        }
-
-        if (plugin.isBlacksmithForgeRecipe(resultType) && plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.BLACKSMITH)) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.blacksmith.forge-only", plugin.placeholders(
-                    "item", plugin.formatMaterialName(resultType)
-            )));
+            player.sendMessage(plugin.colorize("&cForge " + plugin.formatMaterialName(resultType) + " at an anvil instead of the crafting table."));
             return;
         }
 
@@ -86,7 +73,7 @@ public class ProfessionCraftListener implements Listener {
             return;
         }
 
-        if (!plugin.isBlacksmithCraft(resultType)) {
+        if (!plugin.isBlacksmithCraft(resultType) || plugin.isForgeManagedEquipment(resultType)) {
             return;
         }
 

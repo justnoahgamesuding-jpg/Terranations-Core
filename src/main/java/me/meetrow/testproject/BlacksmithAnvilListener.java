@@ -54,23 +54,8 @@ public class BlacksmithAnvilListener implements Listener {
             return;
         }
 
-        Player player = event.getPlayer();
-        if (plugin.bypassesProfessionRestrictions(player.getUniqueId())) {
-            return;
-        }
-
-        if (!plugin.prepareProfessionRequirement(player.getUniqueId(), Profession.BLACKSMITH)) {
-            event.setCancelled(true);
-            player.sendMessage(plugin.getMessage("profession.action-job-required", plugin.placeholders(
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.BLACKSMITH),
-                    "action", "use this block",
-                    "level", "1"
-            )));
-            return;
-        }
-
         event.setCancelled(true);
-        openMenu(player, BlacksmithCategory.BASICS);
+        openMenu(event.getPlayer(), BlacksmithCategory.BASICS);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -107,13 +92,8 @@ public class BlacksmithAnvilListener implements Listener {
             return;
         }
 
-        int level = plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH);
-        if (level < recipe.level()) {
-            player.sendMessage(plugin.getMessage("profession.blacksmith.level-locked", plugin.placeholders(
-                    "item", plugin.formatMaterialName(recipe.result()),
-                    "level", String.valueOf(recipe.level()),
-                    "profession", plugin.getProfessionPlainDisplayName(Profession.BLACKSMITH)
-            )));
+        if (!plugin.canCraftBlacksmithRecipe(player.getUniqueId(), recipe)) {
+            player.sendMessage(getRecipeLockMessage(player, recipe));
             return;
         }
         if (!hasIngredients(player, recipe.ingredients())) {
@@ -124,13 +104,15 @@ public class BlacksmithAnvilListener implements Listener {
         }
 
         removeIngredients(player, recipe.ingredients());
-        ItemStack result = plugin.applyUsageRequirementLore(new ItemStack(recipe.result(), recipe.amount()));
+        ItemStack result = plugin.createForgedEquipment(player, recipe);
         Map<Integer, ItemStack> leftovers = player.getInventory().addItem(result);
         for (ItemStack leftover : leftovers.values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), leftover);
         }
 
-        int awardedXp = plugin.rewardProfessionXp(player, Profession.BLACKSMITH, recipe.xp());
+        int awardedXp = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH)
+                ? plugin.rewardProfessionXp(player, Profession.BLACKSMITH, recipe.xp())
+                : 0;
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1.0F, 1.1F);
         player.sendMessage(plugin.getMessage("profession.blacksmith.anvil-crafted", plugin.placeholders(
                 "item", plugin.formatMaterialName(recipe.result()),
@@ -199,22 +181,29 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private ItemStack createInfoItem(Player player, BlacksmithCategory category) {
-        int level = plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH);
+        boolean blacksmith = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH);
+        int level = blacksmith ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH) : 0;
         return createSimpleItem(Material.BLAST_FURNACE, "&6Blacksmith Forge", List.of(
                 "&7Tier board: &f" + category.display,
-                "&7Blacksmith level: &f" + level,
+                "&7Forge access: &f" + (blacksmith ? "Blacksmith Lv." + level : "Public Smithing"),
                 "",
-                "&7Click any unlocked recipe to forge it.",
+                "&7Everyone can forge basic gear here.",
+                "&7Blacksmiths unlock gold, diamond,",
+                "&7netherite, and stronger roll quality.",
                 "&7Materials are taken directly from",
                 "&7your inventory."
         ));
     }
 
     private ItemStack createCategoryItem(Player player, BlacksmithCategory category, boolean selected) {
-        int level = plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH);
+        int level = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH)
+                ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH)
+                : 0;
         List<String> lore = new ArrayList<>();
         lore.add("&7Required level: &f" + category.requiredLevel);
-        lore.add(level >= category.requiredLevel ? "&aUnlocked" : "&cLocked");
+        lore.add((category == BlacksmithCategory.BASICS || category == BlacksmithCategory.STONE || category == BlacksmithCategory.IRON)
+                ? "&aPublic forge access"
+                : level >= category.requiredLevel ? "&aUnlocked" : "&cBlacksmith only");
         lore.add("");
         lore.add(selected ? "&eCurrently selected." : "&7Click to view recipes.");
         Material material = selected ? Material.ORANGE_STAINED_GLASS_PANE : category.icon;
@@ -222,23 +211,43 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private ItemStack createRecipeItem(Player player, Testproject.BlacksmithRecipe recipe) {
-        int level = plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH);
-        boolean unlocked = level >= recipe.level();
+        boolean unlocked = plugin.canCraftBlacksmithRecipe(player.getUniqueId(), recipe);
+        boolean blacksmith = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH);
         List<String> lore = new ArrayList<>();
         lore.add("&7Required level: &f" + recipe.level());
         lore.add("&7Craft XP: &f" + recipe.xp());
+        if (plugin.isForgeManagedEquipment(recipe.result())) {
+            lore.add("&7Result: &fRolled rarity + item level");
+        }
         lore.add("");
         lore.add("&eIngredients:");
         for (Map.Entry<Material, Integer> entry : recipe.ingredients().entrySet()) {
             lore.add("&7- &f" + entry.getValue() + "x " + plugin.formatMaterialName(entry.getKey()));
         }
         lore.add("");
-        lore.add(unlocked ? "&aClick to craft." : "&cLocked.");
+        if (unlocked) {
+            lore.add("&aClick to craft.");
+        } else if (!blacksmith && !plugin.isPublicBlacksmithRecipe(recipe)) {
+            lore.add("&cRequires the Blacksmith job.");
+        } else {
+            lore.add("&cRequires Blacksmith Lv." + recipe.level() + ".");
+        }
         Material icon = unlocked ? recipe.result() : Material.RED_STAINED_GLASS_PANE;
         String name = unlocked
                 ? "&f" + plugin.formatMaterialName(recipe.result())
                 : "&c" + plugin.formatMaterialName(recipe.result());
         return createSimpleItem(icon, name, lore);
+    }
+
+    private String getRecipeLockMessage(Player player, Testproject.BlacksmithRecipe recipe) {
+        if (!plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH) && !plugin.isPublicBlacksmithRecipe(recipe)) {
+            return plugin.colorize("&cOnly blacksmiths can forge " + plugin.formatMaterialName(recipe.result()) + " above iron tier.");
+        }
+        return plugin.getMessage("profession.blacksmith.level-locked", plugin.placeholders(
+                "item", plugin.formatMaterialName(recipe.result()),
+                "level", String.valueOf(recipe.level()),
+                "profession", plugin.getProfessionPlainDisplayName(Profession.BLACKSMITH)
+        ));
     }
 
     private boolean hasIngredients(Player player, LinkedHashMap<Material, Integer> ingredients) {

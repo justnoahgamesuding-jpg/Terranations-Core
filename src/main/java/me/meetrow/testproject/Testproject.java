@@ -27,6 +27,7 @@ import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.HeightMap;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
@@ -377,6 +378,9 @@ public final class Testproject extends JavaPlugin {
     private NamespacedKey soulboundItemKey;
     private NamespacedKey guidanceItemKey;
     private NamespacedKey stackedMobCountKey;
+    private NamespacedKey forgedItemKey;
+    private NamespacedKey forgedLevelKey;
+    private NamespacedKey forgedRarityKey;
     private final Set<UUID> maintenanceAllowedPlayers = ConcurrentHashMap.newKeySet();
     private final Set<Integer> groundItemClearWarningsSent = ConcurrentHashMap.newKeySet();
     private boolean maintenanceModeEnabled;
@@ -393,6 +397,9 @@ public final class Testproject extends JavaPlugin {
         soulboundItemKey = new NamespacedKey(this, "soulbound_item");
         guidanceItemKey = new NamespacedKey(this, "guidance_item");
         stackedMobCountKey = new NamespacedKey(this, "stacked_mob_count");
+        forgedItemKey = new NamespacedKey(this, "forged_item");
+        forgedLevelKey = new NamespacedKey(this, "forged_level");
+        forgedRarityKey = new NamespacedKey(this, "forged_rarity");
         saveDefaultConfigFiles();
         reloadPluginSettings();
         if (!setupLuckPerms()) {
@@ -1951,7 +1958,11 @@ public final class Testproject extends JavaPlugin {
         }
         int earned = Math.max(0, getProfessionLevel(playerId, profession) - 1);
         int bonus = getProfessionSkillPointBonus(playerId, profession);
-        int spent = getUnlockedProfessionSkillNodeKeys(playerId, profession).size();
+        int spent = 0;
+        for (String nodeKey : getUnlockedProfessionSkillNodeKeys(playerId, profession)) {
+            ProfessionSkillNode unlockedNode = getProfessionSkillNode(profession, nodeKey);
+            spent += unlockedNode != null ? unlockedNode.getCost() : 1;
+        }
         return Math.max(0, earned + bonus - spent);
     }
 
@@ -2583,6 +2594,205 @@ public final class Testproject extends JavaPlugin {
         }
         ItemMeta meta = itemStack.getItemMeta();
         return meta != null && meta.getPersistentDataContainer().has(soulboundItemKey, PersistentDataType.BYTE);
+    }
+
+    public boolean isForgeManagedEquipment(Material material) {
+        if (material == null) {
+            return false;
+        }
+        String name = material.name();
+        return name.endsWith("_SWORD")
+                || name.endsWith("_PICKAXE")
+                || name.endsWith("_AXE")
+                || name.endsWith("_SHOVEL")
+                || name.endsWith("_HOE")
+                || name.endsWith("_HELMET")
+                || name.endsWith("_CHESTPLATE")
+                || name.endsWith("_LEGGINGS")
+                || name.endsWith("_BOOTS");
+    }
+
+    public boolean canUseAdvancedBlacksmithForge(UUID playerId) {
+        return playerId != null && hasProfession(playerId, Profession.BLACKSMITH);
+    }
+
+    public boolean isPublicBlacksmithRecipe(BlacksmithRecipe recipe) {
+        if (recipe == null) {
+            return false;
+        }
+        return switch (recipe.category().toLowerCase(Locale.ROOT)) {
+            case "basics", "stone", "iron" -> true;
+            default -> false;
+        };
+    }
+
+    public boolean canCraftBlacksmithRecipe(UUID playerId, BlacksmithRecipe recipe) {
+        if (recipe == null) {
+            return false;
+        }
+        if (recipe.level() <= 0 || isPublicBlacksmithRecipe(recipe)) {
+            return true;
+        }
+        if (!canUseAdvancedBlacksmithForge(playerId)) {
+            return false;
+        }
+        return getProfessionLevel(playerId, Profession.BLACKSMITH) >= recipe.level();
+    }
+
+    public ItemStack createForgedEquipment(Player player, BlacksmithRecipe recipe) {
+        ItemStack itemStack = applyUsageRequirementLore(new ItemStack(recipe.result(), recipe.amount()));
+        if (!isForgeManagedEquipment(recipe.result())) {
+            return itemStack;
+        }
+
+        UUID playerId = player.getUniqueId();
+        int blacksmithLevel = hasProfession(playerId, Profession.BLACKSMITH)
+                ? getProfessionLevel(playerId, Profession.BLACKSMITH)
+                : 0;
+        int itemLevel = rollForgedItemLevel(playerId, recipe.level(), blacksmithLevel);
+        ForgedRarity rarity = rollForgedRarity(playerId, blacksmithLevel);
+
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null) {
+            return itemStack;
+        }
+
+        meta.getPersistentDataContainer().set(forgedItemKey, PersistentDataType.BYTE, (byte) 1);
+        meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, itemLevel);
+        meta.getPersistentDataContainer().set(forgedRarityKey, PersistentDataType.STRING, rarity.name());
+        meta.displayName(legacyComponent(rarity.getColor() + rarity.getDisplayName() + " &f" + formatMaterialName(recipe.result())));
+
+        List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+        if (!lore.isEmpty()) {
+            lore.add(legacyComponent("&8"));
+        }
+        lore.add(legacyComponent("&6Forged Equipment"));
+        lore.add(legacyComponent("&7Rarity: " + rarity.getColor() + rarity.getDisplayName()));
+        lore.add(legacyComponent("&7Item Level: &f" + itemLevel));
+        lore.add(legacyComponent("&7Forge Tier: &f" + Math.max(1, recipe.level())));
+        if (blacksmithLevel > 0) {
+            lore.add(legacyComponent("&7Smith Quality: &fBlacksmith Lv." + blacksmithLevel));
+        } else {
+            lore.add(legacyComponent("&7Smith Quality: &fPublic Forge"));
+        }
+        meta.lore(lore);
+        applyForgedEquipmentBonuses(meta, recipe.result(), rarity, itemLevel);
+        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ATTRIBUTES);
+        itemStack.setItemMeta(meta);
+        return itemStack;
+    }
+
+    private int rollForgedItemLevel(UUID playerId, int recipeLevel, int blacksmithLevel) {
+        int baseLevel = Math.max(1, recipeLevel);
+        int cap = baseLevel + (blacksmithLevel > 0 ? Math.max(1, blacksmithLevel / 3) : 1);
+        if (blacksmithLevel > 0) {
+            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "reinforced_tools");
+            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "resource_refinement");
+            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "masterwork_items");
+        }
+        cap = Math.max(baseLevel, Math.min(15, cap));
+        int rolled = baseLevel;
+        while (rolled < cap) {
+            double chance = blacksmithLevel > 0 ? 0.45D : 0.25D;
+            if (blacksmithLevel > 0) {
+                chance += Math.min(0.25D, blacksmithLevel * 0.015D);
+                chance += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "reinforced_tools") * 0.10D;
+                chance += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "resource_refinement") * 0.08D;
+            }
+            if (ThreadLocalRandom.current().nextDouble() > Math.min(0.85D, chance)) {
+                break;
+            }
+            rolled++;
+        }
+        return rolled;
+    }
+
+    private ForgedRarity rollForgedRarity(UUID playerId, int blacksmithLevel) {
+        double roll = ThreadLocalRandom.current().nextDouble();
+        double commonWeight = 0.72D;
+        double uncommonWeight = 0.22D;
+        double rareWeight = 0.0D;
+        double epicWeight = 0.0D;
+        double legendaryWeight = 0.0D;
+
+        if (blacksmithLevel > 0) {
+            rareWeight = 0.05D;
+            epicWeight = 0.01D;
+            commonWeight = Math.max(0.32D, commonWeight - blacksmithLevel * 0.02D);
+            uncommonWeight = Math.min(0.34D, uncommonWeight + blacksmithLevel * 0.01D);
+            rareWeight = Math.min(0.20D, rareWeight + blacksmithLevel * 0.007D);
+            epicWeight = Math.min(0.10D, epicWeight + blacksmithLevel * 0.003D);
+            legendaryWeight = Math.min(0.05D, Math.max(0.0D, blacksmithLevel - 9) * 0.004D);
+            rareWeight += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "reinforced_tools") * 0.05D;
+            epicWeight += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "masterwork_items") * 0.08D;
+            legendaryWeight += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "masterwork_items") * 0.03D;
+            uncommonWeight += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "resource_refinement") * 0.04D;
+            rareWeight += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "resource_refinement") * 0.05D;
+        }
+
+        double total = commonWeight + uncommonWeight + rareWeight + epicWeight + legendaryWeight;
+        commonWeight /= total;
+        uncommonWeight /= total;
+        rareWeight /= total;
+        epicWeight /= total;
+        legendaryWeight /= total;
+
+        if (roll < commonWeight) {
+            return ForgedRarity.COMMON;
+        }
+        roll -= commonWeight;
+        if (roll < uncommonWeight) {
+            return ForgedRarity.UNCOMMON;
+        }
+        roll -= uncommonWeight;
+        if (roll < rareWeight) {
+            return ForgedRarity.RARE;
+        }
+        roll -= rareWeight;
+        if (roll < epicWeight) {
+            return ForgedRarity.EPIC;
+        }
+        return ForgedRarity.LEGENDARY;
+    }
+
+    private void applyForgedEquipmentBonuses(ItemMeta meta, Material material, ForgedRarity rarity, int itemLevel) {
+        if (meta == null || material == null || rarity == null) {
+            return;
+        }
+
+        int durability = Math.min(5, rarity.getDurabilityBonus() + Math.max(0, itemLevel / 5));
+        if (durability > 0) {
+            meta.addEnchant(Enchantment.UNBREAKING, durability, true);
+        }
+
+        String name = material.name();
+        if (name.endsWith("_HELMET")
+                || name.endsWith("_CHESTPLATE")
+                || name.endsWith("_LEGGINGS")
+                || name.endsWith("_BOOTS")) {
+            int protection = Math.min(5, rarity.getArmorBonus() + Math.max(0, itemLevel / 6));
+            if (protection > 0) {
+                meta.addEnchant(Enchantment.PROTECTION, protection, true);
+            }
+            return;
+        }
+
+        if (name.endsWith("_SWORD") || name.endsWith("_AXE")) {
+            int sharpness = Math.min(5, rarity.getToolPowerBonus() + Math.max(0, itemLevel / 5));
+            if (sharpness > 0) {
+                meta.addEnchant(Enchantment.SHARPNESS, sharpness, true);
+            }
+        }
+
+        if (name.endsWith("_PICKAXE")
+                || name.endsWith("_AXE")
+                || name.endsWith("_SHOVEL")
+                || name.endsWith("_HOE")) {
+            int efficiency = Math.min(5, rarity.getToolPowerBonus() + Math.max(0, itemLevel / 4));
+            if (efficiency > 0) {
+                meta.addEnchant(Enchantment.EFFICIENCY, efficiency, true);
+            }
+        }
     }
 
     public NamespacedKey getClimateCropLoreKey() {
