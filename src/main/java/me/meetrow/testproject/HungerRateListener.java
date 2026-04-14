@@ -21,7 +21,10 @@ public final class HungerRateListener implements Listener {
 
         Player player = (Player) event.getEntity();
         double climateMultiplier = plugin.getClimateHungerMultiplier(player.getLocation());
-        float scaledExhaustion = (float) (event.getExhaustion() * plugin.getHungerSpeedMultiplier() * climateMultiplier);
+        float scaledExhaustion = (float) (event.getExhaustion()
+                * plugin.getHungerSpeedMultiplier()
+                * climateMultiplier
+                * plugin.getProfessionExhaustionMultiplier(player.getUniqueId()));
         event.setExhaustion(Math.max(0.0F, scaledExhaustion));
     }
 }

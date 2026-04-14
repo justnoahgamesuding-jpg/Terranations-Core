@@ -126,6 +126,11 @@ public final class Testproject extends JavaPlugin {
     private static final boolean DEFAULT_PLAYTEST_SAVE_PLAYER_PROGRESSION = false;
     private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("(?i)&?#([0-9a-f]{6})");
     private static final int SCOREBOARD_CONFIG_VERSION = 7;
+    private static final long MINER_OVERDRIVE_DURATION_MILLIS = 10_000L;
+    private static final long MINER_OVERDRIVE_COOLDOWN_MILLIS = 60_000L;
+    private static final long FARMER_GROWTH_BURST_DURATION_MILLIS = 20_000L;
+    private static final long FARMER_GROWTH_BURST_COOLDOWN_MILLIS = 75_000L;
+    private static final long TRADER_MARKET_SCAN_COOLDOWN_MILLIS = 30_000L;
     private static final DateTimeFormatter PLAYTEST_DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
     public static final String ADMIN_PERMISSION = "terra.admin";
@@ -277,6 +282,11 @@ public final class Testproject extends JavaPlugin {
     private final Set<UUID> climateLiveDisplayPlayers = ConcurrentHashMap.newKeySet();
     private final Set<UUID> oreVisionPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Map<PlacedBlockKey, UUID>> oreVisionDisplays = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> minerOverdriveUntil = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> minerOverdriveCooldownUntil = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> farmerGrowthBurstUntil = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> farmerGrowthBurstCooldownUntil = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> traderMarketScanCooldownUntil = new ConcurrentHashMap<>();
     private final Map<UUID, Map<PlacedBlockKey, StabilityDebugDisplayState>> stabilityDebugDisplays = new ConcurrentHashMap<>();
     private final Set<Material> configuredStructuralSupportMaterials = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Long> climateRecentRainEndMillis = new ConcurrentHashMap<>();
@@ -407,6 +417,7 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ProfessionCraftListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionSmeltingListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionActionListener(this), this);
+        getServer().getPluginManager().registerEvents(new ProfessionAbilityListener(this), this);
         getServer().getPluginManager().registerEvents(new BlacksmithAnvilListener(this), this);
         getServer().getPluginManager().registerEvents(new StaffModeListener(this), this);
         getServer().getPluginManager().registerEvents(new StaffUtilityListener(this), this);
@@ -652,6 +663,11 @@ public final class Testproject extends JavaPlugin {
         climateRecentRainEndMillis.clear();
         oreVisionPlayers.clear();
         oreVisionDisplays.clear();
+        minerOverdriveUntil.clear();
+        minerOverdriveCooldownUntil.clear();
+        farmerGrowthBurstUntil.clear();
+        farmerGrowthBurstCooldownUntil.clear();
+        traderMarketScanCooldownUntil.clear();
         stabilityDebugDisplays.clear();
         clearAllPendingStabilityCollapses();
         pendingStabilityBlockKeys.clear();
@@ -3361,6 +3377,9 @@ public final class Testproject extends JavaPlugin {
         if (profession == Profession.FARMER) {
             chance += countUnlockedProfessionSkillNodes(playerId, profession, "fast_growth") * 0.04D;
             chance += countUnlockedProfessionSkillNodes(playerId, profession, "regrowth_boost") * 0.04D;
+            if (isFarmerGrowthBurstActive(playerId)) {
+                chance += 0.20D;
+            }
         } else if (profession == Profession.LUMBERJACK) {
             chance += countUnlockedProfessionSkillNodes(playerId, profession, "regrowth_boost") * 0.03D;
         }
@@ -7044,6 +7063,139 @@ public final class Testproject extends JavaPlugin {
         return count;
     }
 
+    public long getAbilityCooldownRemainingMillis(UUID playerId, String abilityKey) {
+        if (playerId == null || abilityKey == null) {
+            return 0L;
+        }
+        long now = System.currentTimeMillis();
+        return switch (abilityKey.toLowerCase(Locale.ROOT)) {
+            case "miner_overdrive" -> Math.max(0L, minerOverdriveCooldownUntil.getOrDefault(playerId, 0L) - now);
+            case "farmer_growth_burst" -> Math.max(0L, farmerGrowthBurstCooldownUntil.getOrDefault(playerId, 0L) - now);
+            case "trader_market_scan" -> Math.max(0L, traderMarketScanCooldownUntil.getOrDefault(playerId, 0L) - now);
+            default -> 0L;
+        };
+    }
+
+    public boolean isMinerOverdriveActive(UUID playerId) {
+        return playerId != null && minerOverdriveUntil.getOrDefault(playerId, 0L) > System.currentTimeMillis();
+    }
+
+    public boolean activateMinerOverdrive(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (!hasProfessionSkillNode(playerId, Profession.MINER, "overdrive")) {
+            return false;
+        }
+        if (getAbilityCooldownRemainingMillis(playerId, "miner_overdrive") > 0L) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        minerOverdriveUntil.put(playerId, now + MINER_OVERDRIVE_DURATION_MILLIS);
+        minerOverdriveCooldownUntil.put(playerId, now + MINER_OVERDRIVE_COOLDOWN_MILLIS);
+        player.sendMessage(colorize("&6[Terra] &aMiner Overdrive activated for &f10s&a."));
+        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.7F, 1.2F);
+        return true;
+    }
+
+    public boolean isFarmerGrowthBurstActive(UUID playerId) {
+        return playerId != null && farmerGrowthBurstUntil.getOrDefault(playerId, 0L) > System.currentTimeMillis();
+    }
+
+    public boolean activateFarmerGrowthBurst(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (!hasProfessionSkillNode(playerId, Profession.FARMER, "fast_growth")) {
+            return false;
+        }
+        if (getAbilityCooldownRemainingMillis(playerId, "farmer_growth_burst") > 0L) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        farmerGrowthBurstUntil.put(playerId, now + FARMER_GROWTH_BURST_DURATION_MILLIS);
+        farmerGrowthBurstCooldownUntil.put(playerId, now + FARMER_GROWTH_BURST_COOLDOWN_MILLIS);
+        player.sendMessage(colorize("&6[Terra] &aGrowth Burst activated for &f20s&a."));
+        player.playSound(player.getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.7F, 1.3F);
+        return true;
+    }
+
+    public boolean activateTraderMarketScan(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (!hasProfessionSkillNode(playerId, Profession.TRADER, "better_prices_i")) {
+            return false;
+        }
+        long remaining = getAbilityCooldownRemainingMillis(playerId, "trader_market_scan");
+        if (remaining > 0L) {
+            player.sendMessage(colorize("&cMarket Scan cooldown: &f" + formatLongDurationWords(remaining)));
+            return false;
+        }
+
+        traderMarketScanCooldownUntil.put(playerId, System.currentTimeMillis() + TRADER_MARKET_SCAN_COOLDOWN_MILLIS);
+        DynamicTraderState traderState = getActiveTraderState();
+        if (traderState == null) {
+            long nextSpawn = Math.max(0L, getTraderNextSpawnMillis() - System.currentTimeMillis());
+            player.sendMessage(colorize("&6[Terra] &eNo active trader. Next trader cycle in &f" + formatLongDurationWords(nextSpawn) + "&e."));
+            return true;
+        }
+
+        Country hostCountry = getTraderHostCountry(traderState);
+        long despawnIn = Math.max(0L, traderState.getDespawnAtMillis() - System.currentTimeMillis());
+        player.sendMessage(colorize("&6[Terra] &aMarket Scan"));
+        player.sendMessage(colorize("&7Trader: &f" + traderState.getTraderName()));
+        player.sendMessage(colorize("&7Specialty: &f" + getProfessionPlainDisplayName(traderState.getSpecialtyProfession())));
+        player.sendMessage(colorize("&7Host country: &f" + (hostCountry != null ? hostCountry.getName() : "Unknown")));
+        player.sendMessage(colorize("&7Despawns in: &f" + formatLongDurationWords(despawnIn)));
+        player.sendMessage(colorize("&7Your trader reputation: &f" + formatTraderReputation(getTraderReputation(playerId))));
+        player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8F, 1.2F);
+        return true;
+    }
+
+    public float getProfessionExhaustionMultiplier(UUID playerId) {
+        if (playerId == null) {
+            return 1.0F;
+        }
+        double multiplier = 1.0D;
+        multiplier -= countUnlockedProfessionSkillNodes(playerId, Profession.MINER, "efficient_miner") * 0.12D;
+        multiplier -= countUnlockedProfessionSkillNodes(playerId, Profession.LUMBERJACK, "energy_saver") * 0.10D;
+        multiplier -= countUnlockedProfessionSkillNodes(playerId, Profession.FARMER, "no_hunger_drain") * 0.18D;
+        return (float) Math.max(0.45D, multiplier);
+    }
+
+    public void applyFarmerMealBuffs(Player player, ItemStack itemStack) {
+        if (player == null || itemStack == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        int basicMeals = countUnlockedProfessionSkillNodes(playerId, Profession.FARMER, "basic_meals");
+        int advancedMeals = countUnlockedProfessionSkillNodes(playerId, Profession.FARMER, "advanced_meals");
+        if (basicMeals <= 0 && advancedMeals <= 0) {
+            return;
+        }
+
+        Material material = itemStack.getType();
+        if (!(material.isEdible() || material == Material.POTION)) {
+            return;
+        }
+
+        if (basicMeals > 0) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SATURATION, 20 * 8, 0, true, false, true));
+        }
+        if (advancedMeals > 0) {
+            PotionEffectType type = switch (material) {
+                case BREAD, BAKED_POTATO, COOKED_BEEF, COOKED_CHICKEN, COOKED_PORKCHOP -> PotionEffectType.HASTE;
+                case GOLDEN_CARROT, APPLE, MELON_SLICE, SWEET_BERRIES, GLOW_BERRIES -> PotionEffectType.SPEED;
+                default -> PotionEffectType.REGENERATION;
+            };
+            player.addPotionEffect(new PotionEffect(type, 20 * 20, 0, true, false, true));
+        }
+    }
+
     public int getMinerBreakCooldownSeconds(UUID playerId) {
         int baseCooldown = getBlockDelaySeconds();
         int totalProfessionReduction = getTotalProfessionCooldownReductionSeconds(playerId);
@@ -7054,6 +7206,9 @@ public final class Testproject extends JavaPlugin {
             minerReduction = Math.max(0, (level - 1) * reductionPerLevel);
             minerReduction += countUnlockedProfessionSkillNodes(playerId, Profession.MINER, "quick_hands_i") * 3;
             minerReduction += countUnlockedProfessionSkillNodes(playerId, Profession.MINER, "quick_hands_ii") * 2;
+            if (isMinerOverdriveActive(playerId)) {
+                minerReduction += 6;
+            }
         }
         Country country = getPlayerCountry(playerId);
         int countryReduction = getCountryMinerCooldownReduction(country);
@@ -7122,6 +7277,9 @@ public final class Testproject extends JavaPlugin {
             return Profession.LUMBERJACK;
         }
         for (Profession profession : Profession.values()) {
+            if (!isProfessionEnabled(profession)) {
+                continue;
+            }
             if (isConfiguredProfessionBlock(profession, material)) {
                 return profession;
             }
