@@ -27,7 +27,6 @@ import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.HeightMap;
 import org.bukkit.attribute.Attribute;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
@@ -223,6 +222,7 @@ public final class Testproject extends JavaPlugin {
     private final Map<String, Integer> merchantSharedStock = new ConcurrentHashMap<>();
     private final Map<String, Integer> merchantDailySoldAmounts = new ConcurrentHashMap<>();
     private final Map<UUID, Long> merchantTradeCooldowns = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> legendaryPickaxeBoostUntil = new ConcurrentHashMap<>();
     private final Map<UUID, Long> globalChatCooldowns = new ConcurrentHashMap<>();
     private final Map<String, List<Location>> countryBorderLocationCache = new ConcurrentHashMap<>();
     private final Set<UUID> countryChatEnabledPlayers = ConcurrentHashMap.newKeySet();
@@ -427,6 +427,7 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ProfessionActionListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionAbilityListener(this), this);
         getServer().getPluginManager().registerEvents(new BlacksmithAnvilListener(this), this);
+        getServer().getPluginManager().registerEvents(new ForgedEquipmentListener(this), this);
         getServer().getPluginManager().registerEvents(new StaffModeListener(this), this);
         getServer().getPluginManager().registerEvents(new StaffUtilityListener(this), this);
         getServer().getPluginManager().registerEvents(new GlobalXpBoostListener(this), this);
@@ -2660,7 +2661,8 @@ public final class Testproject extends JavaPlugin {
         meta.getPersistentDataContainer().set(forgedItemKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, itemLevel);
         meta.getPersistentDataContainer().set(forgedRarityKey, PersistentDataType.STRING, rarity.name());
-        meta.displayName(legacyComponent(rarity.getColor() + rarity.getDisplayName() + " &f" + formatMaterialName(recipe.result())));
+        meta.displayName(legacyComponent(rarity.getColor() + rarity.getDisplayName() + " &f"
+                + formatMaterialName(recipe.result()) + " &8[" + toRomanNumeral(Math.max(1, Math.min(5, itemLevel))) + "]"));
 
         List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
         if (!lore.isEmpty()) {
@@ -2668,29 +2670,41 @@ public final class Testproject extends JavaPlugin {
         }
         lore.add(legacyComponent("&6Forged Equipment"));
         lore.add(legacyComponent("&7Rarity: " + rarity.getColor() + rarity.getDisplayName()));
-        lore.add(legacyComponent("&7Item Level: &f" + itemLevel));
+        lore.add(legacyComponent("&7Item Level: &f" + toRomanNumeral(Math.max(1, Math.min(5, itemLevel)))));
         lore.add(legacyComponent("&7Forge Tier: &f" + Math.max(1, recipe.level())));
+        lore.add(legacyComponent("&7Durability: &f+" + (getForgedDurabilityProtectionPercent(rarity, itemLevel)) + "%"));
+        String perkLine = getForgedPerkLore(recipe.result(), rarity);
+        if (perkLine != null) {
+            lore.add(legacyComponent("&7Perk: &f" + perkLine));
+        }
         if (blacksmithLevel > 0) {
             lore.add(legacyComponent("&7Smith Quality: &fBlacksmith Lv." + blacksmithLevel));
         } else {
             lore.add(legacyComponent("&7Smith Quality: &fPublic Forge"));
         }
         meta.lore(lore);
-        applyForgedEquipmentBonuses(meta, recipe.result(), rarity, itemLevel);
-        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ATTRIBUTES);
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         itemStack.setItemMeta(meta);
         return itemStack;
     }
 
     private int rollForgedItemLevel(UUID playerId, int recipeLevel, int blacksmithLevel) {
-        int baseLevel = Math.max(1, recipeLevel);
-        int cap = baseLevel + (blacksmithLevel > 0 ? Math.max(1, blacksmithLevel / 3) : 1);
+        int baseLevel = 1;
+        int cap = blacksmithLevel > 0 ? 3 : 2;
         if (blacksmithLevel > 0) {
-            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "reinforced_tools");
-            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "resource_refinement");
-            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "masterwork_items");
+            cap += blacksmithLevel >= 8 ? 1 : 0;
+            cap += blacksmithLevel >= 12 ? 1 : 0;
+            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "reinforced_tools") > 0 ? 1 : 0;
+            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "resource_refinement") > 0 ? 1 : 0;
+            cap += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "masterwork_items") > 0 ? 1 : 0;
         }
-        cap = Math.max(baseLevel, Math.min(15, cap));
+        if (recipeLevel >= 7) {
+            baseLevel++;
+        }
+        if (recipeLevel >= 10) {
+            baseLevel++;
+        }
+        cap = Math.max(baseLevel, Math.min(5, cap));
         int rolled = baseLevel;
         while (rolled < cap) {
             double chance = blacksmithLevel > 0 ? 0.45D : 0.25D;
@@ -2755,44 +2769,105 @@ public final class Testproject extends JavaPlugin {
         return ForgedRarity.LEGENDARY;
     }
 
-    private void applyForgedEquipmentBonuses(ItemMeta meta, Material material, ForgedRarity rarity, int itemLevel) {
-        if (meta == null || material == null || rarity == null) {
+    public boolean isForgedItem(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return false;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(forgedItemKey, PersistentDataType.BYTE);
+    }
+
+    public int getForgedItemLevel(ItemStack itemStack) {
+        if (!isForgedItem(itemStack)) {
+            return 0;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        Integer stored = meta.getPersistentDataContainer().get(forgedLevelKey, PersistentDataType.INTEGER);
+        return stored == null ? 0 : Math.max(1, stored);
+    }
+
+    public ForgedRarity getForgedItemRarity(ItemStack itemStack) {
+        if (!isForgedItem(itemStack)) {
+            return null;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        String stored = meta.getPersistentDataContainer().get(forgedRarityKey, PersistentDataType.STRING);
+        if (stored == null || stored.isBlank()) {
+            return null;
+        }
+        try {
+            return ForgedRarity.valueOf(stored);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    public int getForgedDisplayLevel(ItemStack itemStack) {
+        return Math.max(1, Math.min(5, getForgedItemLevel(itemStack)));
+    }
+
+    public String toRomanNumeral(int value) {
+        return switch (Math.max(1, Math.min(5, value))) {
+            case 1 -> "I";
+            case 2 -> "II";
+            case 3 -> "III";
+            case 4 -> "IV";
+            default -> "V";
+        };
+    }
+
+    public int getForgedDurabilityProtectionPercent(ForgedRarity rarity, int itemLevel) {
+        if (rarity == null) {
+            return 0;
+        }
+        return Math.min(70, 8 + (itemLevel * 8) + (rarity.ordinal() * 7));
+    }
+
+    public String getForgedPerkLore(Material material, ForgedRarity rarity) {
+        if (material == null || rarity == null) {
+            return null;
+        }
+        if (rarity == ForgedRarity.LEGENDARY && material.name().endsWith("_PICKAXE")) {
+            return "Ore Surge: Fortune III for 30s";
+        }
+        if (rarity == ForgedRarity.EPIC && material.name().endsWith("_PICKAXE")) {
+            return "Deep Cut: stronger ore yields";
+        }
+        if (rarity == ForgedRarity.RARE && material.name().endsWith("_PICKAXE")) {
+            return "Fine Edge: steadier mining";
+        }
+        return "Forged quality bonus";
+    }
+
+    public void activateLegendaryPickaxeBoost(Player player) {
+        if (player == null) {
             return;
         }
+        legendaryPickaxeBoostUntil.put(player.getUniqueId(), System.currentTimeMillis() + 30_000L);
+        player.sendMessage(colorize("&6Ore Surge activated &7for 30 seconds."));
+        player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.9F, 1.2F);
+    }
 
-        int durability = Math.min(5, rarity.getDurabilityBonus() + Math.max(0, itemLevel / 5));
-        if (durability > 0) {
-            meta.addEnchant(Enchantment.UNBREAKING, durability, true);
+    public boolean hasLegendaryPickaxeBoost(UUID playerId) {
+        if (playerId == null) {
+            return false;
         }
+        long until = legendaryPickaxeBoostUntil.getOrDefault(playerId, 0L);
+        if (until <= System.currentTimeMillis()) {
+            legendaryPickaxeBoostUntil.remove(playerId);
+            return false;
+        }
+        return true;
+    }
 
+    public boolean isOreMaterial(Material material) {
+        if (material == null) {
+            return false;
+        }
         String name = material.name();
-        if (name.endsWith("_HELMET")
-                || name.endsWith("_CHESTPLATE")
-                || name.endsWith("_LEGGINGS")
-                || name.endsWith("_BOOTS")) {
-            int protection = Math.min(5, rarity.getArmorBonus() + Math.max(0, itemLevel / 6));
-            if (protection > 0) {
-                meta.addEnchant(Enchantment.PROTECTION, protection, true);
-            }
-            return;
-        }
-
-        if (name.endsWith("_SWORD") || name.endsWith("_AXE")) {
-            int sharpness = Math.min(5, rarity.getToolPowerBonus() + Math.max(0, itemLevel / 5));
-            if (sharpness > 0) {
-                meta.addEnchant(Enchantment.SHARPNESS, sharpness, true);
-            }
-        }
-
-        if (name.endsWith("_PICKAXE")
-                || name.endsWith("_AXE")
-                || name.endsWith("_SHOVEL")
-                || name.endsWith("_HOE")) {
-            int efficiency = Math.min(5, rarity.getToolPowerBonus() + Math.max(0, itemLevel / 4));
-            if (efficiency > 0) {
-                meta.addEnchant(Enchantment.EFFICIENCY, efficiency, true);
-            }
-        }
+        return name.endsWith("_ORE")
+                || material == Material.ANCIENT_DEBRIS
+                || material == Material.GILDED_BLACKSTONE;
     }
 
     public NamespacedKey getClimateCropLoreKey() {
