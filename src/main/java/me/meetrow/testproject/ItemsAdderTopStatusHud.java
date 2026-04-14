@@ -105,7 +105,11 @@ public final class ItemsAdderTopStatusHud {
                 || DEFAULT_FORMAT.equalsIgnoreCase(template)
                 || LEGACY_DEFAULT_FORMAT.equals(template)
                 || template.contains("%panel%")
-                || template.contains("%offset%")) {
+                || template.contains("%offset%")
+                || template.contains("%job%")
+                || template.contains("%job_panel%")
+                || template.contains("%money%")
+                || template.contains("%money_panel%")) {
             template = buildFixedPanelTemplate(player);
         }
 
@@ -132,36 +136,14 @@ public final class ItemsAdderTopStatusHud {
     private String buildFixedPanelTemplate(Player player) {
         int fallbackPanelWidth = Math.max(48, configInt("layout.panel-width-pixels", "panel-width-pixels", 64));
         int locationPanelWidth = Math.max(48, configInt("layout.location-panel-width-pixels", "location-panel-width-pixels", fallbackPanelWidth));
-        int jobPanelWidth = Math.max(48, configInt("layout.job-panel-width-pixels", "job-panel-width-pixels", fallbackPanelWidth));
-        int moneyPanelWidth = Math.max(48, configInt("layout.money-panel-width-pixels", "money-panel-width-pixels", fallbackPanelWidth));
-        int panelGapWidth = configInt("layout.panel-gap-pixels", "panel-gap-pixels", 8);
-        int locationJobGapWidth = Math.max(0, plugin.getConfig().getInt(
-                CONFIG_ROOT + ".layout.location-job-gap-pixels",
-                configInt("location-job-gap-pixels", "panel-gap-pixels", panelGapWidth)
-        ));
-        int jobMoneyGapWidth = Math.max(0, plugin.getConfig().getInt(
-                CONFIG_ROOT + ".layout.job-money-gap-pixels",
-                configInt("job-money-gap-pixels", "panel-gap-pixels", panelGapWidth)
-        ));
         int locationTextWidth = estimateHudTextWidth("\u27a3 " + getLocationLabel(player));
-        int jobTextWidth = estimateHudTextWidth("\u2692 " + getJobLabel(player) + " Lv." + getJobLevel(player));
-        int moneyTextWidth = estimateHudTextWidth("\u26c1 " + plugin.formatMoney(plugin.getBalance(player)));
-        int jobTextInset = configInt("layout.job-text-inset-pixels", "job-text-inset-pixels", 6);
 
         return "%location_panel%" + offset(-locationPanelWidth + centeredTextOffset(locationPanelWidth, locationTextWidth))
-                + "&c\u27a3 &f%location%" + offset(remainingPanelAdvance(locationPanelWidth, locationTextWidth) + locationJobGapWidth)
-                + "%job_panel%" + offset(-jobPanelWidth + centeredTextOffset(jobPanelWidth, jobTextWidth) + jobTextInset)
-                + "&a\u2692 %job% &7Lv.%level%" + offset(remainingPanelAdvance(jobPanelWidth, jobTextWidth) + jobMoneyGapWidth)
-                + "%money_panel%" + offset(-moneyPanelWidth + centeredTextOffset(moneyPanelWidth, moneyTextWidth))
-                + "&6\u26c1 &f%money%";
+                + "&c\u27a3 &f%location%";
     }
 
     private int centeredTextOffset(int panelWidth, int textWidth) {
         return Math.max(4, (panelWidth - textWidth) / 2);
-    }
-
-    private int remainingPanelAdvance(int panelWidth, int textWidth) {
-        return Math.max(4, panelWidth - centeredTextOffset(panelWidth, textWidth) - textWidth);
     }
 
     private int estimateHudTextWidth(String text) {

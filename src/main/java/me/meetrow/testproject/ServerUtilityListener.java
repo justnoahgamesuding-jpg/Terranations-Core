@@ -1,5 +1,6 @@
 package me.meetrow.testproject;
 
+import me.meetrow.testproject.server.AnimatedServerMotd;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Item;
@@ -17,9 +18,11 @@ import org.bukkit.event.world.EntitiesLoadEvent;
 
 public final class ServerUtilityListener implements Listener {
     private final Testproject plugin;
+    private final AnimatedServerMotd animatedServerMotd;
 
     public ServerUtilityListener(Testproject plugin) {
         this.plugin = plugin;
+        this.animatedServerMotd = new AnimatedServerMotd(plugin);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -57,12 +60,15 @@ public final class ServerUtilityListener implements Listener {
 
     @EventHandler
     public void onServerListPing(ServerListPingEvent event) {
-        if (!plugin.isMaintenanceModeEnabled()) {
+        if (plugin.isMaintenanceModeEnabled()) {
+            String line1 = plugin.getMessage("maintenance.motd-line1");
+            String line2 = plugin.getMessage("maintenance.motd-line2");
+            event.setMotd(plugin.colorize(line1 + "\n" + line2));
             return;
         }
-        String line1 = plugin.getMessage("maintenance.motd-line1");
-        String line2 = plugin.getMessage("maintenance.motd-line2");
-        event.setMotd(line1 + "\n" + line2);
+        if (animatedServerMotd.isEnabled()) {
+            event.setMotd(animatedServerMotd.getMotd(event));
+        }
     }
 
     @EventHandler(ignoreCancelled = true)

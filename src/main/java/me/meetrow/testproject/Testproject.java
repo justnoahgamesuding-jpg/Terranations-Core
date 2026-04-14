@@ -1,6 +1,7 @@
 package me.meetrow.testproject;
 
 import me.clip.placeholderapi.PlaceholderAPI;
+import me.meetrow.testproject.scoreboard.CustomScoreboard;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -106,6 +107,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class Testproject extends JavaPlugin {
@@ -123,6 +125,8 @@ public final class Testproject extends JavaPlugin {
     private static final boolean DEFAULT_PLAYTEST_KEEP_COUNTRY_DATA = false;
     private static final boolean DEFAULT_PLAYTEST_SAVE_PLAYER_PROGRESSION = false;
     private static final Pattern SHA1_PATTERN = Pattern.compile("^[a-fA-F0-9]{40}$");
+    private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("(?i)&?#([0-9a-f]{6})");
+    private static final int SCOREBOARD_CONFIG_VERSION = 7;
     private static final DateTimeFormatter PLAYTEST_DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
     public static final String ADMIN_PERMISSION = "terra.admin";
@@ -250,7 +254,7 @@ public final class Testproject extends JavaPlugin {
     private BukkitTask groundItemClearTask;
     private BukkitTask mobStackingTask;
     private ItemsAdderTopStatusHud itemsAdderTopStatusHud;
-    private ItemsAdderVitalBars itemsAdderVitalBars;
+    private CustomScoreboard customScoreboard;
     private ProfessionSelectionListener professionSelectionListener;
     private ProfessionAdminGuiListener professionAdminGuiListener;
     private JobConfigGuiListener jobConfigGuiListener;
@@ -337,6 +341,7 @@ public final class Testproject extends JavaPlugin {
     private File merchantSettingsFile;
     private File territorySettingsFile;
     private File questsSettingsFile;
+    private File scoreboardSettingsFile;
     private FileConfiguration blockValuesConfig;
     private FileConfiguration jobsConfig;
     private FileConfiguration chatConfig;
@@ -349,6 +354,7 @@ public final class Testproject extends JavaPlugin {
     private FileConfiguration merchantSettingsConfig;
     private FileConfiguration territorySettingsConfig;
     private FileConfiguration questsSettingsConfig;
+    private FileConfiguration scoreboardSettingsConfig;
     private final Map<Profession, File> professionFiles = new EnumMap<>(Profession.class);
     private final Map<Profession, FileConfiguration> professionConfigs = new EnumMap<>(Profession.class);
     private NamespacedKey itemSourceOwnerKey;
@@ -576,7 +582,7 @@ public final class Testproject extends JavaPlugin {
         restartStabilityDebugRuntime();
         restartLagReductionRuntime();
         restartItemsAdderTopStatusHud();
-        restartItemsAdderVitalBars();
+        restartCustomScoreboard();
         ensurePersistentActionBarTask();
         restartClimateRuntime();
         processPendingHardRestartPhase();
@@ -607,7 +613,7 @@ public final class Testproject extends JavaPlugin {
         shutdownPersistentActionBarRuntime();
         shutdownClimateRuntime();
         stopItemsAdderTopStatusHud();
-        stopItemsAdderVitalBars();
+        stopCustomScoreboard();
         stopTerraTipsRuntime();
         stopRealTimeClock();
         stopTraderRuntime();
@@ -2544,16 +2550,16 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
-    private void restartItemsAdderVitalBars() {
-        if (itemsAdderVitalBars == null) {
-            itemsAdderVitalBars = new ItemsAdderVitalBars(this);
+    private void restartCustomScoreboard() {
+        if (customScoreboard == null) {
+            customScoreboard = new CustomScoreboard(this);
         }
-        itemsAdderVitalBars.restart();
+        customScoreboard.restart();
     }
 
-    private void stopItemsAdderVitalBars() {
-        if (itemsAdderVitalBars != null) {
-            itemsAdderVitalBars.stop();
+    private void stopCustomScoreboard() {
+        if (customScoreboard != null) {
+            customScoreboard.stop();
         }
     }
 
@@ -2580,6 +2586,11 @@ public final class Testproject extends JavaPlugin {
         }
 
         List<String> segments = new ArrayList<>();
+        String healthSegment = getPlayerHealthActionBarText(player);
+        if (healthSegment != null) {
+            segments.add(healthSegment);
+        }
+
         if (playtestActive) {
             segments.add(getPlaytestActionBarText(getPlaytestRemainingMillis()));
         }
@@ -2595,11 +2606,52 @@ public final class Testproject extends JavaPlugin {
         return String.join(colorize(" &8| "), segments);
     }
 
+    private String getPlayerHealthActionBarText(Player player) {
+        if (!getConfig().getBoolean("health-hotbar.enabled", true)) {
+            return null;
+        }
+
+        double maxHealth = getPlayerMaxHealth(player);
+        double armor = getConfig().getBoolean("health-hotbar.include-armor", true) ? getPlayerArmorPoints(player) : 0.0D;
+        double current = Math.max(0.0D, Math.min(player.getHealth(), maxHealth)) + armor;
+        double max = maxHealth + armor;
+        String template = getConfig().getString("health-hotbar.format", "&c\u2764 &f%current%&7/&f%max%");
+        if (template == null || template.isBlank()) {
+            template = "&c\u2764 &f%current%&7/&f%max%";
+        }
+
+        return colorize(template
+                .replace("%current%", formatHealthNumber(current))
+                .replace("%max%", formatHealthNumber(max))
+                .replace("%health%", formatHealthNumber(Math.max(0.0D, Math.min(player.getHealth(), maxHealth))))
+                .replace("%armor%", formatHealthNumber(armor)));
+    }
+
+    private double getPlayerMaxHealth(Player player) {
+        if (player.getAttribute(Attribute.GENERIC_MAX_HEALTH) == null) {
+            return 20.0D;
+        }
+        return Math.max(1.0D, player.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue());
+    }
+
+    private double getPlayerArmorPoints(Player player) {
+        if (player.getAttribute(Attribute.GENERIC_ARMOR) == null) {
+            return 0.0D;
+        }
+        return Math.max(0.0D, player.getAttribute(Attribute.GENERIC_ARMOR).getValue());
+    }
+
+    private String formatHealthNumber(double value) {
+        double safeValue = Math.max(0.0D, value);
+        return safeValue == Math.rint(safeValue)
+                ? String.valueOf((int) safeValue)
+                : String.format(Locale.US, "%.1f", safeValue);
+    }
+
     private String getPlayerCooldownActionBarText(Player player, long now) {
         if (player == null
                 || hasBlockDelayBypass(player.getUniqueId())
-                || !isBlockDelayEnabled()
-                || shouldSuppressCooldownActionBarForItemsAdderVitalBars()) {
+                || !isBlockDelayEnabled()) {
             return null;
         }
 
@@ -2618,11 +2670,6 @@ public final class Testproject extends JavaPlugin {
             segments.add("&aPlace: &f" + formatCompactCooldown(placeRemaining));
         }
         return colorize(String.join(" &8| ", segments));
-    }
-
-    private boolean shouldSuppressCooldownActionBarForItemsAdderVitalBars() {
-        return getConfig().getBoolean("itemsadder-vital-bars.enabled", true)
-                && getConfig().getBoolean("itemsadder-vital-bars.suppress-cooldown-actionbar", true);
     }
 
     private String formatCompactCooldown(long remainingMillis) {
@@ -7510,7 +7557,7 @@ public final class Testproject extends JavaPlugin {
         shutdownOreVisionRuntime();
         shutdownClimateRuntime();
         stopItemsAdderTopStatusHud();
-        stopItemsAdderVitalBars();
+        stopCustomScoreboard();
         stopTraderRuntime();
         stopMerchantRuntime();
         stopNpcHeadTrackingRuntime();
@@ -7533,7 +7580,7 @@ public final class Testproject extends JavaPlugin {
         restartCountryBorderParticlesRuntime();
         restartLagReductionRuntime();
         restartItemsAdderTopStatusHud();
-        restartItemsAdderVitalBars();
+        restartCustomScoreboard();
         restartClimateRuntime();
 
         for (Player player : getServer().getOnlinePlayers()) {
@@ -12334,40 +12381,47 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("resource-pack.url", "");
         getConfig().addDefault("resource-pack.sha1", "");
         getConfig().addDefault("resource-pack.delay-ticks", 40L);
+        getConfig().addDefault("server-list-motd.enabled", true);
+        getConfig().addDefault("server-list-motd.change-interval", 25);
+        getConfig().addDefault("server-list-motd.frames", getDefaultServerMotdFrames());
+        getConfig().addDefault("health-hotbar.enabled", true);
+        getConfig().addDefault("health-hotbar.include-armor", true);
+        getConfig().addDefault("health-hotbar.format", "&c\u2764 &f%current%&7/&f%max%");
+        getConfig().addDefault("custom-scoreboard.enabled", true);
+        getConfig().addDefault("custom-scoreboard.update-ticks", 20L);
+        getConfig().addDefault("custom-scoreboard.respect-other-scoreboards", true);
+        getConfig().addDefault("custom-scoreboard.hide-numbers", true);
+        getConfig().addDefault("custom-scoreboard.title", "&2&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ");
+        getConfig().addDefault("custom-scoreboard.title-animation", "scoreboard_logo");
+        getConfig().addDefault("custom-scoreboard.shadow.enabled", false);
+        getConfig().addDefault("custom-scoreboard.shadow.color", "&8");
+        getConfig().addDefault("custom-scoreboard.shadow.prefix", "");
+        getConfig().addDefault("custom-scoreboard.lines", List.of(
+                "&7%date% &8| &7%server_time%",
+                "&f%player%",
+                "",
+                "&c⚐ &f%country% &7Lv.%country_level%",
+                "&a⛏ &f%job% &7Lv.%job_level%",
+                "&b✦ &f%job_xp%&7/&f%job_xp_required% XP",
+                "&6⛃ &f$%money%",
+                "",
+                "&9⌚ &f%playtime%",
+                "",
+                "&7ᴘʟᴀʏ.ᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ.ɴᴇᴛ"
+        ));
         getConfig().addDefault("itemsadder-top-status.enabled", true);
         getConfig().addDefault("itemsadder-top-status.require-itemsadder", true);
         getConfig().addDefault("itemsadder-top-status.update-ticks", 20L);
         getConfig().addDefault("itemsadder-top-status.tokens.panel", ":top_status_panel:");
         getConfig().addDefault("itemsadder-top-status.tokens.content-offset", ":offset_-248:");
         getConfig().addDefault("itemsadder-top-status.tokens.location-panel", ":top_status_location_panel:");
-        getConfig().addDefault("itemsadder-top-status.tokens.job-panel", ":top_status_job_panel:");
-        getConfig().addDefault("itemsadder-top-status.tokens.money-panel", ":top_status_money_panel:");
         getConfig().addDefault("itemsadder-top-status.tokens.location-offset", ":offset_-112:");
-        getConfig().addDefault("itemsadder-top-status.tokens.job-offset", ":offset_-118:");
-        getConfig().addDefault("itemsadder-top-status.tokens.money-offset", ":offset_-78:");
         getConfig().addDefault("itemsadder-top-status.layout.panel-width-pixels", 64);
         getConfig().addDefault("itemsadder-top-status.layout.location-panel-width-pixels", 96);
-        getConfig().addDefault("itemsadder-top-status.layout.job-panel-width-pixels", 96);
-        getConfig().addDefault("itemsadder-top-status.layout.money-panel-width-pixels", 96);
         getConfig().addDefault("itemsadder-top-status.layout.panel-gap-pixels", 8);
-        getConfig().addDefault("itemsadder-top-status.layout.location-job-gap-pixels", 8);
-        getConfig().addDefault("itemsadder-top-status.layout.job-money-gap-pixels", 18);
-        getConfig().addDefault("itemsadder-top-status.layout.job-text-inset-pixels", 6);
         getConfig().addDefault("itemsadder-top-status.format", "auto");
         getConfig().addDefault("itemsadder-top-status.wilderness-label", "Wilderness");
-        getConfig().addDefault("itemsadder-top-status.no-job-label", "No Job");
         getConfig().addDefault("itemsadder-top-status.max-location-chars", 7);
-        getConfig().addDefault("itemsadder-top-status.max-job-chars", 6);
-        getConfig().addDefault("itemsadder-vital-bars.enabled", true);
-        getConfig().addDefault("itemsadder-vital-bars.require-itemsadder", true);
-        getConfig().addDefault("itemsadder-vital-bars.update-ticks", 10L);
-        getConfig().addDefault("itemsadder-vital-bars.huds.health-id", "terrahud:terra_health_bar");
-        getConfig().addDefault("itemsadder-vital-bars.huds.hunger-id", "terrahud:terra_hunger_bar");
-        getConfig().addDefault("itemsadder-vital-bars.display.health-max", 10);
-        getConfig().addDefault("itemsadder-vital-bars.display.hunger-max", 10);
-        getConfig().addDefault("itemsadder-vital-bars.display.bar-width-pixels", 96);
-        getConfig().addDefault("itemsadder-vital-bars.display.bar-gap-pixels", 12);
-        getConfig().addDefault("itemsadder-vital-bars.suppress-cooldown-actionbar", true);
         getConfig().addDefault("join-leave-messages.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.interval-minutes", 5);
@@ -15719,6 +15773,7 @@ public final class Testproject extends JavaPlugin {
         saveResourceIfMissing("settings/merchant.yml");
         saveResourceIfMissing("settings/territories.yml");
         saveResourceIfMissing("settings/quests.yml");
+        saveResourceIfMissing("scoreboard/config.yml");
         for (Profession profession : Profession.values()) {
             saveResourceIfMissing("jobs/" + profession.getKey() + ".yml");
         }
@@ -15742,6 +15797,7 @@ public final class Testproject extends JavaPlugin {
         merchantSettingsFile = new File(getDataFolder(), "settings/merchant.yml");
         territorySettingsFile = new File(getDataFolder(), "settings/territories.yml");
         questsSettingsFile = new File(getDataFolder(), "settings/quests.yml");
+        scoreboardSettingsFile = new File(getDataFolder(), "scoreboard/config.yml");
         blockValuesConfig = loadCustomConfig(blockValuesFile, "economy/block-values.yml");
         jobsConfig = loadCustomConfig(jobsFile, "jobs/config.yml");
         coreSettingsConfig = loadCustomConfig(coreSettingsFile, "settings/core.yml");
@@ -15750,6 +15806,8 @@ public final class Testproject extends JavaPlugin {
         merchantSettingsConfig = loadCustomConfig(merchantSettingsFile, "settings/merchant.yml");
         territorySettingsConfig = loadCustomConfig(territorySettingsFile, "settings/territories.yml");
         questsSettingsConfig = loadCustomConfig(questsSettingsFile, "settings/quests.yml");
+        scoreboardSettingsConfig = loadCustomConfig(scoreboardSettingsFile, "scoreboard/config.yml");
+        migrateScoreboardConfig();
         professionFiles.clear();
         professionConfigs.clear();
         for (Profession profession : Profession.values()) {
@@ -15792,7 +15850,23 @@ public final class Testproject extends JavaPlugin {
     private void saveResourceIfMissing(String resourcePath) {
         File file = new File(getDataFolder(), resourcePath);
         if (!file.exists()) {
-            saveResource(resourcePath, false);
+            try {
+                saveResource(resourcePath, false);
+            } catch (IllegalArgumentException exception) {
+                getLogger().severe("Missing embedded resource " + resourcePath + ": " + exception.getMessage());
+                File parent = file.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                    getLogger().severe("Failed to create parent folder for " + resourcePath + ".");
+                    return;
+                }
+                try {
+                    if (!file.createNewFile()) {
+                        getLogger().severe("Failed to create empty fallback file for " + resourcePath + ".");
+                    }
+                } catch (IOException ioException) {
+                    getLogger().severe("Failed to create empty fallback file for " + resourcePath + ": " + ioException.getMessage());
+                }
+            }
         }
     }
 
@@ -15826,8 +15900,10 @@ public final class Testproject extends JavaPlugin {
         migrateLegacyMainConfigSection("realtime-clock");
         migrateLegacyMainConfigSection("player-presence-sounds");
         migrateLegacyMainConfigSection("resource-pack");
+        migrateLegacyMainConfigSection("server-list-motd");
+        migrateLegacyMainConfigSection("health-hotbar");
+        migrateLegacyMainConfigSection("custom-scoreboard");
         migrateLegacyMainConfigSection("itemsadder-top-status");
-        migrateLegacyMainConfigSection("itemsadder-vital-bars");
         migrateLegacyMainConfigSection("join-leave-messages");
         migrateLegacyMainConfigSection("lag-reduction");
         migrateLegacyMainConfigSection("country-sounds");
@@ -15881,6 +15957,7 @@ public final class Testproject extends JavaPlugin {
         mergeManagedConfigIntoRuntime(stabilitySettingsConfig);
         mergeManagedConfigIntoRuntime(merchantSettingsConfig);
         mergeManagedConfigIntoRuntime(territorySettingsConfig);
+        mergeManagedConfigIntoRuntime(scoreboardSettingsConfig);
     }
 
     private void mergeManagedConfigIntoRuntime(FileConfiguration managedConfig) {
@@ -15911,6 +15988,9 @@ public final class Testproject extends JavaPlugin {
         if (path.startsWith("territories.") || path.startsWith("country-border-particles.")) {
             return territorySettingsConfig;
         }
+        if (path.equals("custom-scoreboard") || path.startsWith("custom-scoreboard.")) {
+            return scoreboardSettingsConfig;
+        }
         if (path.startsWith("block-delay.")
                 || path.startsWith("economy.")
                 || path.startsWith("rewards.")
@@ -15923,10 +16003,12 @@ public final class Testproject extends JavaPlugin {
                 || path.startsWith("realtime-clock.")
                 || path.startsWith("player-presence-sounds.")
                 || path.startsWith("resource-pack.")
+                || path.equals("server-list-motd")
+                || path.startsWith("server-list-motd.")
+                || path.equals("health-hotbar")
+                || path.startsWith("health-hotbar.")
                 || path.equals("itemsadder-top-status")
                 || path.startsWith("itemsadder-top-status.")
-                || path.equals("itemsadder-vital-bars")
-                || path.startsWith("itemsadder-vital-bars.")
                 || path.startsWith("join-leave-messages.")
                 || path.startsWith("lag-reduction.")
                 || path.startsWith("country-sounds.")
@@ -15956,6 +16038,9 @@ public final class Testproject extends JavaPlugin {
         if (path.startsWith("territories.") || path.startsWith("country-border-particles.")) {
             return territorySettingsFile;
         }
+        if (path.equals("custom-scoreboard") || path.startsWith("custom-scoreboard.")) {
+            return scoreboardSettingsFile;
+        }
         if (getManagedConfigForPath(path) == coreSettingsConfig) {
             return coreSettingsFile;
         }
@@ -15980,6 +16065,79 @@ public final class Testproject extends JavaPlugin {
 
     private void saveDataConfig() {
         saveYaml(dataConfig, dataFile);
+    }
+
+    private void migrateScoreboardConfig() {
+        if (scoreboardSettingsConfig == null || scoreboardSettingsFile == null) {
+            return;
+        }
+        int version = scoreboardSettingsConfig.getInt("custom-scoreboard.config-version", 0);
+        if (version >= SCOREBOARD_CONFIG_VERSION) {
+            return;
+        }
+
+        scoreboardSettingsConfig.set("custom-scoreboard.config-version", SCOREBOARD_CONFIG_VERSION);
+        scoreboardSettingsConfig.set("custom-scoreboard.enabled", true);
+        scoreboardSettingsConfig.set("custom-scoreboard.update-ticks", 20);
+        scoreboardSettingsConfig.set("custom-scoreboard.respect-other-scoreboards", true);
+        scoreboardSettingsConfig.set("custom-scoreboard.hide-numbers", true);
+        scoreboardSettingsConfig.set("custom-scoreboard.title", "&2&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ");
+        scoreboardSettingsConfig.set("custom-scoreboard.title-animation", "scoreboard_logo");
+        scoreboardSettingsConfig.set("custom-scoreboard.shadow.enabled", false);
+        scoreboardSettingsConfig.set("custom-scoreboard.shadow.color", "&8");
+        scoreboardSettingsConfig.set("custom-scoreboard.shadow.prefix", "");
+        scoreboardSettingsConfig.set("custom-scoreboard.lines", getDefaultScoreboardLines());
+        if (!scoreboardSettingsConfig.contains("scoreboard_logo.texts")) {
+            scoreboardSettingsConfig.set("scoreboard_logo.change-interval", 25);
+            scoreboardSettingsConfig.set("scoreboard_logo.texts", getDefaultScoreboardLogoFrames());
+        }
+        saveYaml(scoreboardSettingsConfig, scoreboardSettingsFile);
+    }
+
+    private List<String> getDefaultScoreboardLines() {
+        return List.of(
+                "&7%date% &8| &7%server_time%",
+                "&f%player%",
+                "",
+                "&c⚐ &f%country% &7Lv.%country_level%",
+                "&a⛏ &f%job% &7Lv.%job_level%",
+                "&b✦ &f%job_xp%&7/&f%job_xp_required% XP",
+                "&6⛃ &f$%money%",
+                "",
+                "&9⌚ &f%playtime%",
+                "",
+                "&7ᴘʟᴀʏ.ᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ.ɴᴇᴛ"
+        );
+    }
+
+    private List<String> getDefaultScoreboardLogoFrames() {
+        return List.of(
+                "&#E9FFE2&lᴛ&#E4FCDB&lᴇ&#DEF8D4&lʀ&#D9F5CD&lʀ&#D3F1C6&lᴀ&#CEEEBF&lɴ&#C9EAB8&lᴀ&#C3E7B1&lᴛ&#BEE3AA&lɪ&#B8E0A2&lᴏ&#B3DC9B&lɴ&#AED994&lѕ",
+                "&#E4FCDB&lᴛ&#DEF8D4&lᴇ&#D9F5CD&lʀ&#D3F1C6&lʀ&#CEEEBF&lᴀ&#C9EAB8&lɴ&#C3E7B1&lᴀ&#BEE3AA&lᴛ&#B8E0A2&lɪ&#B3DC9B&lᴏ&#AED994&lɴ&#A8D58D&lѕ",
+                "&#DEF8D4&lᴛ&#D9F5CD&lᴇ&#D3F1C6&lʀ&#CEEEBF&lʀ&#C9EAB8&lᴀ&#C3E7B1&lɴ&#BEE3AA&lᴀ&#B8E0A2&lᴛ&#B3DC9B&lɪ&#AED994&lᴏ&#A8D58D&lɴ&#A3D286&lѕ",
+                "&#D9F5CD&lᴛ&#D3F1C6&lᴇ&#CEEEBF&lʀ&#C9EAB8&lʀ&#C3E7B1&lᴀ&#BEE3AA&lɴ&#B8E0A2&lᴀ&#B3DC9B&lᴛ&#AED994&lɪ&#A8D58D&lᴏ&#A3D286&lɴ&#9DCE7F&lѕ",
+                "&#D3F1C6&lᴛ&#CEEEBF&lᴇ&#C9EAB8&lʀ&#C3E7B1&lʀ&#BEE3AA&lᴀ&#B8E0A2&lɴ&#B3DC9B&lᴀ&#AED994&lᴛ&#A8D58D&lɪ&#A3D286&lᴏ&#9DCE7F&lɴ&#98CB78&lѕ",
+                "&#CEEEBF&lᴛ&#C9EAB8&lᴇ&#C3E7B1&lʀ&#BEE3AA&lʀ&#B8E0A2&lᴀ&#B3DC9B&lɴ&#AED994&lᴀ&#A8D58D&lᴛ&#A3D286&lɪ&#9DCE7F&lᴏ&#98CB78&lɴ&#93C771&lѕ",
+                "&#C9EAB8&lᴛ&#C3E7B1&lᴇ&#BEE3AA&lʀ&#B8E0A2&lʀ&#B3DC9B&lᴀ&#AED994&lɴ&#A8D58D&lᴀ&#A3D286&lᴛ&#9DCE7F&lɪ&#98CB78&lᴏ&#93C771&lɴ&#8DC46A&lѕ",
+                "&#C3E7B1&lᴛ&#BEE3AA&lᴇ&#B8E0A2&lʀ&#B3DC9B&lʀ&#AED994&lᴀ&#A8D58D&lɴ&#A3D286&lᴀ&#9DCE7F&lᴛ&#98CB78&lɪ&#93C771&lᴏ&#8DC46A&lɴ&#88C063&lѕ"
+        );
+    }
+
+    private List<Map<String, Object>> getDefaultServerMotdFrames() {
+        List<Map<String, Object>> frames = new ArrayList<>();
+        frames.add(Map.of("lines", List.of(
+                "&#E9FFE2&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &7%online%&8/&7%max_players%",
+                "&7Countries &8• &7Jobs &8• &7Survival"
+        )));
+        frames.add(Map.of("lines", List.of(
+                "&#BEE3AA&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &f%server_time%",
+                "&aBuild your country. Grow your land."
+        )));
+        frames.add(Map.of("lines", List.of(
+                "&#7DB955&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &7%date%",
+                "&2Play &8• &fplay.terranations.net"
+        )));
+        return frames;
     }
 
     private void saveMaintenanceAccessList() {
@@ -16183,6 +16341,24 @@ public final class Testproject extends JavaPlugin {
         return SECTION_SERIALIZER.serialize(legacyComponent(text));
     }
 
+    private String expandHexColors(String text) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        Matcher matcher = HEX_COLOR_PATTERN.matcher(text);
+        StringBuilder builder = new StringBuilder();
+        while (matcher.find()) {
+            String hex = matcher.group(1);
+            StringBuilder replacement = new StringBuilder("&x");
+            for (int index = 0; index < hex.length(); index++) {
+                replacement.append('&').append(hex.charAt(index));
+            }
+            matcher.appendReplacement(builder, Matcher.quoteReplacement(replacement.toString()));
+        }
+        matcher.appendTail(builder);
+        return builder.toString();
+    }
+
     public String formatMaterialName(Material material) {
         return formatMaterialName(material, material.name());
     }
@@ -16268,7 +16444,7 @@ public final class Testproject extends JavaPlugin {
     }
 
     public Component legacyComponent(String text) {
-        return AMPERSAND_SERIALIZER.deserialize(text == null ? "" : text);
+        return AMPERSAND_SERIALIZER.deserialize(expandHexColors(text == null ? "" : text));
     }
 
     public String plainText(Component component) {

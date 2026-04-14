@@ -107,6 +107,27 @@ resource-pack:
   sha1: ""
   delay-ticks: 40
 
+server-list-motd:
+  enabled: true
+  change-interval: 25
+  # Supports & color codes, &#RRGGBB hex colors, and placeholders:
+  # %online%, %max_players%, %date%, %server_time%
+  frames:
+    - lines:
+        - "&#E9FFE2&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &7%online%&8/&7%max_players%"
+        - "&7Countries &8• &7Jobs &8• &7Survival"
+    - lines:
+        - "&#BEE3AA&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &f%server_time%"
+        - "&aBuild your country. Grow your land."
+    - lines:
+        - "&#7DB955&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &7%date%"
+        - "&2Play &8• &fplay.terranations.net"
+
+health-hotbar:
+  enabled: true
+  include-armor: true
+  format: "&c❤ &f%current%&7/&f%max%"
+
 itemsadder-top-status:
   enabled: true
   require-itemsadder: true
@@ -116,51 +137,17 @@ itemsadder-top-status:
     panel: ":top_status_panel:"
     content-offset: ":offset_-248:"
     location-panel: ":top_status_location_panel:"
-    job-panel: ":top_status_job_panel:"
-    money-panel: ":top_status_money_panel:"
     location-offset: ":offset_-112:"
-    job-offset: ":offset_-118:"
-    money-offset: ":offset_-78:"
 
   layout:
     panel-width-pixels: 64
     location-panel-width-pixels: 96
-    job-panel-width-pixels: 96
-    money-panel-width-pixels: 96
     panel-gap-pixels: 8
-    location-job-gap-pixels: 8
-    job-money-gap-pixels: 18
-    job-text-inset-pixels: 6
 
-  # Leave this as "auto" so Terra centers each text segment inside equal-width panels.
+  # Leave this as "auto" so Terra centers the location text inside the panel.
   format: "auto"
   wilderness-label: "Wilderness"
-  no-job-label: "No Job"
   max-location-chars: 7
-  max-job-chars: 6
-
-itemsadder-vital-bars:
-  enabled: true
-  require-itemsadder: true
-  update-ticks: 10
-
-  huds:
-    health-id: "terrahud:terra_health_bar"
-    hunger-id: "terrahud:terra_hunger_bar"
-
-  display:
-    # STATUS HUDs use 10 icons with half-step float values.
-    health-max: 10
-    hunger-max: 10
-    # 10 status icons at scale_ratio 9 are about 90 HUD pixels wide.
-    bar-width-pixels: 96
-    bar-gap-pixels: 12
-    # Optional exact overrides:
-    # health-x-position-pixels: -54
-    # hunger-x-position-pixels: 54
-
-  # ItemsAdder HUDs and Bukkit actionbars share the same client display channel.
-  suppress-cooldown-actionbar: true
 
 # ---------------------------------------------------------------------------
 # Sounds And Messaging
