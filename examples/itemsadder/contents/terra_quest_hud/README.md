@@ -7,19 +7,22 @@ Folder layout:
 ```text
 configs/terra_quest_hud.yml
 textures/font/hud/top_status/
+resourcepack/assets/terrahud/textures/font/hud/top_status/
 resourcepack/assets/minecraft/
 ```
 
 What goes where:
 
-- `textures/font/hud/top_status/` contains the `terrahud` panel images used by `font_images`.
+- `textures/font/hud/top_status/` keeps the source panel images with the content config.
+- `resourcepack/assets/terrahud/textures/font/hud/top_status/` is the runtime namespace path ItemsAdder actually reads for `terrahud:*` font images.
 - `resourcepack/assets/minecraft/` contains vanilla overrides such as boss bar, hotbar, hearts, hunger, XP bar, and custom font files.
 
 Do not duplicate these files into:
 
 - `resourcepack/minecraft/`
 - `resourcepack/terrahud/`
-- `resourcepack/assets/terrahud/`
+
+Do keep the four top status panel PNGs mirrored in `resourcepack/assets/terrahud/textures/font/hud/top_status/`, otherwise ItemsAdder will log `Image not found for font_image 'terrahud:...'`.
 
 Install by copying this folder to:
 

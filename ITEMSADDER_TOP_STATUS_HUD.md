@@ -21,12 +21,13 @@ Canonical structure inside that folder:
 ```text
 configs/terra_quest_hud.yml
 textures/font/hud/top_status/
+resourcepack/assets/terrahud/textures/font/hud/top_status/
 resourcepack/assets/minecraft/
 ```
 
-Keep the HUD panel images only in `textures/font/hud/top_status/`.
+Keep the HUD panel images in `textures/font/hud/top_status/` and mirror them into `resourcepack/assets/terrahud/textures/font/hud/top_status/`.
 Keep vanilla sprite and font overrides only in `resourcepack/assets/minecraft/`.
-The old duplicate folders `resourcepack/minecraft`, `resourcepack/terrahud`, and `resourcepack/assets/terrahud` should not be used.
+The old duplicate folders `resourcepack/minecraft` and `resourcepack/terrahud` should not be used.
 
 Then run:
 
