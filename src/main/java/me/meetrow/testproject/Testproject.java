@@ -362,6 +362,7 @@ public final class Testproject extends JavaPlugin {
     private NamespacedKey fixedOreToolKey;
     private NamespacedKey climateCropLoreKey;
     private NamespacedKey soulboundItemKey;
+    private NamespacedKey guidanceItemKey;
     private NamespacedKey stackedMobCountKey;
     private final Set<UUID> maintenanceAllowedPlayers = ConcurrentHashMap.newKeySet();
     private final Set<Integer> groundItemClearWarningsSent = ConcurrentHashMap.newKeySet();
@@ -377,6 +378,7 @@ public final class Testproject extends JavaPlugin {
         fixedOreToolKey = new NamespacedKey(this, "fixed_ore_tool");
         climateCropLoreKey = new NamespacedKey(this, "climate_crop_lore");
         soulboundItemKey = new NamespacedKey(this, "soulbound_item");
+        guidanceItemKey = new NamespacedKey(this, "guidance_item");
         stackedMobCountKey = new NamespacedKey(this, "stacked_mob_count");
         saveDefaultConfigFiles();
         reloadPluginSettings();
@@ -586,6 +588,7 @@ public final class Testproject extends JavaPlugin {
         processPendingHardRestartPhase();
 
         for (Player player : getServer().getOnlinePlayers()) {
+            ensurePlayerGuidanceItem(player);
             handleTutorialJoin(player);
             if (requiresProfessionSelection(player) && !isTutorialIntroActive(player.getUniqueId())) {
                 openProfessionMenu(player);
@@ -2313,6 +2316,62 @@ public final class Testproject extends JavaPlugin {
         meta.lore(lore);
         itemStack.setItemMeta(meta);
         return itemStack;
+    }
+
+    public ItemStack createGuidanceItem() {
+        ItemStack itemStack = applySoulboundTag(new ItemStack(Material.NETHER_STAR));
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null) {
+            return itemStack;
+        }
+
+        meta.displayName(legacyComponent("&6Terra Guide"));
+        meta.lore(List.of(
+                legacyComponent("&7Your main tool for guidance,"),
+                legacyComponent("&7management, and progression."),
+                legacyComponent("&8"),
+                legacyComponent("&ePlaceholder item for now."),
+                legacyComponent("&7More functionality comes next.")
+        ));
+        meta.getPersistentDataContainer().set(guidanceItemKey, PersistentDataType.BYTE, (byte) 1);
+        itemStack.setItemMeta(meta);
+        return itemStack;
+    }
+
+    public boolean isGuidanceItem(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return false;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(guidanceItemKey, PersistentDataType.BYTE);
+    }
+
+    public void ensurePlayerGuidanceItem(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        PlayerInventory inventory = player.getInventory();
+        ItemStack displaced = inventory.getItem(8);
+        boolean displacedIsGuide = isGuidanceItem(displaced);
+
+        ItemStack[] contents = inventory.getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            if (isGuidanceItem(contents[slot])) {
+                contents[slot] = null;
+            }
+        }
+        inventory.setContents(contents);
+
+        if (!displacedIsGuide && displaced != null && !displaced.getType().isAir()) {
+            Map<Integer, ItemStack> leftovers = inventory.addItem(displaced);
+            for (ItemStack leftover : leftovers.values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+            }
+        }
+
+        inventory.setItem(8, createGuidanceItem());
+        player.updateInventory();
     }
 
     public boolean isSoulboundItem(ItemStack itemStack) {
