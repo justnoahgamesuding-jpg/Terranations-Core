@@ -4,39 +4,31 @@ custom-scoreboard:
   config-version: 7
   enabled: true
   update-ticks: 20
-  # Leave this on so tutorial sidebars or other plugins can own the sidebar.
   respect-other-scoreboards: true
   hide-numbers: true
-  title-animation: scoreboard_logo
-  title: '&2&lTerranations'
-  # Vanilla scoreboards cannot draw a real pixel shadow.
-  # Keep this disabled; enabling it will not duplicate lines.
+  title-animation: ''
+  title: '&2&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ'
   shadow:
     enabled: false
     color: '&8'
     prefix: ''
   job-name-color: '&f'
   lines:
+    - '&8&m----------------'
     - '&7%date% &8| &7%server_time%'
     - '&f%player%'
     - ''
     - '&c⚐ &f%country% &7Lv.%country_level%'
     - '&a⛏ %job_color%%job% &7Lv.%job_level%'
     - '&b✦ &f%job_xp%&7/&f%job_xp_required% XP'
-    - '&6⛃ &f$%money%'
+    - '&6⛃ &f%money%'
     - ''
     - '&9⌚ &f%playtime%'
     - ''
-    - '&7play.terranations.net'
+    - '&7ᴘʟᴀʏ.ᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ.ɴᴇᴛ'
+    - '&8&m----------------'
 
 scoreboard_logo:
   change-interval: 25
   texts:
-    - "&#E9FFE2&lT&#E4FCDB&le&#DEF8D4&lr&#D9F5CD&lr&#D3F1C6&la&#CEEEBF&ln&#C9EAB8&la&#C3E7B1&lt&#BEE3AA&li&#B8E0A2&lo&#B3DC9B&ln&#AED994&ls"
-    - "&#E4FCDB&lT&#DEF8D4&le&#D9F5CD&lr&#D3F1C6&lr&#CEEEBF&la&#C9EAB8&ln&#C3E7B1&la&#BEE3AA&lt&#B8E0A2&li&#B3DC9B&lo&#AED994&ln&#A8D58D&ls"
-    - "&#DEF8D4&lT&#D9F5CD&le&#D3F1C6&lr&#CEEEBF&lr&#C9EAB8&la&#C3E7B1&ln&#BEE3AA&la&#B8E0A2&lt&#B3DC9B&li&#AED994&lo&#A8D58D&ln&#A3D286&ls"
-    - "&#D9F5CD&lT&#D3F1C6&le&#CEEEBF&lr&#C9EAB8&lr&#C3E7B1&la&#BEE3AA&ln&#B8E0A2&la&#B3DC9B&lt&#AED994&li&#A8D58D&lo&#A3D286&ln&#9DCE7F&ls"
-    - "&#D3F1C6&lT&#CEEEBF&le&#C9EAB8&lr&#C3E7B1&lr&#BEE3AA&la&#B8E0A2&ln&#B3DC9B&la&#AED994&lt&#A8D58D&li&#A3D286&lo&#9DCE7F&ln&#98CB78&ls"
-    - "&#CEEEBF&lT&#C9EAB8&le&#C3E7B1&lr&#BEE3AA&lr&#B8E0A2&la&#B3DC9B&ln&#AED994&la&#A8D58D&lt&#A3D286&li&#9DCE7F&lo&#98CB78&ln&#93C771&ls"
-    - "&#C9EAB8&lT&#C3E7B1&le&#BEE3AA&lr&#B8E0A2&lr&#B3DC9B&la&#AED994&ln&#A8D58D&la&#A3D286&lt&#9DCE7F&li&#98CB78&lo&#93C771&ln&#8DC46A&ls"
-    - "&#C3E7B1&lT&#BEE3AA&le&#B8E0A2&lr&#B3DC9B&lr&#AED994&la&#A8D58D&ln&#A3D286&la&#9DCE7F&lt&#98CB78&li&#93C771&lo&#8DC46A&ln&#88C063&ls"
+    - '&2&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ'
