@@ -819,7 +819,7 @@ public class BlacksmithAnvilListener implements Listener {
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             inventory.setItem(slot, black);
         }
-        for (int slot : new int[]{10, 16, 17, 18, 19, 25, 28, 29, 30, 32, 33, 34}) {
+        for (int slot : new int[]{9, 10, 16, 17, 18, 19, 25, 27, 28, 29, 30, 32, 33, 34}) {
             inventory.setItem(slot, gray);
         }
         inventory.setItem(MERGE_INFO_SLOT, createSimpleItem(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&6Merge Forge", List.of(
