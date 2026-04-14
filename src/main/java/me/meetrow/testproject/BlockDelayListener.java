@@ -51,20 +51,6 @@ public class BlockDelayListener implements Listener {
             )));
             return;
         }
-        if (!bypassProfessionRestrictions && plugin.isFarmerCrop(material) && isHoe(player.getInventory().getItemInMainHand())
-                && plugin.meetsProfessionRequirement(player.getUniqueId(), Profession.FARMER)) {
-            int requiredLevel = plugin.getFarmerHoeRequiredLevel(player.getInventory().getItemInMainHand().getType());
-            if (plugin.getProfessionLevel(player.getUniqueId(), Profession.FARMER) < requiredLevel) {
-                event.setCancelled(true);
-                player.sendMessage(plugin.getMessage("profession.farmer.hoe-locked", plugin.placeholders(
-                        "item", plugin.formatMaterialName(player.getInventory().getItemInMainHand().getType()),
-                        "level", String.valueOf(requiredLevel),
-                        "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER)
-                )));
-                return;
-            }
-        }
-
         RequiredTool requiredTool = getRequiredTool(material);
         if (requiredTool != null && !isRequiredTool(player.getInventory().getItemInMainHand(), requiredTool)) {
             event.setCancelled(true);
@@ -83,11 +69,6 @@ public class BlockDelayListener implements Listener {
                         "level", String.valueOf(plugin.getRequiredProfessionLevelForBlock(requiredProfession, material)),
                         "profession", plugin.getProfessionPlainDisplayName(requiredProfession)
                 )));
-                return;
-            }
-            if (requiredProfession == Profession.MINER && !isMinerTool(player.getInventory().getItemInMainHand())) {
-                event.setCancelled(true);
-                player.sendMessage(plugin.getMessage("profession.miner.tool-required"));
                 return;
             }
         }

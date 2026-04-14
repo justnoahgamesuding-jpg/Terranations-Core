@@ -249,6 +249,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handleMaintenanceCommand(sender, args);
         }
 
+        if (args[0].equalsIgnoreCase("clearinventory")) {
+            return handleClearInventoryCommand(sender, args);
+        }
+
         if (args[0].equalsIgnoreCase("quests")) {
             return handleQuestsCommand(sender, args);
         }
@@ -310,6 +314,24 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Progress: " + plugin.getTutorialQuestProgressText(playerId), NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("Percent: " + plugin.getTutorialQuestPercent(playerId), NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("Profession: " + plugin.getTutorialQuestProfessionKey(playerId), NamedTextColor.YELLOW));
+        return true;
+    }
+
+    private boolean handleClearInventoryCommand(CommandSender sender, String[] args) {
+        if (args.length != 2) {
+            sender.sendMessage(Component.text("Usage: /terra clearinventory <player>", NamedTextColor.RED));
+            return true;
+        }
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target == null) {
+            sender.sendMessage(plugin.getMessage("general.player-not-found"));
+            return true;
+        }
+        plugin.clearOnlinePlayerInventory(target);
+        sender.sendMessage(Component.text("Cleared " + target.getName() + "'s inventory and kept the Terra Guide.", NamedTextColor.GREEN));
+        if (sender != target) {
+            target.sendMessage(Component.text("Your inventory was cleared. Your Terra Guide was kept.", NamedTextColor.RED));
+        }
         return true;
     }
 
@@ -2872,6 +2894,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         entries.add(new HelpEntry("/terra cooldowndebug", "Toggle cooldown debug bossbars.", ignored -> sender instanceof Player));
         entries.add(new HelpEntry("/terra lag <status|clearitems|stacknow|itemclear|mobstack|itemmerge>", "Manage lag-reduction tools.", ignored -> true));
         entries.add(new HelpEntry("/terra maintenance <on|off|status|add|remove|list>", "Manage maintenance mode access.", ignored -> true));
+        entries.add(new HelpEntry("/terra clearinventory <player>", "Clear a player's inventory but keep the Terra Guide.", ignored -> true));
         entries.add(new HelpEntry("/terra realtimeclock <on|off|status|sync>", "Control the real-time day/night clock.", ignored -> true));
         entries.add(new HelpEntry("/terra hungerspeed <multiplier|status>", "Set the global hunger drain speed.", ignored -> true));
         entries.add(new HelpEntry("/terra stability <status|enable|disable|scan|debug|meter|radius|delay|span|supportradius|debugradius|supports|strictness>", "Manage cave-in and support rules.", ignored -> true));
@@ -3266,6 +3289,13 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             if (args.length == 3 && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove"))) {
                 return partialMatches(args[2], getKnownPlayerNames());
+            }
+            return Collections.emptyList();
+        }
+
+        if (args[0].equalsIgnoreCase("clearinventory")) {
+            if (args.length == 2) {
+                return partialMatches(args[1], getKnownPlayerNames());
             }
             return Collections.emptyList();
         }

@@ -49,17 +49,7 @@ public class CountryFarmlandListener implements Listener {
             return;
         }
 
-        int requiredLevel = plugin.getFarmerHoeRequiredLevel(event.getItem().getType());
         int farmerLevel = plugin.getProfessionLevel(event.getPlayer().getUniqueId(), Profession.FARMER);
-        if (farmerLevel < requiredLevel) {
-                event.setCancelled(true);
-                event.getPlayer().sendMessage(plugin.getMessage("profession.farmer.hoe-locked", plugin.placeholders(
-                        "item", plugin.formatMaterialName(event.getItem().getType()),
-                        "level", String.valueOf(requiredLevel),
-                        "profession", plugin.getProfessionPlainDisplayName(Profession.FARMER)
-                )));
-                return;
-            }
 
         int actionRequiredLevel = originalType == Material.COARSE_DIRT
                 ? plugin.getFarmerCoarseDirtConversionRequiredLevel()

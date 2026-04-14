@@ -2308,13 +2308,13 @@ public final class Testproject extends JavaPlugin {
 
             while (amount > 0) {
                 int stackAmount = Math.min(amount, material.getMaxStackSize());
-                items.add(applySoulboundTag(new ItemStack(material, stackAmount)));
+                items.add(new ItemStack(material, stackAmount));
                 amount -= stackAmount;
             }
         }
 
         if (profession == Profession.BLACKSMITH && items.stream().noneMatch(item -> item.getType() == Material.ANVIL)) {
-            items.add(applySoulboundTag(new ItemStack(Material.ANVIL, 1)));
+            items.add(new ItemStack(Material.ANVIL, 1));
         }
 
         return items;
@@ -2481,7 +2481,7 @@ public final class Testproject extends JavaPlugin {
 
     private void giveProfessionStarterKit(Player player, Profession profession, List<ItemStack> items) {
         for (ItemStack item : items) {
-            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(applyUsageRequirementLore(item.clone()));
+            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(item.clone());
             for (ItemStack leftover : leftovers.values()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), leftover);
             }
@@ -2823,6 +2823,41 @@ public final class Testproject extends JavaPlugin {
         return Math.min(70, 8 + (itemLevel * 8) + (rarity.ordinal() * 7));
     }
 
+    public double getForgedArmorHealthBonus(ItemStack itemStack) {
+        if (!isForgedItem(itemStack)) {
+            return 0.0D;
+        }
+        Material material = itemStack.getType();
+        String name = material.name();
+        if (!(name.endsWith("_HELMET")
+                || name.endsWith("_CHESTPLATE")
+                || name.endsWith("_LEGGINGS")
+                || name.endsWith("_BOOTS"))) {
+            return 0.0D;
+        }
+        ForgedRarity rarity = getForgedItemRarity(itemStack);
+        int itemLevel = getForgedDisplayLevel(itemStack);
+        if (rarity == null) {
+            return 0.0D;
+        }
+        return (rarity.ordinal() * 1.5D) + (itemLevel * 0.75D);
+    }
+
+    public void refreshForgedArmorHealth(Player player) {
+        if (player == null || player.getAttribute(Attribute.GENERIC_MAX_HEALTH) == null) {
+            return;
+        }
+        double bonus = 0.0D;
+        for (ItemStack armorPiece : player.getInventory().getArmorContents()) {
+            bonus += getForgedArmorHealthBonus(armorPiece);
+        }
+        double targetMaxHealth = 20.0D + bonus;
+        player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(targetMaxHealth);
+        if (player.getHealth() > targetMaxHealth) {
+            player.setHealth(targetMaxHealth);
+        }
+    }
+
     public String getForgedPerkLore(Material material, ForgedRarity rarity) {
         if (material == null || rarity == null) {
             return null;
@@ -2846,8 +2881,8 @@ public final class Testproject extends JavaPlugin {
         }
         if (name.endsWith("_AXE")) {
             return switch (rarity) {
-                case LEGENDARY -> "Timber Rush: Haste II after chopping logs";
-                case EPIC -> "Heavy Swing: stronger chop uptime";
+                case LEGENDARY -> "Timber Rush: bonus logs on chop";
+                case EPIC -> "Heavy Swing: extra wood drops";
                 case RARE -> "Woodcaller: steadier lumber flow";
                 default -> "Forged chop quality";
             };
@@ -7518,7 +7553,6 @@ public final class Testproject extends JavaPlugin {
         double multiplier = 1.0D;
         multiplier -= countUnlockedProfessionSkillNodes(playerId, Profession.MINER, "efficient_miner") * 0.12D;
         multiplier -= countUnlockedProfessionSkillNodes(playerId, Profession.LUMBERJACK, "energy_saver") * 0.10D;
-        multiplier -= countUnlockedProfessionSkillNodes(playerId, Profession.FARMER, "no_hunger_drain") * 0.18D;
         return (float) Math.max(0.45D, multiplier);
     }
 
@@ -8042,34 +8076,6 @@ public final class Testproject extends JavaPlugin {
     }
 
     public ItemStack applyUsageRequirementLore(ItemStack itemStack) {
-        if (itemStack == null || itemStack.getType().isAir()) {
-            return itemStack;
-        }
-
-        Profession requiredProfession = getUsageRequirementProfession(itemStack.getType());
-        int requiredLevel = getUsageRequirementLevel(itemStack.getType(), requiredProfession);
-        if (requiredProfession == null || requiredLevel <= 0) {
-            return itemStack;
-        }
-
-        ItemMeta itemMeta = itemStack.getItemMeta();
-        if (itemMeta == null) {
-            return itemStack;
-        }
-
-        List<Component> lore = itemMeta.lore() != null ? new ArrayList<>(itemMeta.lore()) : new ArrayList<>();
-        String plainJobPrefix = "Required Job:";
-        String plainLevelPrefix = "Required Level:";
-        lore.removeIf(line -> {
-            String plain = PLAIN_TEXT_SERIALIZER.serialize(line);
-            return plain.startsWith(plainJobPrefix) || plain.startsWith(plainLevelPrefix);
-        });
-
-        lore.add(legacyComponent("&8"));
-        lore.add(legacyComponent("&7Required Job: " + getProfessionDisplayName(requiredProfession)));
-        lore.add(legacyComponent("&7Required Level: &f" + requiredLevel));
-        itemMeta.lore(lore);
-        itemStack.setItemMeta(itemMeta);
         return itemStack;
     }
 
@@ -8828,6 +8834,8 @@ public final class Testproject extends JavaPlugin {
             return;
         }
         clearPlayerInventory(player.getInventory());
+        ensurePlayerGuidanceItem(player);
+        refreshForgedArmorHealth(player);
         player.updateInventory();
     }
 
@@ -8846,11 +8854,17 @@ public final class Testproject extends JavaPlugin {
     }
 
     private void clearPlayerInventory(PlayerInventory inventory) {
+        ItemStack guidanceItem = inventory != null && isGuidanceItem(inventory.getItem(8))
+                ? inventory.getItem(8).clone()
+                : null;
         inventory.clear();
         inventory.setArmorContents(null);
         inventory.setExtraContents(null);
         inventory.setItemInOffHand(null);
         inventory.setHeldItemSlot(0);
+        if (guidanceItem != null) {
+            inventory.setItem(8, guidanceItem);
+        }
     }
 
     public int countGroundItems() {

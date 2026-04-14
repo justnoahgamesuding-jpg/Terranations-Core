@@ -70,22 +70,13 @@ skill-tree:
       requires: [ basic_meals ]
       description:
         - "Planned stronger food utility."
-    no_hunger_drain:
-      name: "No Hunger Drain"
-      branch: "Survival"
-      icon: GOLDEN_CARROT
-      slot: 28
-      cost: 2
-      secondary-allowed: true
-      description:
-        - "Planned farming sustain node."
     biome_adaptation:
       name: "Biome Adaptation"
       branch: "Survival"
       icon: LEATHER_BOOTS
       slot: 29
       cost: 3
-      requires: [ no_hunger_drain ]
+      requires: [ basic_meals ]
       description:
         - "Planned climate resilience node."
     fishing_specialization:

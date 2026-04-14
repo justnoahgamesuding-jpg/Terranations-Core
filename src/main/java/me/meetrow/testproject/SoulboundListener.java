@@ -88,6 +88,6 @@ public class SoulboundListener implements Listener {
     }
 
     private void sendSoulboundMessage(Player player) {
-        player.sendActionBar(Component.text("That starter item is soulbound.", NamedTextColor.RED));
+        player.sendActionBar(Component.text("That item is soulbound.", NamedTextColor.RED));
     }
 }

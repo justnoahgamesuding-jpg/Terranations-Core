@@ -9,7 +9,12 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -36,6 +41,37 @@ public class ForgedEquipmentListener implements Listener {
         int protectionPercent = plugin.getForgedDurabilityProtectionPercent(rarity, itemLevel);
         if (ThreadLocalRandom.current().nextInt(100) < protectionPercent) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        plugin.refreshForgedArmorHealth(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerRespawn(PlayerRespawnEvent event) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> plugin.refreshForgedArmorHealth(event.getPlayer()));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            plugin.getServer().getScheduler().runTask(plugin, () -> plugin.refreshForgedArmorHealth(player));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            plugin.getServer().getScheduler().runTask(plugin, () -> plugin.refreshForgedArmorHealth(player));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player player) {
+            plugin.refreshForgedArmorHealth(player);
         }
     }
 
@@ -112,12 +148,12 @@ public class ForgedEquipmentListener implements Listener {
             return;
         }
         if (rarity == ForgedRarity.LEGENDARY && ThreadLocalRandom.current().nextDouble() <= 0.15D) {
-            player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 20 * 20, 1, true, false, true));
+            dropExtraMaterial(player, event.getBlock().getType(), 2);
             player.sendActionBar(plugin.legacyComponent("&6Timber Rush"));
             return;
         }
         if (rarity == ForgedRarity.EPIC && ThreadLocalRandom.current().nextDouble() <= 0.12D) {
-            player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 20 * 12, 0, true, false, true));
+            dropExtraMaterial(player, event.getBlock().getType(), 1);
             player.sendActionBar(plugin.legacyComponent("&5Heavy Swing"));
         }
     }
@@ -189,6 +225,13 @@ public class ForgedEquipmentListener implements Listener {
         }
         String name = block.getType().name();
         return name.endsWith("_LOG") || name.endsWith("_WOOD") || name.endsWith("_HYPHAE");
+    }
+
+    private void dropExtraMaterial(Player player, Material material, int amount) {
+        if (player == null || material == null || amount <= 0) {
+            return;
+        }
+        player.getWorld().dropItemNaturally(player.getLocation(), new ItemStack(material, amount));
     }
 
     private void dropDifference(Player player, Collection<ItemStack> normalDrops, Collection<ItemStack> boostedDrops) {
