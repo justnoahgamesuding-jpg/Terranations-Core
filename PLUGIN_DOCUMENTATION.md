@@ -12,6 +12,7 @@ Terra combines these major systems:
 - structural stability and support logic
 - trader routes and merchant waves
 - Terra-owned balance storage
+- a locked player guide item in hotbar slot 9 for future gameplay navigation
 - staff, maintenance, lag-reduction, and rollback utilities
 
 ## Command Surface
@@ -71,6 +72,7 @@ Notes:
 
 - Break and place cooldowns are separate.
 - `/terra reload` also refreshes climate-lore items and soulbound starter items in loaded inventories.
+- The Terra Guide item is restored to slot 9 for online players and stays locked there.
 - `lag clearitems` intentionally excludes Terra trader and merchant entities.
 - The stability meter always runs in the background even when its chat display is off.
 
@@ -252,6 +254,13 @@ Key behavior:
 - Farmer and Lumberjack have instant-growth proc systems.
 - Blacksmith and Farmer use furnace collaboration and output tagging.
 
+### Terra Guide
+
+- Every player receives a `Terra Guide` nether star in hotbar slot 9.
+- The item is soulbound and additionally locked to that slot.
+- It cannot be moved, dropped, hotbar-swapped, offhand-swapped, or placed into containers.
+- It is intended to become the main player hub for guidance, management, and progression menus.
+
 ### Countries
 
 Countries now include more than membership:
@@ -329,6 +338,31 @@ The plugin includes:
 - custom join or leave messages
 - plugin-list protection
 - CoreProtect rollback dispatch helpers
+
+## PlaceholderAPI
+
+Terra exposes PlaceholderAPI placeholders for scoreboards, menus, and chat integrations.
+
+Common placeholders include:
+
+- `%terra_balance%`
+- `%terra_player_country%`
+- `%terra_player_country_level%`
+- `%terra_profession_display%`
+- `%terra_current_job_level%`
+- `%terra_current_job_xp%`
+- `%terra_current_job_xp_required%`
+- `%terra_server_time%`
+- `%terra_server_date%`
+- `%terra_server_datetime%`
+- `%terra_climate_name%`
+- `%terra_climate_temperature%`
+- `%terra_climate_season%`
+
+Notes:
+
+- `%terra_current_job_xp%` is remaining XP to the next level, not current earned XP for the level.
+- `%terra_server_time%`, `%terra_server_date%`, and `%terra_server_datetime%` follow the same timezone as the real-time world clock configured in `realtime-clock.timezone`.
 
 ## Integrations
 

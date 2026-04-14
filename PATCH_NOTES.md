@@ -4,6 +4,14 @@ This file keeps the more detailed feature ledger for the current code snapshot. 
 
 | Date | Feature | Notes |
 | --- | --- | --- |
+| 2026-04-14 | Terra Guide slot item | Players now receive a locked soulbound `Terra Guide` nether star in hotbar slot 9. |
+| 2026-04-14 | guide slot lock rules | The guide item cannot be moved, dropped, offhand-swapped, hotbar-swapped, or placed into containers. |
+| 2026-04-14 | country level placeholders | `%terra_player_country_level%` and `%terra_current_country_level%` were added for external UI use. |
+| 2026-04-14 | server time placeholders | `%terra_server_time%`, `%terra_server_date%`, and `%terra_server_datetime%` were added and aligned with the real-time clock timezone. |
+| 2026-04-14 | climate placeholders | `%terra_climate_name%`, `%terra_climate_temperature%`, `%terra_climate_season%`, `%terra_climate_raining%`, and `%terra_climate_freezing%` were added. |
+| 2026-04-14 | ItemsAdder-only pack flow | Terra's standalone resource-pack delivery settings were removed in favor of an ItemsAdder-only workflow. |
+| 2026-04-14 | ItemsAdder pack cleanup | Broken font overrides and unused HUD panel assets were removed from the repository pack examples. |
+| 2026-04-14 | quest stat sync removal | The old `terra_quest_steps` ItemsAdder stat sync path was disabled. |
 | 2026-04-06 | `/flyspeed` standalone command | Fly speed is now exposed as its own admin command instead of only living under `/terra`. |
 | 2026-04-06 | `/vanish` standalone command | Direct vanish control was added for admins. |
 | 2026-04-06 | expanded `/staff` tooling | Staff mode grew into a broader moderation and utility surface. |

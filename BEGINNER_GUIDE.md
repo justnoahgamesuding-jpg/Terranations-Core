@@ -9,9 +9,10 @@ Terra is built around specialization and cooperation rather than fast vanilla su
 The core loop is:
 
 1. Choose a profession.
-2. Join or build up a country.
-3. Level by doing work that matches your role.
-4. Respect climate, land use, and support rules.
+2. Use the Terra Guide in hotbar slot 9 as your main reference item.
+3. Join or build up a country.
+4. Level by doing work that matches your role.
+5. Respect climate, land use, and support rules.
 
 ## Core Professions
 
@@ -29,10 +30,11 @@ The core loop is:
 ## First 15 Minutes
 
 1. Pick a profession with `/jobs`.
-2. Check your current profession state with `/jobs info`.
-3. Open the country browser with `/country list`.
-4. Join an open country with `/country join <name>`, or ask staff if the server is still organizing countries.
-5. Start doing profession-matching work immediately.
+2. Keep your `Terra Guide` in hotbar slot 9. It is locked there and will become your main hub item.
+3. Check your current profession state with `/jobs info`.
+4. Open the country browser with `/country list`.
+5. Join an open country with `/country join <name>`, or ask staff if the server is still organizing countries.
+6. Start doing profession-matching work immediately.
 
 ## Commands You Will Actually Use
 
@@ -130,6 +132,13 @@ That means you cannot:
 - store them in containers
 
 They are meant to stay with the player who earned them.
+
+The `Terra Guide` is stricter than normal soulbound items:
+
+- it always lives in hotbar slot 9
+- it cannot be moved to another slot
+- it cannot be placed in inventories or containers
+- it is intended to become the main access point for guidance and progression features
 
 ## Good Early Priorities
 

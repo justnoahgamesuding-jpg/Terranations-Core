@@ -2,6 +2,20 @@
 
 This file is the short, high-level timeline for the current repository snapshot.
 
+## 2026-04-14
+
+### UI and player guidance shifted away from the old pack-driven approach
+
+- Terra's standalone resource-pack delivery flow was removed in favor of an ItemsAdder-only path.
+- The old custom font override was removed from the bundled pack examples after it caused client load failures.
+- New PlaceholderAPI values were added for country level, local or server time, and climate display so external scoreboards can carry more gameplay context.
+
+### A dedicated player guide item was introduced
+
+- Every player now receives a locked `Terra Guide` item in hotbar slot 9.
+- The guide item is soulbound and cannot be moved, dropped, swapped, or stored.
+- This is the new foundation for future guidance, management, and progression menus.
+
 ## 2026-04-06
 
 ### Staff and server operations expanded
