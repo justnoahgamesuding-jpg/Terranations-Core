@@ -8287,6 +8287,7 @@ public final class Testproject extends JavaPlugin {
         staffModeGamemodes.putIfAbsent(player.getUniqueId(), player.getGameMode());
         staffModeInventories.putIfAbsent(player.getUniqueId(), StaffInventoryState.capture(player.getInventory()));
         clearPlayerInventory(player.getInventory());
+        ensurePlayerGuidanceItem(player);
         player.setGameMode(GameMode.CREATIVE);
         player.addPotionEffect(new org.bukkit.potion.PotionEffect(
                 org.bukkit.potion.PotionEffectType.NIGHT_VISION,
