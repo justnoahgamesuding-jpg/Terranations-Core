@@ -3071,114 +3071,23 @@ public final class Testproject extends JavaPlugin {
         };
     }
 
-    public ForgeMergeOutcome attemptForgeMerge(Player player, String rareMaterialKey) {
-        if (player == null || !hasProfession(player.getUniqueId(), Profession.BLACKSMITH)) {
+    public ForgeMergeOutcome attemptForgeMergeFromInputs(ItemStack baseItem, String rareMaterialKey) {
+        if (!isForgedItem(baseItem) || getForgedDisplayLevel(baseItem) >= 5 || rareMaterialKey == null || rareMaterialKey.isBlank()) {
             return ForgeMergeOutcome.INVALID;
         }
-        ItemStack target = player.getInventory().getItemInMainHand();
-        if (!isForgedItem(target) || getForgedDisplayLevel(target) >= 5) {
-            return ForgeMergeOutcome.INVALID;
-        }
-        if (rareMaterialKey == null || rareMaterialKey.isBlank()) {
-            return ForgeMergeOutcome.INVALID;
-        }
-        if (countMatchingForgeMergeItems(player, target) < 10) {
-            return ForgeMergeOutcome.INVALID;
-        }
-        if (!hasRareContractMaterial(player, rareMaterialKey, 1)) {
-            return ForgeMergeOutcome.INVALID;
-        }
-
-        ItemStack upgradedItem = target.clone();
-        removeMatchingForgeItems(player, target, 10);
-        removeRareContractMaterial(player, rareMaterialKey, 1);
-
         if (ThreadLocalRandom.current().nextDouble() > getForgeMergeSuccessChance(rareMaterialKey)) {
             return ForgeMergeOutcome.FAILED;
         }
 
-        ItemMeta meta = upgradedItem.getItemMeta();
+        ItemMeta meta = baseItem.getItemMeta();
         if (meta == null) {
             return ForgeMergeOutcome.INVALID;
         }
-        int nextLevel = Math.min(5, getForgedDisplayLevel(upgradedItem) + 1);
+        int nextLevel = Math.min(5, getForgedDisplayLevel(baseItem) + 1);
         meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, nextLevel);
-        upgradedItem.setItemMeta(meta);
-        refreshVisibleDurability(upgradedItem);
-        if (player.getInventory().getItemInMainHand().getType().isAir()) {
-            player.getInventory().setItemInMainHand(upgradedItem);
-        } else {
-            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(upgradedItem);
-            for (ItemStack leftover : leftovers.values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-            }
-        }
+        baseItem.setItemMeta(meta);
+        refreshVisibleDurability(baseItem);
         return ForgeMergeOutcome.SUCCESS;
-    }
-
-    public boolean hasRareContractMaterial(Player player, String rareMaterialKey, int amount) {
-        if (player == null || rareMaterialKey == null || amount <= 0) {
-            return false;
-        }
-        int total = 0;
-        for (ItemStack itemStack : player.getInventory().getContents()) {
-            if (rareMaterialKey.equalsIgnoreCase(getRareContractMaterialKey(itemStack))) {
-                total += itemStack.getAmount();
-                if (total >= amount) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private void removeRareContractMaterial(Player player, String rareMaterialKey, int amount) {
-        int remaining = amount;
-        ItemStack[] contents = player.getInventory().getContents();
-        for (int i = 0; i < contents.length && remaining > 0; i++) {
-            ItemStack itemStack = contents[i];
-            if (!rareMaterialKey.equalsIgnoreCase(getRareContractMaterialKey(itemStack))) {
-                continue;
-            }
-            int taken = Math.min(remaining, itemStack.getAmount());
-            itemStack.setAmount(itemStack.getAmount() - taken);
-            remaining -= taken;
-            if (itemStack.getAmount() <= 0) {
-                contents[i] = null;
-            }
-        }
-        player.getInventory().setContents(contents);
-    }
-
-    private int countMatchingForgeMergeItems(Player player, ItemStack target) {
-        if (player == null || target == null) {
-            return 0;
-        }
-        int total = 0;
-        for (ItemStack itemStack : player.getInventory().getContents()) {
-            if (itemStack != null && itemStack.getType() == target.getType() && isForgedItem(itemStack)) {
-                total += itemStack.getAmount();
-            }
-        }
-        return total;
-    }
-
-    private void removeMatchingForgeItems(Player player, ItemStack target, int amount) {
-        int remaining = amount;
-        ItemStack[] contents = player.getInventory().getContents();
-        for (int i = 0; i < contents.length && remaining > 0; i++) {
-            ItemStack itemStack = contents[i];
-            if (itemStack == null || itemStack.getType() != target.getType() || !isForgedItem(itemStack)) {
-                continue;
-            }
-            int taken = Math.min(remaining, itemStack.getAmount());
-            itemStack.setAmount(itemStack.getAmount() - taken);
-            remaining -= taken;
-            if (itemStack.getAmount() <= 0) {
-                contents[i] = null;
-            }
-        }
-        player.getInventory().setContents(contents);
     }
 
     private JobContract generateJobContractOffer(UUID playerId, Profession profession, long cycle) {
@@ -8111,6 +8020,19 @@ public final class Testproject extends JavaPlugin {
         return Math.max(3, baseCooldown - builderReduction);
     }
 
+    public int getBlacksmithActionCooldownSeconds(UUID playerId) {
+        int baseCooldown = getBlockDelaySeconds();
+        int reduction = 0;
+        if (hasProfession(playerId, Profession.BLACKSMITH)) {
+            int level = getProfessionLevel(playerId, Profession.BLACKSMITH);
+            int reductionPerLevel = Math.max(0, getProfessionConfig(Profession.BLACKSMITH).getInt("progression.cooldown-reduction-seconds-per-level", 2));
+            reduction = Math.max(0, (level - 1) * reductionPerLevel);
+            reduction += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "bulk_crafting") * 2;
+            reduction += countUnlockedProfessionSkillNodes(playerId, Profession.BLACKSMITH, "fast_smelting") * 2;
+        }
+        return Math.max(3, baseCooldown - reduction);
+    }
+
     public int getSharedActionCooldownSeconds(UUID playerId) {
         return Math.max(0, Math.min(getMinerBreakCooldownSeconds(playerId), getBuilderPlaceCooldownSeconds(playerId)));
     }
@@ -8122,6 +8044,7 @@ public final class Testproject extends JavaPlugin {
         return switch (actionProfession) {
             case MINER -> getMinerBreakCooldownSeconds(playerId);
             case BUILDER -> getBuilderPlaceCooldownSeconds(playerId);
+            case BLACKSMITH -> getBlacksmithActionCooldownSeconds(playerId);
             default -> Math.max(0, getBlockDelaySeconds());
         };
     }

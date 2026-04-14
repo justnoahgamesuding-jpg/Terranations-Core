@@ -9,6 +9,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -31,6 +32,10 @@ public class BlacksmithAnvilListener implements Listener {
     private static final int CLOSE_SLOT = 50;
     private static final int MERGE_SLOT = 52;
     private static final int CATEGORY_INFO_SLOT = 49;
+    private static final int[] MERGE_INPUT_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21};
+    private static final int MERGE_RARE_SLOT = 23;
+    private static final int MERGE_ACTION_SLOT = 25;
+    private static final int MERGE_BACK_SLOT = 26;
     private static final int[] RECIPE_SLOTS = {
             11, 12, 13, 14, 15, 16, 17,
             20, 21, 22, 23, 24, 25, 26,
@@ -141,7 +146,28 @@ public class BlacksmithAnvilListener implements Listener {
     public void onInventoryDrag(InventoryDragEvent event) {
         if (event.getView().getTopInventory().getHolder() instanceof BlacksmithMenuHolder) {
             event.setCancelled(true);
+            return;
         }
+        if (!(event.getView().getTopInventory().getHolder() instanceof MergeMenuHolder)) {
+            return;
+        }
+        for (int rawSlot : event.getRawSlots()) {
+            if (!isMergeInputSlot(rawSlot) && rawSlot != MERGE_RARE_SLOT) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
+        if (!(event.getInventory().getHolder() instanceof MergeMenuHolder)) {
+            return;
+        }
+        returnMergeInputs(player, event.getInventory());
     }
 
     private void openMenu(Player player, BlacksmithCategory category) {
@@ -327,116 +353,67 @@ public class BlacksmithAnvilListener implements Listener {
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             inventory.setItem(slot, filler);
         }
-        ItemStack heldItem = player.getInventory().getItemInMainHand();
-        boolean validTarget = plugin.isForgedItem(heldItem) && plugin.getForgedDisplayLevel(heldItem) < 5;
-        inventory.setItem(10, validTarget ? heldItem.clone() : createSimpleItem(Material.BARRIER, "&cHold a forged item", List.of(
-                "&7Hold the forged tool or armor piece",
-                "&7you want to upgrade in your main hand.",
-                "&7It must be below Tier V."
-        )));
+        for (int slot : MERGE_INPUT_SLOTS) {
+            inventory.setItem(slot, null);
+        }
+        inventory.setItem(MERGE_RARE_SLOT, null);
         inventory.setItem(12, createSimpleItem(Material.ANVIL, "&7Merge Rules", List.of(
                 "&710 forged copies of the same item",
                 "&71 rare material",
-                "&7Success upgrades the held item by 1 tier",
+                "&7Put the 10 forged items into the slots",
+                "&7Place 1 rare material in the catalyst slot",
+                "&7Success upgrades one result by 1 tier",
                 "&cFailure destroys all inputs"
         )));
-        inventory.setItem(14, createSimpleItem(Material.BOOK, "&7Status", List.of(
+        inventory.setItem(18, createSimpleItem(Material.BOOK, "&7Status", List.of(
                 plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH) ? "&aBlacksmith access active" : "&cBlacksmith only",
-                validTarget ? "&aHeld item ready" : "&cHeld item invalid",
-                "&7Matching copies: &f" + countHeldItemCopies(player)
+                "&7Input slots: &f10 forged copies",
+                "&7Catalyst slot: &f1 rare material"
         )));
-        inventory.setItem(18, createMergeMaterialButton("forge_shard", "&5Forge Shard"));
-        inventory.setItem(19, createMergeMaterialButton("tempered_flux", "&cTempered Flux"));
-        inventory.setItem(20, createMergeMaterialButton("binding_thread", "&dBinding Thread"));
-        inventory.setItem(21, createMergeMaterialButton("runic_prism", "&bRunic Prism"));
-        inventory.setItem(22, createMergeMaterialButton("ancient_core", "&6Ancient Core"));
-        inventory.setItem(26, createSimpleItem(Material.ARROW, "&7Back", List.of("&7Return to the forge board.")));
+        inventory.setItem(22, createSimpleItem(Material.NETHER_STAR, "&dCatalyst Slot", List.of(
+                "&7Place one forge material here:",
+                "&7Forge Shard, Tempered Flux,",
+                "&7Binding Thread, Runic Prism,",
+                "&7or Ancient Core."
+        )));
+        inventory.setItem(MERGE_ACTION_SLOT, createSimpleItem(Material.ANVIL, "&6Merge", List.of(
+                "&7Attempt the forge merge.",
+                "&cFailure destroys all inputs."
+        )));
+        inventory.setItem(MERGE_BACK_SLOT, createSimpleItem(Material.ARROW, "&7Back", List.of("&7Return to the forge board.")));
         player.openInventory(inventory);
     }
 
     private void handleMergeMenuClick(InventoryClickEvent event, Player player) {
-        event.setCancelled(true);
-        if (event.getClickedInventory() == null || event.getClickedInventory().getType() == InventoryType.PLAYER) {
+        if (event.getClickedInventory() == null) {
             return;
         }
-        if (event.getSlot() == 26) {
+        if (event.getClickedInventory().getType() == InventoryType.PLAYER) {
+            handlePlayerInventoryMergeClick(event, player);
+            return;
+        }
+
+        int slot = event.getSlot();
+        if (slot == MERGE_BACK_SLOT) {
+            event.setCancelled(true);
+            returnMergeInputs(player, event.getView().getTopInventory());
             openMenu(player, BlacksmithCategory.BASICS);
             return;
         }
-
-        String materialKey = switch (event.getSlot()) {
-            case 18 -> "forge_shard";
-            case 19 -> "tempered_flux";
-            case 20 -> "binding_thread";
-            case 21 -> "runic_prism";
-            case 22 -> "ancient_core";
-            default -> null;
-        };
-        if (materialKey == null) {
+        if (slot == MERGE_ACTION_SLOT) {
+            event.setCancelled(true);
+            runMergeAttempt(player, event.getView().getTopInventory());
             return;
         }
-        if (!plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH)) {
-            player.sendMessage(plugin.colorize("&cOnly blacksmiths can use the merge forge."));
+        if (slot == 12 || slot == 18 || slot == 22) {
+            event.setCancelled(true);
             return;
         }
-        ItemStack heldItem = player.getInventory().getItemInMainHand();
-        if (!plugin.isForgedItem(heldItem)) {
-            player.sendMessage(plugin.colorize("&cHold a forged item in your main hand first."));
+        if (isMergeInputSlot(slot) || slot == MERGE_RARE_SLOT) {
+            handleTopInventoryMergeClick(event, player);
             return;
         }
-        if (plugin.getForgedDisplayLevel(heldItem) >= 5) {
-            player.sendMessage(plugin.colorize("&cThat item is already at Tier V."));
-            return;
-        }
-        if (countHeldItemCopies(player) < 10) {
-            player.sendMessage(plugin.colorize("&cYou need 10 forged copies of that item to attempt a merge."));
-            return;
-        }
-        if (!plugin.hasRareContractMaterial(player, materialKey, 1)) {
-            player.sendMessage(plugin.colorize("&cYou need " + plugin.formatRareContractMaterialName(materialKey) + " to attempt that merge."));
-            return;
-        }
-        if (!plugin.tryConsumeSharedActionCooldown(player, Profession.BLACKSMITH)) {
-            return;
-        }
-
-        Testproject.ForgeMergeOutcome outcome = plugin.attemptForgeMerge(player, materialKey);
-        if (outcome == Testproject.ForgeMergeOutcome.INVALID) {
-            player.sendMessage(plugin.colorize("&cThe merge could not be completed."));
-            return;
-        }
-
-        if (outcome == Testproject.ForgeMergeOutcome.SUCCESS) {
-            player.sendMessage(plugin.colorize("&6Merge success. &aYour forged item advanced to a higher tier."));
-            player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.1F);
-        } else {
-            player.sendMessage(plugin.colorize("&cMerge failed. &7The forged copies and rare material were destroyed."));
-            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.9F, 0.8F);
-        }
-        openMergeMenu(player);
-    }
-
-    private int countHeldItemCopies(Player player) {
-        ItemStack heldItem = player.getInventory().getItemInMainHand();
-        if (!plugin.isForgedItem(heldItem)) {
-            return 0;
-        }
-        int total = 0;
-        for (ItemStack itemStack : player.getInventory().getContents()) {
-            if (itemStack != null && itemStack.getType() == heldItem.getType() && plugin.isForgedItem(itemStack)) {
-                total += itemStack.getAmount();
-            }
-        }
-        return total;
-    }
-
-    private ItemStack createMergeMaterialButton(String materialKey, String displayName) {
-        return createSimpleItem(Material.NETHER_STAR, displayName, List.of(
-                "&7Success chance: &f" + (int) Math.round(plugin.getForgeMergeSuccessChance(materialKey) * 100.0D) + "%",
-                "&7Cost: &f10 forged copies",
-                "&7      &f1x " + plugin.formatRareContractMaterialName(materialKey),
-                "&cFailure destroys all inputs."
-        ));
+        event.setCancelled(true);
     }
 
     private ItemStack createSimpleItem(Material material, String displayName, List<String> loreLines) {
@@ -499,6 +476,199 @@ public class BlacksmithAnvilListener implements Listener {
 
         private String displayName(int playerLevel) {
             return (playerLevel >= requiredLevel ? "&a" : "&c") + display;
+        }
+    }
+
+    private void handlePlayerInventoryMergeClick(InventoryClickEvent event, Player player) {
+        ItemStack current = event.getCurrentItem();
+        if (current == null || current.getType().isAir()) {
+            return;
+        }
+        if (event.isShiftClick()) {
+            event.setCancelled(true);
+            Inventory top = event.getView().getTopInventory();
+            if (plugin.isForgedItem(current) && findFirstEmptyMergeInput(top) >= 0) {
+                moveSingleItem(event.getClickedInventory(), event.getSlot(), top, findFirstEmptyMergeInput(top));
+                return;
+            }
+            if (plugin.getRareContractMaterialKey(current) != null && top.getItem(MERGE_RARE_SLOT) == null) {
+                moveSingleItem(event.getClickedInventory(), event.getSlot(), top, MERGE_RARE_SLOT);
+            }
+        }
+    }
+
+    private void handleTopInventoryMergeClick(InventoryClickEvent event, Player player) {
+        int slot = event.getSlot();
+        ItemStack cursor = event.getCursor();
+        ItemStack current = event.getCurrentItem();
+        if (slot == MERGE_RARE_SLOT) {
+            if (cursor != null && !cursor.getType().isAir()) {
+                if (plugin.getRareContractMaterialKey(cursor) == null || cursor.getAmount() != 1) {
+                    event.setCancelled(true);
+                    player.sendMessage(plugin.colorize("&cPlace exactly one rare forge material in the catalyst slot."));
+                    return;
+                }
+            }
+            return;
+        }
+        if (!isMergeInputSlot(slot)) {
+            event.setCancelled(true);
+            return;
+        }
+        if (cursor != null && !cursor.getType().isAir()) {
+            if (!plugin.isForgedItem(cursor) || cursor.getAmount() != 1) {
+                event.setCancelled(true);
+                player.sendMessage(plugin.colorize("&cEach merge input slot only accepts one forged item."));
+                return;
+            }
+            ItemStack existingType = getFirstMergeInput(event.getView().getTopInventory());
+            if (existingType != null && existingType.getType() != cursor.getType()) {
+                event.setCancelled(true);
+                player.sendMessage(plugin.colorize("&cAll forge merge inputs must be the same item type."));
+            }
+            return;
+        }
+        if (current != null && !current.getType().isAir()) {
+            return;
+        }
+    }
+
+    private void runMergeAttempt(Player player, Inventory inventory) {
+        if (!plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH)) {
+            player.sendMessage(plugin.colorize("&cOnly blacksmiths can use the merge forge."));
+            return;
+        }
+        ItemStack[] inputs = getMergeInputs(inventory);
+        if (inputs.length != 10) {
+            player.sendMessage(plugin.colorize("&cYou need to place 10 forged copies into the merge grid."));
+            return;
+        }
+        if (!allSameForgedType(inputs)) {
+            player.sendMessage(plugin.colorize("&cAll 10 input items must be the same forged item type."));
+            return;
+        }
+        if (plugin.getForgedDisplayLevel(inputs[0]) >= 5) {
+            player.sendMessage(plugin.colorize("&cThat item is already at Tier V."));
+            return;
+        }
+        ItemStack catalyst = inventory.getItem(MERGE_RARE_SLOT);
+        String rareKey = plugin.getRareContractMaterialKey(catalyst);
+        if (rareKey == null) {
+            player.sendMessage(plugin.colorize("&cPlace one rare forge material in the catalyst slot."));
+            return;
+        }
+        if (!plugin.tryConsumeSharedActionCooldown(player, Profession.BLACKSMITH)) {
+            return;
+        }
+
+        Testproject.ForgeMergeOutcome outcome = plugin.attemptForgeMergeFromInputs(inputs[0], rareKey);
+        clearMergeInventory(inventory);
+        if (outcome == Testproject.ForgeMergeOutcome.SUCCESS) {
+            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(inputs[0]);
+            for (ItemStack leftover : leftovers.values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+            }
+            player.sendMessage(plugin.colorize("&6Merge success. &aOne forged item advanced to a higher tier."));
+            player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.1F);
+        } else {
+            player.sendMessage(plugin.colorize("&cMerge failed. &7All forged items and the catalyst were destroyed."));
+            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.9F, 0.8F);
+        }
+        openMergeMenu(player);
+    }
+
+    private ItemStack[] getMergeInputs(Inventory inventory) {
+        List<ItemStack> inputs = new ArrayList<>();
+        for (int slot : MERGE_INPUT_SLOTS) {
+            ItemStack itemStack = inventory.getItem(slot);
+            if (itemStack != null && !itemStack.getType().isAir()) {
+                inputs.add(itemStack);
+            }
+        }
+        return inputs.toArray(ItemStack[]::new);
+    }
+
+    private boolean allSameForgedType(ItemStack[] inputs) {
+        if (inputs.length == 0) {
+            return false;
+        }
+        Material type = inputs[0].getType();
+        for (ItemStack itemStack : inputs) {
+            if (!plugin.isForgedItem(itemStack) || itemStack.getAmount() != 1 || itemStack.getType() != type) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void clearMergeInventory(Inventory inventory) {
+        for (int slot : MERGE_INPUT_SLOTS) {
+            inventory.setItem(slot, null);
+        }
+        inventory.setItem(MERGE_RARE_SLOT, null);
+    }
+
+    private void returnMergeInputs(Player player, Inventory inventory) {
+        for (int slot : MERGE_INPUT_SLOTS) {
+            returnMergeItem(player, inventory, slot);
+        }
+        returnMergeItem(player, inventory, MERGE_RARE_SLOT);
+    }
+
+    private void returnMergeItem(Player player, Inventory inventory, int slot) {
+        ItemStack itemStack = inventory.getItem(slot);
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return;
+        }
+        inventory.setItem(slot, null);
+        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(itemStack);
+        for (ItemStack leftover : leftovers.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+    }
+
+    private int findFirstEmptyMergeInput(Inventory inventory) {
+        for (int slot : MERGE_INPUT_SLOTS) {
+            ItemStack itemStack = inventory.getItem(slot);
+            if (itemStack == null || itemStack.getType().isAir()) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private ItemStack getFirstMergeInput(Inventory inventory) {
+        for (int slot : MERGE_INPUT_SLOTS) {
+            ItemStack itemStack = inventory.getItem(slot);
+            if (itemStack != null && !itemStack.getType().isAir()) {
+                return itemStack;
+            }
+        }
+        return null;
+    }
+
+    private boolean isMergeInputSlot(int slot) {
+        for (int mergeSlot : MERGE_INPUT_SLOTS) {
+            if (mergeSlot == slot) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void moveSingleItem(Inventory source, int sourceSlot, Inventory target, int targetSlot) {
+        ItemStack sourceItem = source.getItem(sourceSlot);
+        if (sourceItem == null || sourceItem.getType().isAir()) {
+            return;
+        }
+        ItemStack moved = sourceItem.clone();
+        moved.setAmount(1);
+        target.setItem(targetSlot, moved);
+        sourceItem.setAmount(sourceItem.getAmount() - 1);
+        if (sourceItem.getAmount() <= 0) {
+            source.setItem(sourceSlot, null);
+        } else {
+            source.setItem(sourceSlot, sourceItem);
         }
     }
 }
