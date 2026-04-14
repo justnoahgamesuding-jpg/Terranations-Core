@@ -240,7 +240,7 @@ public class BlacksmithAnvilListener implements Listener {
     private List<Testproject.BlacksmithRecipe> getRecipes(BlacksmithCategory category) {
         List<Testproject.BlacksmithRecipe> recipes = new ArrayList<>();
         for (Testproject.BlacksmithRecipe recipe : plugin.getBlacksmithAnvilRecipes()) {
-            if (recipe.result().name().startsWith("NETHERITE_") || recipe.category().equalsIgnoreCase("netherite")) {
+            if (shouldHideForgeRecipe(recipe)) {
                 continue;
             }
             if (recipe.category().equalsIgnoreCase(category.key)) {
@@ -248,13 +248,99 @@ public class BlacksmithAnvilListener implements Listener {
             }
         }
         recipes.sort((left, right) -> {
-            int levelCompare = Integer.compare(left.level(), right.level());
-            if (levelCompare != 0) {
-                return levelCompare;
+            int typeCompare = Integer.compare(getForgeRecipeSortGroup(left.result()), getForgeRecipeSortGroup(right.result()));
+            if (typeCompare != 0) {
+                return typeCompare;
             }
-            return left.result().name().compareTo(right.result().name());
+            int materialCompare = Integer.compare(getForgeMaterialSortGroup(left.result()), getForgeMaterialSortGroup(right.result()));
+            if (materialCompare != 0) {
+                return materialCompare;
+            }
+            int nameCompare = left.result().name().compareTo(right.result().name());
+            if (nameCompare != 0) {
+                return nameCompare;
+            }
+            return Integer.compare(left.level(), right.level());
         });
         return recipes;
+    }
+
+    private boolean shouldHideForgeRecipe(Testproject.BlacksmithRecipe recipe) {
+        if (recipe == null) {
+            return true;
+        }
+        Material result = recipe.result();
+        if (result == null) {
+            return true;
+        }
+        if (result.name().startsWith("NETHERITE_") || recipe.category().equalsIgnoreCase("netherite")) {
+            return true;
+        }
+        if (result == Material.ANVIL || result == Material.CHIPPED_ANVIL || result == Material.DAMAGED_ANVIL) {
+            return true;
+        }
+        if (result == Material.FURNACE || result == Material.BLAST_FURNACE || result == Material.SMOKER) {
+            return true;
+        }
+        return result.name().contains("BUCKET");
+    }
+
+    private int getForgeRecipeSortGroup(Material material) {
+        if (material == null) {
+            return 99;
+        }
+        String name = material.name();
+        if (name.endsWith("_SWORD")) {
+            return 0;
+        }
+        if (name.endsWith("_PICKAXE")) {
+            return 1;
+        }
+        if (name.endsWith("_SHOVEL")) {
+            return 2;
+        }
+        if (name.endsWith("_AXE")) {
+            return 3;
+        }
+        if (name.endsWith("_HOE")) {
+            return 4;
+        }
+        if (name.endsWith("_BOOTS")) {
+            return 5;
+        }
+        if (name.endsWith("_LEGGINGS")) {
+            return 6;
+        }
+        if (name.endsWith("_CHESTPLATE")) {
+            return 7;
+        }
+        if (name.endsWith("_HELMET")) {
+            return 8;
+        }
+        return 9;
+    }
+
+    private int getForgeMaterialSortGroup(Material material) {
+        if (material == null) {
+            return 99;
+        }
+        String name = material.name();
+        if (name.startsWith("WOODEN_") || name.startsWith("LEATHER_")) {
+            return 0;
+        }
+        if (name.startsWith("STONE_")) {
+            return 1;
+        }
+        if (name.startsWith("IRON_") || name.startsWith("CHAINMAIL_")) {
+            return 2;
+        }
+        if (name.startsWith("GOLDEN_")) {
+            return 3;
+        }
+        if (name.startsWith("DIAMOND_")) {
+            return 4;
+        }
+        return 5;
     }
 
     private Testproject.BlacksmithRecipe getRecipeForSlot(BlacksmithCategory category, int slot) {
