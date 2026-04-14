@@ -22,7 +22,7 @@ Do not duplicate these files into:
 - `resourcepack/minecraft/`
 - `resourcepack/terrahud/`
 
-Do keep the four top status panel PNGs mirrored in `resourcepack/assets/terrahud/textures/font/hud/top_status/`, otherwise ItemsAdder will log `Image not found for font_image 'terrahud:...'`.
+Do keep the active top status panel PNGs mirrored in `resourcepack/assets/terrahud/textures/font/hud/top_status/`, otherwise ItemsAdder will log `Image not found for font_image 'terrahud:...'`.
 
 Install by copying this folder to:
 

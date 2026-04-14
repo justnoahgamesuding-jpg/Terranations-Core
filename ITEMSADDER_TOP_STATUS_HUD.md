@@ -78,8 +78,6 @@ The HUD panel images are:
 ```text
 examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/panel.png
 examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/location_panel.png
-examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/job_panel.png
-examples/itemsadder/contents/terra_quest_hud/textures/font/hud/top_status/money_panel.png
 ```
 
 The HUD uses the vanilla bossbar text position for top-screen placement. The ItemsAdder pack includes transparent white bossbar sprites so the vanilla white bossbar texture does not show behind the panel:

@@ -14,13 +14,3 @@ font_images:
     path: font/hud/top_status/location_panel.png
     scale_ratio: 14
     y_position: 7
-  top_status_job_panel:
-    suggest_in_command: false
-    path: font/hud/top_status/job_panel.png
-    scale_ratio: 14
-    y_position: 7
-  top_status_money_panel:
-    suggest_in_command: false
-    path: font/hud/top_status/money_panel.png
-    scale_ratio: 14
-    y_position: 7
