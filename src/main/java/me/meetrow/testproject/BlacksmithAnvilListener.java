@@ -198,8 +198,9 @@ public class BlacksmithAnvilListener implements Listener {
         )));
         inventory.setItem(MERGE_SLOT, createSimpleItem(Material.NETHER_STAR, "&6Forge Merge", List.of(
                 "&7Open the upgrade workstation.",
-                "&7Use forged duplicates plus a catalyst",
-                "&7to risk a higher tier result."
+                "&7Use forged duplicates to risk",
+                "&7a higher tier result.",
+                "&7Catalysts are optional and improve odds."
         )));
         inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close the forge menu.")));
 
@@ -373,22 +374,24 @@ public class BlacksmithAnvilListener implements Listener {
         inventory.setItem(MERGE_RARE_SLOT, null);
         inventory.setItem(4, createSimpleItem(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&6Forge Merge Workstation", List.of(
                 "&710 forged duplicates",
-                "&71 catalyst material",
-                "&7One result upgraded on success",
+                "&70-1 catalyst material",
+                "&7One result upgrades on success",
                 "&cAll inputs destroyed on failure"
         )));
         inventory.setItem(7, createSimpleItem(Material.SMITHING_TABLE, "&eMerge Status", List.of(
                 plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH) ? "&aBlacksmith access active" : "&cBlacksmith only",
                 "&7Place the forged duplicates in the",
-                "&7central grid, then add a catalyst."
+                "&7central grid.",
+                "&7Catalyst slot is optional."
         )));
         inventory.setItem(16, createSimpleItem(Material.AMETHYST_SHARD, "&dCatalyst", List.of(
+                "&7Optional merge booster.",
                 "&7Accepted materials:",
-                "&8• &fForge Shard",
-                "&8• &fTempered Flux",
-                "&8• &fBinding Thread",
-                "&8• &fRunic Prism",
-                "&8• &fAncient Core"
+                "&8- &fForge Shard",
+                "&8- &fTempered Flux",
+                "&8- &fBinding Thread",
+                "&8- &fRunic Prism",
+                "&8- &fAncient Core"
         )));
         inventory.setItem(MERGE_PREVIEW_SLOT, createSimpleItem(Material.ANVIL, "&7Result Preview", List.of(
                 "&7After a successful merge, one item",
@@ -529,7 +532,7 @@ public class BlacksmithAnvilListener implements Listener {
             if (cursor != null && !cursor.getType().isAir()) {
                 if (plugin.getRareContractMaterialKey(cursor) == null || cursor.getAmount() != 1) {
                     event.setCancelled(true);
-                    player.sendMessage(plugin.colorize("&cPlace exactly one rare forge material in the catalyst slot."));
+                    player.sendMessage(plugin.colorize("&cThe catalyst slot only accepts one optional forge material."));
                     return;
                 }
             }
@@ -580,10 +583,6 @@ public class BlacksmithAnvilListener implements Listener {
         }
         ItemStack catalyst = inventory.getItem(MERGE_RARE_SLOT);
         String rareKey = plugin.getRareContractMaterialKey(catalyst);
-        if (rareKey == null) {
-            player.sendMessage(plugin.colorize("&cPlace one rare forge material in the catalyst slot."));
-            return;
-        }
         if (!plugin.tryConsumeSharedActionCooldown(player, Profession.BLACKSMITH)) {
             return;
         }
@@ -602,7 +601,7 @@ public class BlacksmithAnvilListener implements Listener {
             player.sendMessage(plugin.colorize("&6Merge success. &aOne forged item advanced to a higher tier."));
             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.1F);
         } else {
-            player.sendMessage(plugin.colorize("&cMerge failed. &7All forged items and the catalyst were destroyed."));
+            player.sendMessage(plugin.colorize("&cMerge failed. &7All forged items" + (rareKey != null ? " and the catalyst" : "") + " were destroyed."));
             player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.9F, 0.8F);
         }
         openMergeMenu(player);
@@ -747,8 +746,8 @@ public class BlacksmithAnvilListener implements Listener {
             preview.editMeta(meta -> meta.lore(List.of(
                     plugin.legacyComponent("&7Current Tier: &f" + plugin.toRomanNumeral(plugin.getForgedDisplayLevel(first))),
                     plugin.legacyComponent("&7Next Tier: &f" + plugin.toRomanNumeral(Math.min(5, plugin.getForgedDisplayLevel(first) + 1))),
-                    plugin.legacyComponent("&7Catalyst: &f" + (rareKey != null ? plugin.formatRareContractMaterialName(rareKey) : "Missing")),
-                    plugin.legacyComponent("&7Success: &f" + (rareKey != null ? (int) Math.round(plugin.getForgeMergeSuccessChance(rareKey) * 100.0D) + "%" : "--"))
+                    plugin.legacyComponent("&7Catalyst: &f" + (rareKey != null ? plugin.formatRareContractMaterialName(rareKey) : "None")),
+                    plugin.legacyComponent("&7Success: &f" + (int) Math.round(plugin.getForgeMergeSuccessChance(rareKey) * 100.0D) + "%")
             )));
         }
         inventory.setItem(MERGE_PREVIEW_SLOT, preview);
