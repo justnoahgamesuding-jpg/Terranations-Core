@@ -357,16 +357,9 @@ public class BlacksmithAnvilListener implements Listener {
         for (int slot : new int[]{10, 11, 12, 13, 14, 15, 16, 19, 25, 28, 34}) {
             inventory.setItem(slot, gray);
         }
-        inventory.setItem(20, createUiItem(Material.STONE_SWORD, "&8Stone Rack", "filler", List.of()));
-        inventory.setItem(21, createUiItem(Material.STONE_PICKAXE, "&8Stone Rack", "filler", List.of()));
-        inventory.setItem(22, createUiItem(Material.STONE_SHOVEL, "&8Stone Rack", "filler", List.of()));
-        inventory.setItem(23, createUiItem(Material.STONE_AXE, "&8Stone Rack", "filler", List.of()));
-        inventory.setItem(24, createUiItem(Material.STONE_HOE, "&8Stone Rack", "filler", List.of()));
-        inventory.setItem(29, createUiItem(Material.WOODEN_SWORD, "&8Wood Rack", "filler", List.of()));
-        inventory.setItem(30, createUiItem(Material.WOODEN_PICKAXE, "&8Wood Rack", "filler", List.of()));
-        inventory.setItem(31, createUiItem(Material.WOODEN_SHOVEL, "&8Wood Rack", "filler", List.of()));
-        inventory.setItem(32, createUiItem(Material.WOODEN_AXE, "&8Wood Rack", "filler", List.of()));
-        inventory.setItem(33, createUiItem(Material.WOODEN_HOE, "&8Wood Rack", "filler", List.of()));
+        for (int slot : RECIPE_SLOTS) {
+            inventory.setItem(slot, null);
+        }
     }
 
     private void openVanillaAnvil(Player player) {
