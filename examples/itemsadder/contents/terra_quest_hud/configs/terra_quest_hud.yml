@@ -2,18 +2,7 @@ info:
   namespace: terrahud
 
 font_images:
-  quest_progress_positive:
-    suggest_in_command: false
-    path: font/hud/quest_progress/positive.png
-    y_position: -92
-  quest_progress_half:
-    suggest_in_command: false
-    path: font/hud/quest_progress/half.png
-    y_position: -92
-  quest_progress_negative:
-    suggest_in_command: false
-    path: font/hud/quest_progress/negative.png
-    y_position: -92
+  # Top status panels
   top_status_panel:
     suggest_in_command: false
     path: font/hud/top_status/panel.png
@@ -23,35 +12,88 @@ font_images:
     suggest_in_command: false
     path: font/hud/top_status/location_panel.png
     scale_ratio: 14
-    y_position: 9
+    y_position: 11
   top_status_job_panel:
     suggest_in_command: false
     path: font/hud/top_status/job_panel.png
     scale_ratio: 14
-    y_position: 9
+    y_position: 11
   top_status_money_panel:
     suggest_in_command: false
     path: font/hud/top_status/money_panel.png
     scale_ratio: 14
-    y_position: 9
+    y_position: 11
+
+  # Vital status icons
+  # health
+  terra_health_full:
+    suggest_in_command: false
+    path: font/hud/vitals/status/health/full.png
+    scale_ratio: 9
+    y_position: -12
+  terra_health_half:
+    suggest_in_command: false
+    path: font/hud/vitals/status/health/half.png
+    scale_ratio: 9
+    y_position: -12
+  terra_health_empty:
+    suggest_in_command: false
+    path: font/hud/vitals/status/health/empty.png
+    scale_ratio: 9
+    y_position: -12
+  # hunger
+  terra_hunger_full:
+    suggest_in_command: false
+    path: font/hud/vitals/status/hunger/full.png
+    scale_ratio: 9
+    y_position: -12
+  terra_hunger_half:
+    suggest_in_command: false
+    path: font/hud/vitals/status/hunger/half.png
+    scale_ratio: 9
+    y_position: -12
+  terra_hunger_empty:
+    suggest_in_command: false
+    path: font/hud/vitals/status/hunger/empty.png
+    scale_ratio: 9
+    y_position: -12
 
 huds:
-  quest_progress:
+  terra_health_bar:
     enabled: true
     show:
       auto: true
-      creative: true
+      creative: false
       underwater: true
       riding: true
     type: STATUS
-    x_position_pixels: -178
+    x_position_pixels: -54
     direction: RIGHT
     value:
-      player_stat_name: terra_quest_steps
-      start: 0
+      player_stat_name: terra_health_value
+      start: 10
       min: 0
       max: 10
     images:
-      positive: terrahud:quest_progress_positive
-      half: terrahud:quest_progress_half
-      negative: terrahud:quest_progress_negative
+      positive: terrahud:terra_health_full
+      half: terrahud:terra_health_half
+      negative: terrahud:terra_health_empty
+  terra_hunger_bar:
+    enabled: true
+    show:
+      auto: true
+      creative: false
+      underwater: true
+      riding: true
+    type: STATUS
+    x_position_pixels: 54
+    direction: RIGHT
+    value:
+      player_stat_name: terra_hunger_value
+      start: 10
+      min: 0
+      max: 10
+    images:
+      positive: terrahud:terra_hunger_full
+      half: terrahud:terra_hunger_half
+      negative: terrahud:terra_hunger_empty

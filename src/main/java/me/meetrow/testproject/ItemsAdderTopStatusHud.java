@@ -20,9 +20,7 @@ public final class ItemsAdderTopStatusHud {
     private static final String LEGACY_DEFAULT_FORMAT =
             "%panel%%offset%&7LOCATION &f%location% &8| &7JOB &f%job% &7Lv.%level% &8| &7MONEY &f$%money%";
     private static final String DEFAULT_FORMAT =
-            "%location_panel%%location_offset%&f\u2316 %location%:offset_14:"
-                    + "%job_panel%%job_offset%&a\u2692 %job% &7Lv.%level%:offset_14:"
-                    + "%money_panel%%money_offset%&6\u2600 &f%money%";
+            "auto";
 
     private final Testproject plugin;
     private final Map<UUID, BossBar> bars = new ConcurrentHashMap<>();
@@ -101,23 +99,25 @@ public final class ItemsAdderTopStatusHud {
     }
 
     private String buildTitle(Player player) {
-        String template = plugin.getConfig().getString(
-                CONFIG_ROOT + ".format",
-                DEFAULT_FORMAT
-        );
-        if (LEGACY_DEFAULT_FORMAT.equals(template) || template.contains("%panel%") || template.contains("%offset%")) {
-            template = DEFAULT_FORMAT;
+        String template = plugin.getConfig().getString(CONFIG_ROOT + ".format", DEFAULT_FORMAT);
+        if (template == null
+                || template.isBlank()
+                || DEFAULT_FORMAT.equalsIgnoreCase(template)
+                || LEGACY_DEFAULT_FORMAT.equals(template)
+                || template.contains("%panel%")
+                || template.contains("%offset%")) {
+            template = buildFixedPanelTemplate(player);
         }
 
         String text = template
-                .replace("%panel%", plugin.getConfig().getString(CONFIG_ROOT + ".panel-token", ":top_status_panel:"))
-                .replace("%offset%", plugin.getConfig().getString(CONFIG_ROOT + ".content-offset-token", ":offset_-248:"))
-                .replace("%location_panel%", plugin.getConfig().getString(CONFIG_ROOT + ".location-panel-token", ":top_status_location_panel:"))
-                .replace("%job_panel%", plugin.getConfig().getString(CONFIG_ROOT + ".job-panel-token", ":top_status_job_panel:"))
-                .replace("%money_panel%", plugin.getConfig().getString(CONFIG_ROOT + ".money-panel-token", ":top_status_money_panel:"))
-                .replace("%location_offset%", plugin.getConfig().getString(CONFIG_ROOT + ".location-offset-token", ":offset_-112:"))
-                .replace("%job_offset%", plugin.getConfig().getString(CONFIG_ROOT + ".job-offset-token", ":offset_-118:"))
-                .replace("%money_offset%", plugin.getConfig().getString(CONFIG_ROOT + ".money-offset-token", ":offset_-78:"))
+                .replace("%panel%", configString("tokens.panel", "panel-token", ":top_status_panel:"))
+                .replace("%offset%", configString("tokens.content-offset", "content-offset-token", ":offset_-248:"))
+                .replace("%location_panel%", configString("tokens.location-panel", "location-panel-token", ":top_status_location_panel:"))
+                .replace("%job_panel%", configString("tokens.job-panel", "job-panel-token", ":top_status_job_panel:"))
+                .replace("%money_panel%", configString("tokens.money-panel", "money-panel-token", ":top_status_money_panel:"))
+                .replace("%location_offset%", configString("tokens.location-offset", "location-offset-token", ":offset_-112:"))
+                .replace("%job_offset%", configString("tokens.job-offset", "job-offset-token", ":offset_-118:"))
+                .replace("%money_offset%", configString("tokens.money-offset", "money-offset-token", ":offset_-78:"))
                 .replace("%location%", getLocationLabel(player))
                 .replace("%job%", getJobLabel(player))
                 .replace("%level%", String.valueOf(getJobLevel(player)))
@@ -127,6 +127,66 @@ public final class ItemsAdderTopStatusHud {
             text = PlaceholderAPI.setPlaceholders(player, text);
         }
         return replaceItemsAdderFontImages(text);
+    }
+
+    private String buildFixedPanelTemplate(Player player) {
+        int fallbackPanelWidth = Math.max(48, configInt("layout.panel-width-pixels", "panel-width-pixels", 64));
+        int locationPanelWidth = Math.max(48, configInt("layout.location-panel-width-pixels", "location-panel-width-pixels", fallbackPanelWidth));
+        int jobPanelWidth = Math.max(48, configInt("layout.job-panel-width-pixels", "job-panel-width-pixels", fallbackPanelWidth));
+        int moneyPanelWidth = Math.max(48, configInt("layout.money-panel-width-pixels", "money-panel-width-pixels", fallbackPanelWidth));
+        int panelGapWidth = configInt("layout.panel-gap-pixels", "panel-gap-pixels", 8);
+        int locationJobGapWidth = Math.max(0, plugin.getConfig().getInt(
+                CONFIG_ROOT + ".layout.location-job-gap-pixels",
+                configInt("location-job-gap-pixels", "panel-gap-pixels", panelGapWidth)
+        ));
+        int jobMoneyGapWidth = Math.max(0, plugin.getConfig().getInt(
+                CONFIG_ROOT + ".layout.job-money-gap-pixels",
+                configInt("job-money-gap-pixels", "panel-gap-pixels", panelGapWidth)
+        ));
+        int locationTextWidth = estimateHudTextWidth("\u27a3 " + getLocationLabel(player));
+        int jobTextWidth = estimateHudTextWidth("\u2692 " + getJobLabel(player) + " Lv." + getJobLevel(player));
+        int moneyTextWidth = estimateHudTextWidth("\u26c1 " + plugin.formatMoney(plugin.getBalance(player)));
+        int jobTextInset = configInt("layout.job-text-inset-pixels", "job-text-inset-pixels", 6);
+
+        return "%location_panel%" + offset(-locationPanelWidth + centeredTextOffset(locationPanelWidth, locationTextWidth))
+                + "&c\u27a3 &f%location%" + offset(remainingPanelAdvance(locationPanelWidth, locationTextWidth) + locationJobGapWidth)
+                + "%job_panel%" + offset(-jobPanelWidth + centeredTextOffset(jobPanelWidth, jobTextWidth) + jobTextInset)
+                + "&a\u2692 %job% &7Lv.%level%" + offset(remainingPanelAdvance(jobPanelWidth, jobTextWidth) + jobMoneyGapWidth)
+                + "%money_panel%" + offset(-moneyPanelWidth + centeredTextOffset(moneyPanelWidth, moneyTextWidth))
+                + "&6\u26c1 &f%money%";
+    }
+
+    private int centeredTextOffset(int panelWidth, int textWidth) {
+        return Math.max(4, (panelWidth - textWidth) / 2);
+    }
+
+    private int remainingPanelAdvance(int panelWidth, int textWidth) {
+        return Math.max(4, panelWidth - centeredTextOffset(panelWidth, textWidth) - textWidth);
+    }
+
+    private int estimateHudTextWidth(String text) {
+        if (text == null || text.isBlank()) {
+            return 0;
+        }
+        int width = 0;
+        boolean colorCode = false;
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (colorCode) {
+                colorCode = false;
+                continue;
+            }
+            if (character == '&') {
+                colorCode = true;
+                continue;
+            }
+            width += character == ' ' ? 4 : 6;
+        }
+        return width;
+    }
+
+    private String offset(int pixels) {
+        return ":offset_" + pixels + ":";
     }
 
     private String getLocationLabel(Player player) {
@@ -170,5 +230,24 @@ public final class ItemsAdderTopStatusHud {
         } catch (ReflectiveOperationException | LinkageError exception) {
             return text;
         }
+    }
+
+    private String configString(String path, String legacyPath, String defaultValue) {
+        String value = plugin.getConfig().getString(CONFIG_ROOT + "." + path);
+        if (value == null && legacyPath != null) {
+            value = plugin.getConfig().getString(CONFIG_ROOT + "." + legacyPath);
+        }
+        return value != null ? value : defaultValue;
+    }
+
+    private int configInt(String path, String legacyPath, int defaultValue) {
+        String fullPath = CONFIG_ROOT + "." + path;
+        if (plugin.getConfig().contains(fullPath)) {
+            return plugin.getConfig().getInt(fullPath, defaultValue);
+        }
+        if (legacyPath != null) {
+            return plugin.getConfig().getInt(CONFIG_ROOT + "." + legacyPath, defaultValue);
+        }
+        return defaultValue;
     }
 }

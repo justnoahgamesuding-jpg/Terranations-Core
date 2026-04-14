@@ -250,6 +250,7 @@ public final class Testproject extends JavaPlugin {
     private BukkitTask groundItemClearTask;
     private BukkitTask mobStackingTask;
     private ItemsAdderTopStatusHud itemsAdderTopStatusHud;
+    private ItemsAdderVitalBars itemsAdderVitalBars;
     private ProfessionSelectionListener professionSelectionListener;
     private ProfessionAdminGuiListener professionAdminGuiListener;
     private JobConfigGuiListener jobConfigGuiListener;
@@ -575,6 +576,7 @@ public final class Testproject extends JavaPlugin {
         restartStabilityDebugRuntime();
         restartLagReductionRuntime();
         restartItemsAdderTopStatusHud();
+        restartItemsAdderVitalBars();
         ensurePersistentActionBarTask();
         restartClimateRuntime();
         processPendingHardRestartPhase();
@@ -605,6 +607,7 @@ public final class Testproject extends JavaPlugin {
         shutdownPersistentActionBarRuntime();
         shutdownClimateRuntime();
         stopItemsAdderTopStatusHud();
+        stopItemsAdderVitalBars();
         stopTerraTipsRuntime();
         stopRealTimeClock();
         stopTraderRuntime();
@@ -2541,6 +2544,19 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
+    private void restartItemsAdderVitalBars() {
+        if (itemsAdderVitalBars == null) {
+            itemsAdderVitalBars = new ItemsAdderVitalBars(this);
+        }
+        itemsAdderVitalBars.restart();
+    }
+
+    private void stopItemsAdderVitalBars() {
+        if (itemsAdderVitalBars != null) {
+            itemsAdderVitalBars.stop();
+        }
+    }
+
     private void updatePersistentActionBars() {
         long now = System.currentTimeMillis();
         for (Player player : getServer().getOnlinePlayers()) {
@@ -2580,7 +2596,10 @@ public final class Testproject extends JavaPlugin {
     }
 
     private String getPlayerCooldownActionBarText(Player player, long now) {
-        if (player == null || hasBlockDelayBypass(player.getUniqueId()) || !isBlockDelayEnabled()) {
+        if (player == null
+                || hasBlockDelayBypass(player.getUniqueId())
+                || !isBlockDelayEnabled()
+                || shouldSuppressCooldownActionBarForItemsAdderVitalBars()) {
             return null;
         }
 
@@ -2599,6 +2618,11 @@ public final class Testproject extends JavaPlugin {
             segments.add("&aPlace: &f" + formatCompactCooldown(placeRemaining));
         }
         return colorize(String.join(" &8| ", segments));
+    }
+
+    private boolean shouldSuppressCooldownActionBarForItemsAdderVitalBars() {
+        return getConfig().getBoolean("itemsadder-vital-bars.enabled", true)
+                && getConfig().getBoolean("itemsadder-vital-bars.suppress-cooldown-actionbar", true);
     }
 
     private String formatCompactCooldown(long remainingMillis) {
@@ -7486,6 +7510,7 @@ public final class Testproject extends JavaPlugin {
         shutdownOreVisionRuntime();
         shutdownClimateRuntime();
         stopItemsAdderTopStatusHud();
+        stopItemsAdderVitalBars();
         stopTraderRuntime();
         stopMerchantRuntime();
         stopNpcHeadTrackingRuntime();
@@ -7508,6 +7533,7 @@ public final class Testproject extends JavaPlugin {
         restartCountryBorderParticlesRuntime();
         restartLagReductionRuntime();
         restartItemsAdderTopStatusHud();
+        restartItemsAdderVitalBars();
         restartClimateRuntime();
 
         for (Player player : getServer().getOnlinePlayers()) {
@@ -12311,22 +12337,37 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("itemsadder-top-status.enabled", true);
         getConfig().addDefault("itemsadder-top-status.require-itemsadder", true);
         getConfig().addDefault("itemsadder-top-status.update-ticks", 20L);
-        getConfig().addDefault("itemsadder-top-status.panel-token", ":top_status_panel:");
-        getConfig().addDefault("itemsadder-top-status.content-offset-token", ":offset_-248:");
-        getConfig().addDefault("itemsadder-top-status.location-panel-token", ":top_status_location_panel:");
-        getConfig().addDefault("itemsadder-top-status.job-panel-token", ":top_status_job_panel:");
-        getConfig().addDefault("itemsadder-top-status.money-panel-token", ":top_status_money_panel:");
-        getConfig().addDefault("itemsadder-top-status.location-offset-token", ":offset_-112:");
-        getConfig().addDefault("itemsadder-top-status.job-offset-token", ":offset_-118:");
-        getConfig().addDefault("itemsadder-top-status.money-offset-token", ":offset_-78:");
-        getConfig().addDefault("itemsadder-top-status.format",
-                "%location_panel%%location_offset%&f⌖ %location%:offset_14:"
-                        + "%job_panel%%job_offset%&a⚒ %job% &7Lv.%level%:offset_14:"
-                        + "%money_panel%%money_offset%&6☀ &f%money%");
+        getConfig().addDefault("itemsadder-top-status.tokens.panel", ":top_status_panel:");
+        getConfig().addDefault("itemsadder-top-status.tokens.content-offset", ":offset_-248:");
+        getConfig().addDefault("itemsadder-top-status.tokens.location-panel", ":top_status_location_panel:");
+        getConfig().addDefault("itemsadder-top-status.tokens.job-panel", ":top_status_job_panel:");
+        getConfig().addDefault("itemsadder-top-status.tokens.money-panel", ":top_status_money_panel:");
+        getConfig().addDefault("itemsadder-top-status.tokens.location-offset", ":offset_-112:");
+        getConfig().addDefault("itemsadder-top-status.tokens.job-offset", ":offset_-118:");
+        getConfig().addDefault("itemsadder-top-status.tokens.money-offset", ":offset_-78:");
+        getConfig().addDefault("itemsadder-top-status.layout.panel-width-pixels", 64);
+        getConfig().addDefault("itemsadder-top-status.layout.location-panel-width-pixels", 96);
+        getConfig().addDefault("itemsadder-top-status.layout.job-panel-width-pixels", 96);
+        getConfig().addDefault("itemsadder-top-status.layout.money-panel-width-pixels", 96);
+        getConfig().addDefault("itemsadder-top-status.layout.panel-gap-pixels", 8);
+        getConfig().addDefault("itemsadder-top-status.layout.location-job-gap-pixels", 8);
+        getConfig().addDefault("itemsadder-top-status.layout.job-money-gap-pixels", 18);
+        getConfig().addDefault("itemsadder-top-status.layout.job-text-inset-pixels", 6);
+        getConfig().addDefault("itemsadder-top-status.format", "auto");
         getConfig().addDefault("itemsadder-top-status.wilderness-label", "Wilderness");
         getConfig().addDefault("itemsadder-top-status.no-job-label", "No Job");
-        getConfig().addDefault("itemsadder-top-status.max-location-chars", 12);
-        getConfig().addDefault("itemsadder-top-status.max-job-chars", 10);
+        getConfig().addDefault("itemsadder-top-status.max-location-chars", 7);
+        getConfig().addDefault("itemsadder-top-status.max-job-chars", 6);
+        getConfig().addDefault("itemsadder-vital-bars.enabled", true);
+        getConfig().addDefault("itemsadder-vital-bars.require-itemsadder", true);
+        getConfig().addDefault("itemsadder-vital-bars.update-ticks", 10L);
+        getConfig().addDefault("itemsadder-vital-bars.huds.health-id", "terrahud:terra_health_bar");
+        getConfig().addDefault("itemsadder-vital-bars.huds.hunger-id", "terrahud:terra_hunger_bar");
+        getConfig().addDefault("itemsadder-vital-bars.display.health-max", 10);
+        getConfig().addDefault("itemsadder-vital-bars.display.hunger-max", 10);
+        getConfig().addDefault("itemsadder-vital-bars.display.bar-width-pixels", 96);
+        getConfig().addDefault("itemsadder-vital-bars.display.bar-gap-pixels", 12);
+        getConfig().addDefault("itemsadder-vital-bars.suppress-cooldown-actionbar", true);
         getConfig().addDefault("join-leave-messages.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.enabled", true);
         getConfig().addDefault("lag-reduction.ground-item-clear.interval-minutes", 5);
@@ -15786,6 +15827,7 @@ public final class Testproject extends JavaPlugin {
         migrateLegacyMainConfigSection("player-presence-sounds");
         migrateLegacyMainConfigSection("resource-pack");
         migrateLegacyMainConfigSection("itemsadder-top-status");
+        migrateLegacyMainConfigSection("itemsadder-vital-bars");
         migrateLegacyMainConfigSection("join-leave-messages");
         migrateLegacyMainConfigSection("lag-reduction");
         migrateLegacyMainConfigSection("country-sounds");
@@ -15883,6 +15925,8 @@ public final class Testproject extends JavaPlugin {
                 || path.startsWith("resource-pack.")
                 || path.equals("itemsadder-top-status")
                 || path.startsWith("itemsadder-top-status.")
+                || path.equals("itemsadder-vital-bars")
+                || path.startsWith("itemsadder-vital-bars.")
                 || path.startsWith("join-leave-messages.")
                 || path.startsWith("lag-reduction.")
                 || path.startsWith("country-sounds.")

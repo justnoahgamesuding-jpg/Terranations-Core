@@ -1,67 +1,92 @@
-# Core gameplay and server-behavior settings.
-# Use this file for general systems that are not climate, stability,
-# merchant-shop, or territory-map specific.
+# Terra core settings.
+# Climate, stability, territories, merchant shops, quests, jobs, chat, and messages
+# have their own files under src/main/resources.
 
-# Block action delay shared across normal break/place actions.
+# ---------------------------------------------------------------------------
+# Gameplay
+# ---------------------------------------------------------------------------
+
 block-delay:
-  # Enables the global break/place cooldown system.
   enabled: false
-  # Base cooldown in seconds before profession reductions.
   seconds: 30
-
-# Global economy scaling used by Terra-owned prices and rewards.
-economy:
-  enabled: true
-  # Multiplies money rewards earned from Terra systems.
-  reward-scale: 0.20
-  # Multiplies Terra shop and trade prices.
-  price-scale: 0.20
 
 rewards:
   break:
-    # Enables job XP and money reward handling for block breaking.
     enabled: true
-    # Allows money payouts in addition to XP payouts.
     money-enabled: true
 
+economy:
+  enabled: true
+  reward-scale: 0.20
+  price-scale: 0.20
+
+hunger:
+  speed-multiplier: 1.0
+  climate:
+    comfort-min-c: 12.0
+    comfort-max-c: 24.0
+    mild-step-c: 8.0
+    extreme-step-c: 18.0
+    mild-bonus: 0.18
+    extreme-bonus: 0.42
+    max-multiplier: 1.85
+
+profession-procs:
+  farmer:
+    instant-grow:
+      base-chance: 0.02
+      per-level: 0.006
+      max-chance: 0.25
+  lumberjack:
+    instant-grow:
+      base-chance: 0.02
+      per-level: 0.005
+      max-chance: 0.20
+
+country-home:
+  cooldown-seconds: 3600
+
+items:
+  ender-pearls-enabled: true
+  shulker-boxes-enabled: true
+  # Per-material functional overrides written by /terra items <material> ...
+  # Example:
+  # materials:
+  #   CRAFTING_TABLE: false
+  materials: {}
+
+# ---------------------------------------------------------------------------
+# World Systems
+# ---------------------------------------------------------------------------
+
 hostile-mobs:
-  # If false, normal hostile mobs are actively suppressed.
   spawning-enabled: true
 
 phantoms:
   enabled: false
 
-# Regenerates wilderness damage and removes temporary wilderness builds.
 wilderness-regeneration:
   enabled: true
-  # Seconds before a broken wilderness block is restored.
   seconds: 600
-  # Seconds before a placed wilderness block is removed.
   build-decay-seconds: 300
 
-# Admin ore vision overlay radius.
 ore-vision:
   horizontal-radius: 20
   vertical-radius: 12
 
-# Country route-trader timing.
 traders:
   enabled: true
   spawn-minutes-min: 180
   spawn-minutes-max: 360
   active-minutes: 90
-  # Delay before a player can receive another personal trader contract.
   delivery-cooldown-minutes: 30
-  # Lifetime of an accepted contract.
   accepted-quest-minutes: 1440
 
-# Nearby NPC head tracking for Terra trader/merchant entities.
 npc-head-tracking:
   enabled: true
   range-blocks: 5.0
   interval-ticks: 4
 
-# Real-world time syncing for configured worlds.
 realtime-clock:
   enabled: false
   timezone: "Europe/Amsterdam"
@@ -70,7 +95,80 @@ realtime-clock:
   # Leave empty to target every loaded world.
   worlds: []
 
-# Join/leave presence sounds.
+# ---------------------------------------------------------------------------
+# HUD And Resource Pack
+# ---------------------------------------------------------------------------
+
+resource-pack:
+  enabled: false
+  # Direct HTTPS URL to a zip. GitHub raw URLs work for small packs.
+  url: ""
+  # Leave empty unless you calculate a SHA-1 hash for the zip.
+  sha1: ""
+  delay-ticks: 40
+
+itemsadder-top-status:
+  enabled: true
+  require-itemsadder: true
+  update-ticks: 20
+
+  tokens:
+    panel: ":top_status_panel:"
+    content-offset: ":offset_-248:"
+    location-panel: ":top_status_location_panel:"
+    job-panel: ":top_status_job_panel:"
+    money-panel: ":top_status_money_panel:"
+    location-offset: ":offset_-112:"
+    job-offset: ":offset_-118:"
+    money-offset: ":offset_-78:"
+
+  layout:
+    panel-width-pixels: 64
+    location-panel-width-pixels: 96
+    job-panel-width-pixels: 96
+    money-panel-width-pixels: 96
+    panel-gap-pixels: 8
+    location-job-gap-pixels: 8
+    job-money-gap-pixels: 18
+    job-text-inset-pixels: 6
+
+  # Leave this as "auto" so Terra centers each text segment inside equal-width panels.
+  format: "auto"
+  wilderness-label: "Wilderness"
+  no-job-label: "No Job"
+  max-location-chars: 7
+  max-job-chars: 6
+
+itemsadder-vital-bars:
+  enabled: true
+  require-itemsadder: true
+  update-ticks: 10
+
+  huds:
+    health-id: "terrahud:terra_health_bar"
+    hunger-id: "terrahud:terra_hunger_bar"
+
+  display:
+    # STATUS HUDs use 10 icons with half-step float values.
+    health-max: 10
+    hunger-max: 10
+    # 10 status icons at scale_ratio 9 are about 90 HUD pixels wide.
+    bar-width-pixels: 96
+    bar-gap-pixels: 12
+    # Optional exact overrides:
+    # health-x-position-pixels: -54
+    # hunger-x-position-pixels: 54
+
+  # ItemsAdder HUDs and Bukkit actionbars share the same client display channel.
+  suppress-cooldown-actionbar: true
+
+# ---------------------------------------------------------------------------
+# Sounds And Messaging
+# ---------------------------------------------------------------------------
+
+join-leave-messages:
+  enabled: true
+
 player-presence-sounds:
   enabled: true
   join-sound: "BLOCK_AMETHYST_BLOCK_CHIME"
@@ -78,42 +176,29 @@ player-presence-sounds:
   sound-volume: 0.6
   sound-pitch: 1.2
 
-# Optional server resource-pack delivery.
-# Use a direct HTTPS URL to a zip. GitHub raw URLs work for small packs:
-# https://raw.githubusercontent.com/<user>/<repo>/<branch>/terranations_hud_pack.zip
-resource-pack:
-  enabled: false
-  url: ""
-  # Leave empty unless you calculate a SHA-1 hash for the zip.
-  sha1: ""
-  delay-ticks: 40
-
-# Top-center ItemsAdder status HUD.
-# Uses the bossbar text position with transparent bossbar textures in the ItemsAdder pack.
-itemsadder-top-status:
+country-sounds:
   enabled: true
-  # If true, the HUD waits until ItemsAdder is installed.
-  require-itemsadder: true
-  update-ticks: 20
-  panel-token: ":top_status_panel:"
-  content-offset-token: ":offset_-248:"
-  location-panel-token: ":top_status_location_panel:"
-  job-panel-token: ":top_status_job_panel:"
-  money-panel-token: ":top_status_money_panel:"
-  location-offset-token: ":offset_-112:"
-  job-offset-token: ":offset_-118:"
-  money-offset-token: ":offset_-78:"
-  format: "%location_panel%%location_offset%&f⌖ %location%:offset_14:%job_panel%%job_offset%&a⚒ %job% &7Lv.%level%:offset_14:%money_panel%%money_offset%&6☀ &f%money%"
-  wilderness-label: "Wilderness"
-  no-job-label: "No Job"
-  max-location-chars: 12
-  max-job-chars: 10
+  invite-sent-sound: "BLOCK_NOTE_BLOCK_PLING"
+  invite-received-sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
+  transfer-request-sound: "BLOCK_AMETHYST_BLOCK_RESONATE"
+  transfer-accepted-sound: "UI_TOAST_CHALLENGE_COMPLETE"
+  sound-volume: 0.8
+  sound-pitch: 1.0
 
-# Custom server join and leave broadcast formatting.
-join-leave-messages:
+chat-sounds:
   enabled: true
+  message-sound: "BLOCK_NOTE_BLOCK_HAT"
+  sound-volume: 0.25
+  sound-pitch: 1.6
 
-# General lag-reduction systems.
+terra-tips:
+  enabled: true
+  interval-minutes: 8
+
+# ---------------------------------------------------------------------------
+# Performance
+# ---------------------------------------------------------------------------
+
 lag-reduction:
   ground-item-clear:
     enabled: true
@@ -127,66 +212,3 @@ lag-reduction:
   item-merge:
     enabled: true
     radius-blocks: 2.5
-
-# Country invitation and transfer feedback sounds.
-country-sounds:
-  enabled: true
-  invite-sent-sound: "BLOCK_NOTE_BLOCK_PLING"
-  invite-received-sound: "ENTITY_EXPERIENCE_ORB_PICKUP"
-  transfer-request-sound: "BLOCK_AMETHYST_BLOCK_RESONATE"
-  transfer-accepted-sound: "UI_TOAST_CHALLENGE_COMPLETE"
-  sound-volume: 0.8
-  sound-pitch: 1.0
-
-# Local/country/global chat sound feedback.
-chat-sounds:
-  enabled: true
-  message-sound: "BLOCK_NOTE_BLOCK_HAT"
-  sound-volume: 0.25
-  sound-pitch: 1.6
-
-# Passive tip broadcast system.
-terra-tips:
-  enabled: true
-  interval-minutes: 8
-
-# Hunger tuning and climate-based hunger modifiers.
-hunger:
-  speed-multiplier: 1.0
-  climate:
-    comfort-min-c: 12.0
-    comfort-max-c: 24.0
-    mild-step-c: 8.0
-    extreme-step-c: 18.0
-    mild-bonus: 0.18
-    extreme-bonus: 0.42
-    max-multiplier: 1.85
-
-# Passive profession proc chances.
-profession-procs:
-  farmer:
-    instant-grow:
-      base-chance: 0.02
-      per-level: 0.006
-      max-chance: 0.25
-  lumberjack:
-    instant-grow:
-      base-chance: 0.02
-      per-level: 0.005
-      max-chance: 0.20
-
-# Country home teleport cooldown in seconds.
-country-home:
-  cooldown-seconds: 3600
-
-# Hard item restrictions for movement/storage progression.
-items:
-  # If false, players cannot throw or use ender pearls.
-  ender-pearls-enabled: true
-  # If false, players cannot place or open shulker boxes.
-  shulker-boxes-enabled: true
-  # Per-material functional overrides written by /terra items <material> ...
-  # Example:
-  # materials:
-  #   CRAFTING_TABLE: false
-  materials: {}

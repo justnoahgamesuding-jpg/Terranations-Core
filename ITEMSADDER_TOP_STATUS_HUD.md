@@ -47,11 +47,27 @@ itemsadder-top-status:
   location-offset-token: ":offset_-112:"
   job-offset-token: ":offset_-118:"
   money-offset-token: ":offset_-78:"
-  format: "%location_panel%%location_offset%&f⌖ %location%:offset_14:%job_panel%%job_offset%&a⚒ %job% &7Lv.%level%:offset_14:%money_panel%%money_offset%&6☀ &f%money%"
+  panel-width-pixels: 64
+  location-panel-width-pixels: 96
+  job-panel-width-pixels: 96
+  money-panel-width-pixels: 96
+  panel-gap-pixels: 8
+  location-job-gap-pixels: 8
+  job-money-gap-pixels: 18
+  job-text-inset-pixels: 6
+  format: "auto"
   wilderness-label: "Wilderness"
   no-job-label: "No Job"
-  max-location-chars: 12
-  max-job-chars: 10
+  max-location-chars: 7
+  max-job-chars: 6
+```
+
+Auto mode uses these symbols:
+
+```text
+➣ location
+⚒ job
+⛁ money
 ```
 
 If the text is not lined up on a black panel, adjust that panel's offset token.
