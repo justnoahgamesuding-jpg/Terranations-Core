@@ -91,6 +91,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -107,6 +108,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -223,6 +225,7 @@ public final class Testproject extends JavaPlugin {
     private final Map<String, Integer> merchantDailySoldAmounts = new ConcurrentHashMap<>();
     private final Map<UUID, Long> merchantTradeCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Long> legendaryPickaxeBoostUntil = new ConcurrentHashMap<>();
+    private final Map<UUID, JobContract> activeJobContracts = new ConcurrentHashMap<>();
     private final Map<UUID, Long> globalChatCooldowns = new ConcurrentHashMap<>();
     private final Map<String, List<Location>> countryBorderLocationCache = new ConcurrentHashMap<>();
     private final Set<UUID> countryChatEnabledPlayers = ConcurrentHashMap.newKeySet();
@@ -381,6 +384,7 @@ public final class Testproject extends JavaPlugin {
     private NamespacedKey forgedItemKey;
     private NamespacedKey forgedLevelKey;
     private NamespacedKey forgedRarityKey;
+    private NamespacedKey rareContractMaterialKey;
     private final Set<UUID> maintenanceAllowedPlayers = ConcurrentHashMap.newKeySet();
     private final Set<Integer> groundItemClearWarningsSent = ConcurrentHashMap.newKeySet();
     private boolean maintenanceModeEnabled;
@@ -400,6 +404,7 @@ public final class Testproject extends JavaPlugin {
         forgedItemKey = new NamespacedKey(this, "forged_item");
         forgedLevelKey = new NamespacedKey(this, "forged_level");
         forgedRarityKey = new NamespacedKey(this, "forged_rarity");
+        rareContractMaterialKey = new NamespacedKey(this, "rare_contract_material");
         saveDefaultConfigFiles();
         reloadPluginSettings();
         if (!setupLuckPerms()) {
@@ -1578,11 +1583,13 @@ public final class Testproject extends JavaPlugin {
         professionSkillPointBonuses.remove(playerId);
         unlockedProfessionSkillNodes.remove(playerId);
         pendingStarterKitGrants.remove(playerId);
+        activeJobContracts.remove(playerId);
         dataConfig.set("professions." + playerId, null);
         dataConfig.set("profession-progress." + playerId, null);
         dataConfig.set("profession-skill-points." + playerId, null);
         dataConfig.set("profession-skills." + playerId, null);
         dataConfig.set("starter-kits.pending." + playerId, null);
+        dataConfig.set("job-contracts.active." + playerId, null);
         saveDataConfig();
     }
 
@@ -1715,6 +1722,7 @@ public final class Testproject extends JavaPlugin {
             dataConfig.set("personal-guide.playtime-millis." + playerId, null);
             dataConfig.set("personal-guide.skills." + playerId, null);
             dataConfig.set("personal-guide.work-orders." + playerId, null);
+            dataConfig.set("job-contracts.active." + playerId, null);
         }
 
         saveDataConfig();
@@ -2661,27 +2669,14 @@ public final class Testproject extends JavaPlugin {
         meta.getPersistentDataContainer().set(forgedItemKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(forgedLevelKey, PersistentDataType.INTEGER, itemLevel);
         meta.getPersistentDataContainer().set(forgedRarityKey, PersistentDataType.STRING, rarity.name());
-        meta.displayName(legacyComponent(rarity.getColor() + rarity.getDisplayName() + " &f"
-                + formatMaterialName(recipe.result()) + " &8[" + toRomanNumeral(Math.max(1, Math.min(5, itemLevel))) + "]"));
+        meta.displayName(legacyComponent("&8[" + rarity.getColor()
+                + formatMaterialName(recipe.result()) + " " + toRomanNumeral(Math.max(1, Math.min(5, itemLevel))) + "&8]"));
 
-        List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
-        if (!lore.isEmpty()) {
-            lore.add(legacyComponent("&8"));
-        }
-        lore.add(legacyComponent("&6Forged Equipment"));
-        lore.add(legacyComponent("&7Rarity: " + rarity.getColor() + rarity.getDisplayName()));
-        lore.add(legacyComponent("&7Item Level: &f" + toRomanNumeral(Math.max(1, Math.min(5, itemLevel)))));
-        lore.add(legacyComponent("&7Forge Tier: &f" + Math.max(1, recipe.level())));
-        lore.add(legacyComponent("&7Durability: &f+" + (getForgedDurabilityProtectionPercent(rarity, itemLevel)) + "%"));
+        List<Component> lore = new ArrayList<>();
+        lore.add(legacyComponent("&7Tier: " + rarity.getColor() + rarity.getDisplayName()));
+        lore.add(legacyComponent("&7Durability: &f" + getForgedDurabilityProtectionPercent(rarity, itemLevel)));
         String perkLine = getForgedPerkLore(recipe.result(), rarity);
-        if (perkLine != null) {
-            lore.add(legacyComponent("&7Perk: &f" + perkLine));
-        }
-        if (blacksmithLevel > 0) {
-            lore.add(legacyComponent("&7Smith Quality: &fBlacksmith Lv." + blacksmithLevel));
-        } else {
-            lore.add(legacyComponent("&7Smith Quality: &fPublic Forge"));
-        }
+        lore.add(legacyComponent("&7Perk: &f" + (perkLine != null ? perkLine : "None")));
         meta.lore(lore);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         itemStack.setItemMeta(meta);
@@ -2858,6 +2853,320 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
+    public JobContract getActiveJobContract(UUID playerId) {
+        return playerId == null ? null : activeJobContracts.get(playerId);
+    }
+
+    public List<JobContract> generateAvailableJobContracts(UUID playerId) {
+        if (playerId == null) {
+            return List.of();
+        }
+        List<JobContract> contracts = new ArrayList<>();
+        long cycle = System.currentTimeMillis() / (30L * 60_000L);
+        for (Profession profession : getOwnedProfessions(playerId)) {
+            JobContract contract = generateJobContractOffer(playerId, profession, cycle);
+            if (contract != null) {
+                contracts.add(contract);
+            }
+        }
+        return contracts;
+    }
+
+    public long getJobContractRefreshMillisRemaining() {
+        long cycleMillis = 30L * 60_000L;
+        long now = System.currentTimeMillis();
+        long next = ((now / cycleMillis) + 1L) * cycleMillis;
+        return Math.max(0L, next - now);
+    }
+
+    public boolean acceptGeneratedJobContract(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null || !hasProfession(playerId, profession) || activeJobContracts.containsKey(playerId)) {
+            return false;
+        }
+        JobContract offer = generateJobContractOffer(playerId, profession, System.currentTimeMillis() / (30L * 60_000L));
+        if (offer == null) {
+            return false;
+        }
+        JobContract accepted = new JobContract(
+                offer.profession(),
+                offer.requestedMaterial(),
+                offer.requiredAmount(),
+                offer.rewardXp(),
+                offer.rewardMoney(),
+                offer.rareMaterialKey(),
+                offer.rareMaterialAmount(),
+                System.currentTimeMillis()
+        );
+        activeJobContracts.put(playerId, accepted);
+        saveJobContract(playerId);
+        return true;
+    }
+
+    public boolean abandonActiveJobContract(UUID playerId) {
+        if (playerId == null || activeJobContracts.remove(playerId) == null) {
+            return false;
+        }
+        saveJobContract(playerId);
+        return true;
+    }
+
+    public int getJobContractInventoryAmount(Player player, JobContract contract) {
+        if (player == null || contract == null) {
+            return 0;
+        }
+        int amount = 0;
+        for (ItemStack itemStack : player.getInventory().getStorageContents()) {
+            if (itemStack != null && itemStack.getType() == contract.requestedMaterial()) {
+                amount += itemStack.getAmount();
+            }
+        }
+        return amount;
+    }
+
+    public boolean completeActiveJobContract(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        JobContract contract = activeJobContracts.get(playerId);
+        if (contract == null) {
+            return false;
+        }
+        if (getJobContractInventoryAmount(player, contract) < contract.requiredAmount()) {
+            return false;
+        }
+        removeMaterials(player, contract.requestedMaterial(), contract.requiredAmount());
+        if (contract.rewardMoney() > 0.0D) {
+            depositBalance(playerId, contract.rewardMoney());
+        }
+        if (contract.rewardXp() > 0) {
+            rewardProfessionXp(player, contract.profession(), contract.rewardXp());
+        }
+        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(createRareContractMaterial(contract.rareMaterialKey(), contract.rareMaterialAmount()));
+        for (ItemStack leftover : leftovers.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+        activeJobContracts.remove(playerId);
+        saveJobContract(playerId);
+        player.sendMessage(colorize("&6[Contracts] &aCompleted your &f" + getProfessionPlainDisplayName(contract.profession())
+                + "&a contract for &f" + formatMoney(contract.rewardMoney()) + "&a and &f" + contract.rewardXp() + " XP&a."));
+        player.sendMessage(colorize("&7Rare Material: &f" + formatRareContractMaterialName(contract.rareMaterialKey())
+                + " x" + contract.rareMaterialAmount()));
+        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.9F, 1.0F);
+        return true;
+    }
+
+    public String formatRareContractMaterialName(String key) {
+        if (key == null || key.isBlank()) {
+            return "Forge Shard";
+        }
+        return switch (key.toLowerCase(Locale.ROOT)) {
+            case "forge_shard" -> "Forge Shard";
+            case "binding_thread" -> "Binding Thread";
+            case "ancient_core" -> "Ancient Core";
+            default -> Arrays.stream(key.replace('_', ' ').split(" "))
+                    .filter(part -> !part.isBlank())
+                    .map(part -> Character.toUpperCase(part.charAt(0)) + part.substring(1).toLowerCase(Locale.ROOT))
+                    .collect(Collectors.joining(" "));
+        };
+    }
+
+    public ItemStack createRareContractMaterial(String key, int amount) {
+        Material baseMaterial = switch (key == null ? "" : key.toLowerCase(Locale.ROOT)) {
+            case "binding_thread" -> Material.STRING;
+            case "ancient_core" -> Material.PRISMARINE_CRYSTALS;
+            default -> Material.AMETHYST_SHARD;
+        };
+        ItemStack itemStack = new ItemStack(baseMaterial, Math.max(1, amount));
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta != null) {
+            meta.displayName(legacyComponent(switch (key == null ? "" : key.toLowerCase(Locale.ROOT)) {
+                case "binding_thread" -> "&dBinding Thread";
+                case "ancient_core" -> "&6Ancient Core";
+                default -> "&5Forge Shard";
+            }));
+            meta.lore(List.of(
+                    legacyComponent("&7Rare contract material."),
+                    legacyComponent("&7Reserved for future custom items.")
+            ));
+            meta.getPersistentDataContainer().set(rareContractMaterialKey, PersistentDataType.STRING, key == null ? "forge_shard" : key.toLowerCase(Locale.ROOT));
+            itemStack.setItemMeta(meta);
+        }
+        return itemStack;
+    }
+
+    private JobContract generateJobContractOffer(UUID playerId, Profession profession, long cycle) {
+        if (playerId == null || profession == null || !hasProfession(playerId, profession)) {
+            return null;
+        }
+        int level = getProfessionLevel(playerId, profession);
+        List<Material> pool = getJobContractMaterialPool(profession, level);
+        if (pool.isEmpty()) {
+            return null;
+        }
+        int seed = Math.abs((playerId.toString() + ":" + profession.getKey() + ":" + cycle).hashCode());
+        Material requestedMaterial = pool.get(seed % pool.size());
+        int amount = getJobContractRequiredAmount(requestedMaterial, level, seed);
+        int rewardXp = getJobContractRewardXp(profession, requestedMaterial, amount, level);
+        double rewardMoney = getJobContractRewardMoney(requestedMaterial, amount, level);
+        String rareKey = getJobContractRareMaterialKey(seed, level);
+        int rareAmount = getJobContractRareMaterialAmount(level, seed);
+        return new JobContract(profession, requestedMaterial, amount, rewardXp, rewardMoney, rareKey, rareAmount, 0L);
+    }
+
+    private List<Material> getJobContractMaterialPool(Profession profession, int level) {
+        return switch (profession) {
+            case MINER -> buildContractPool(
+                    Material.COBBLESTONE, Material.COAL, Material.RAW_COPPER, Material.RAW_IRON,
+                    level >= 6 ? Material.REDSTONE : null,
+                    level >= 6 ? Material.LAPIS_LAZULI : null,
+                    level >= 8 ? Material.GOLD_INGOT : null,
+                    level >= 9 ? Material.DIAMOND : null,
+                    level >= 10 ? Material.ANCIENT_DEBRIS : null
+            );
+            case LUMBERJACK -> buildContractPool(
+                    Material.OAK_LOG, Material.SPRUCE_LOG, Material.BIRCH_LOG, Material.JUNGLE_LOG,
+                    level >= 4 ? Material.ACACIA_LOG : null,
+                    level >= 5 ? Material.DARK_OAK_LOG : null,
+                    level >= 6 ? Material.MANGROVE_LOG : null,
+                    level >= 7 ? Material.CHERRY_LOG : null,
+                    level >= 8 ? Material.BAMBOO_BLOCK : null
+            );
+            case FARMER -> buildContractPool(
+                    Material.WHEAT, Material.CARROT, Material.POTATO, Material.BREAD,
+                    level >= 3 ? Material.BEETROOT : null,
+                    level >= 4 ? Material.PUMPKIN : null,
+                    level >= 4 ? Material.MELON_SLICE : null,
+                    level >= 5 ? Material.NETHER_WART : null,
+                    level >= 7 ? Material.SWEET_BERRIES : null
+            );
+            case BLACKSMITH -> buildContractPool(
+                    Material.COAL, Material.CHARCOAL, Material.COPPER_INGOT, Material.IRON_INGOT,
+                    level >= 4 ? Material.GOLD_INGOT : null,
+                    level >= 7 ? Material.DIAMOND : null,
+                    level >= 10 ? Material.NETHERITE_SCRAP : null
+            );
+            case TRADER -> buildContractPool(
+                    Material.PAPER, Material.LEATHER, Material.BREAD, Material.EMERALD,
+                    level >= 4 ? Material.IRON_INGOT : null,
+                    level >= 6 ? Material.GOLD_INGOT : null,
+                    level >= 8 ? Material.DIAMOND : null
+            );
+            default -> List.of();
+        };
+    }
+
+    private List<Material> buildContractPool(Material... materials) {
+        List<Material> pool = new ArrayList<>();
+        for (Material material : materials) {
+            if (material != null && !material.isAir()) {
+                pool.add(material);
+            }
+        }
+        return pool;
+    }
+
+    private int getJobContractRequiredAmount(Material material, int level, int seed) {
+        int base = switch (material) {
+            case DIAMOND, ANCIENT_DEBRIS, NETHERITE_SCRAP -> 2;
+            case GOLD_INGOT, EMERALD, REDSTONE, LAPIS_LAZULI -> 6;
+            case IRON_INGOT, RAW_IRON, RAW_COPPER, COPPER_INGOT, CHARCOAL, COAL -> 12;
+            case OAK_LOG, SPRUCE_LOG, BIRCH_LOG, JUNGLE_LOG, ACACIA_LOG, DARK_OAK_LOG, MANGROVE_LOG, CHERRY_LOG, BAMBOO_BLOCK -> 16;
+            case WHEAT, CARROT, POTATO, BEETROOT, BREAD, MELON_SLICE, SWEET_BERRIES -> 20;
+            case PUMPKIN, NETHER_WART -> 12;
+            default -> 10;
+        };
+        return Math.max(1, base + Math.max(0, level / 3) + (seed % 4));
+    }
+
+    private int getJobContractRewardXp(Profession profession, Material material, int amount, int level) {
+        int materialValue = switch (material) {
+            case DIAMOND, ANCIENT_DEBRIS, NETHERITE_SCRAP -> 28;
+            case GOLD_INGOT, EMERALD -> 20;
+            case IRON_INGOT, RAW_IRON, RAW_COPPER, COPPER_INGOT, REDSTONE, LAPIS_LAZULI, NETHER_WART -> 14;
+            default -> 9;
+        };
+        return Math.max(8, materialValue + amount + level * 2 + profession.ordinal() * 2);
+    }
+
+    private double getJobContractRewardMoney(Material material, int amount, int level) {
+        double materialValue = switch (material) {
+            case DIAMOND, ANCIENT_DEBRIS, NETHERITE_SCRAP -> 6.5D;
+            case GOLD_INGOT, EMERALD -> 4.5D;
+            case IRON_INGOT, RAW_IRON, RAW_COPPER, COPPER_INGOT, REDSTONE, LAPIS_LAZULI -> 2.5D;
+            default -> 1.2D;
+        };
+        return roundMoney((amount * materialValue) + (level * 3.0D));
+    }
+
+    private String getJobContractRareMaterialKey(int seed, int level) {
+        if (level >= 9 && seed % 5 == 0) {
+            return "ancient_core";
+        }
+        if (level >= 5 && seed % 3 == 0) {
+            return "binding_thread";
+        }
+        return "forge_shard";
+    }
+
+    private int getJobContractRareMaterialAmount(int level, int seed) {
+        return Math.max(1, 1 + (level >= 8 ? 1 : 0) + (seed % 2 == 0 ? 1 : 0));
+    }
+
+    private void removeMaterials(Player player, Material material, int amount) {
+        if (player == null || material == null || amount <= 0) {
+            return;
+        }
+        int remaining = amount;
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int i = 0; i < contents.length && remaining > 0; i++) {
+            ItemStack itemStack = contents[i];
+            if (itemStack == null || itemStack.getType() != material) {
+                continue;
+            }
+            int taken = Math.min(remaining, itemStack.getAmount());
+            itemStack.setAmount(itemStack.getAmount() - taken);
+            remaining -= taken;
+            if (itemStack.getAmount() <= 0) {
+                contents[i] = null;
+            }
+        }
+        player.getInventory().setStorageContents(contents);
+    }
+
+    private void reloadJobContracts() {
+        activeJobContracts.clear();
+        ConfigurationSection section = dataConfig.getConfigurationSection("job-contracts.active");
+        if (section == null) {
+            return;
+        }
+        for (String playerKey : section.getKeys(false)) {
+            try {
+                UUID playerId = UUID.fromString(playerKey);
+                JobContract contract = JobContract.fromConfig(section.getConfigurationSection(playerKey));
+                if (contract != null) {
+                    activeJobContracts.put(playerId, contract);
+                }
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+    }
+
+    private void saveJobContract(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        String path = "job-contracts.active." + playerId;
+        JobContract contract = activeJobContracts.get(playerId);
+        if (contract == null) {
+            dataConfig.set(path, null);
+        } else {
+            ConfigurationSection section = dataConfig.createSection(path);
+            contract.save(section);
+        }
+        saveDataConfig();
+    }
+
     public String getForgedPerkLore(Material material, ForgedRarity rarity) {
         if (material == null || rarity == null) {
             return null;
@@ -2868,7 +3177,7 @@ public final class Testproject extends JavaPlugin {
                 case LEGENDARY -> "Ore Surge: Fortune III for 30s";
                 case EPIC -> "Deep Cut: higher ore yield chance";
                 case RARE -> "Fine Edge: steadier mining";
-                default -> "Forged mining quality";
+                default -> null;
             };
         }
         if (name.endsWith("_SWORD")) {
@@ -2876,7 +3185,7 @@ public final class Testproject extends JavaPlugin {
                 case LEGENDARY -> "Battle Rhythm: Strength I burst on hit";
                 case EPIC -> "Edge Flow: Speed burst on hit";
                 case RARE -> "Duel Focus: sharper combat uptime";
-                default -> "Forged combat quality";
+                default -> null;
             };
         }
         if (name.endsWith("_AXE")) {
@@ -2884,7 +3193,7 @@ public final class Testproject extends JavaPlugin {
                 case LEGENDARY -> "Timber Rush: bonus logs on chop";
                 case EPIC -> "Heavy Swing: extra wood drops";
                 case RARE -> "Woodcaller: steadier lumber flow";
-                default -> "Forged chop quality";
+                default -> null;
             };
         }
         if (name.endsWith("_HOE")) {
@@ -2892,7 +3201,7 @@ public final class Testproject extends JavaPlugin {
                 case LEGENDARY -> "Harvest Bloom: crop speed burst";
                 case EPIC -> "Field Step: speed after harvest";
                 case RARE -> "Green Thumb: smoother harvest rhythm";
-                default -> "Forged harvest quality";
+                default -> null;
             };
         }
         if (name.endsWith("_HELMET")
@@ -2903,10 +3212,10 @@ public final class Testproject extends JavaPlugin {
                 case LEGENDARY -> "Bulwark: Resistance burst when struck";
                 case EPIC -> "Guardstep: Speed burst when struck";
                 case RARE -> "Iron Will: steadier defense";
-                default -> "Forged defense quality";
+                default -> null;
             };
         }
-        return "Forged quality bonus";
+        return null;
     }
 
     public void activateLegendaryPickaxeBoost(Player player) {
@@ -13331,6 +13640,7 @@ public final class Testproject extends JavaPlugin {
         reloadTutorialQuestDefinitions();
         reloadTutorialStages();
         reloadAssignedQuestStates();
+        reloadJobContracts();
         reloadFixedOreBlocks();
         reloadFurnaceSessions();
         reloadTraderData();

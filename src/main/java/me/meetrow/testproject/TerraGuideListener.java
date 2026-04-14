@@ -27,6 +27,10 @@ public final class TerraGuideListener implements Listener {
     private static final int CLOSE_SLOT = 49;
     private static final int BACK_SLOT = 45;
     private static final int SKILL_SELECTOR_INFO_SLOT = 4;
+    private static final int CONTRACT_ACTIVE_SLOT = 13;
+    private static final int CONTRACT_REROLL_INFO_SLOT = 40;
+    private static final int CONTRACT_ABANDON_SLOT = 41;
+    private static final int[] CONTRACT_OFFER_SLOTS = {20, 22, 24, 31, 33};
 
     private final Testproject plugin;
 
@@ -72,7 +76,7 @@ public final class TerraGuideListener implements Listener {
             case MAIN -> handleMainClick(player, event.getSlot());
             case STATS -> handleBackClose(player, event.getSlot());
             case SKILL_SELECTOR -> handleSkillSelectorClick(player, event.getSlot());
-            case CONTRACTS -> handleContractsClick(player, event.getSlot());
+            case CONTRACTS -> handleContractsClick(player, event);
         }
     }
 
@@ -165,18 +169,54 @@ public final class TerraGuideListener implements Listener {
         fillEmpty(inventory);
 
         UUID playerId = player.getUniqueId();
-        inventory.setItem(4, createItem(Material.WRITABLE_BOOK, "&6Active Quest", List.of(
-                "&7Title: &f" + plugin.getTutorialQuestTitlePlain(playerId),
-                "&7Objective: &f" + plugin.getTutorialQuestObjectivePlain(playerId),
-                plugin.getTutorialQuestHintPlain(playerId).isBlank() ? "&7Hint: &fNone" : "&7Hint: &f" + plugin.getTutorialQuestHintPlain(playerId),
-                "&7Progress: &f" + plugin.getTutorialQuestProgressText(playerId)
+        inventory.setItem(4, createItem(Material.WRITABLE_BOOK, "&6Job Contracts", List.of(
+                "&7Take one active contract at a time.",
+                "&7Deliver the requested goods for",
+                "&7money, job XP, and rare materials."
         )));
-        inventory.setItem(20, createItem(Material.CLOCK, "&eContracts Rework Pending", List.of(
-                "&7The old skill tree contract loop",
-                "&7has been removed.",
-                "",
-                "&7This page will be rebuilt around",
-                "&7job-based contracts next."
+        JobContract activeContract = plugin.getActiveJobContract(playerId);
+        if (activeContract == null) {
+            inventory.setItem(CONTRACT_ACTIVE_SLOT, createItem(Material.BARRIER, "&7No Active Contract", List.of(
+                    "&7Accept a contract from one of your",
+                    "&7owned professions below."
+            )));
+        } else {
+            int currentAmount = plugin.getJobContractInventoryAmount(player, activeContract);
+            inventory.setItem(CONTRACT_ACTIVE_SLOT, createItem(activeContract.requestedMaterial(), "&aActive Contract", List.of(
+                    "&7Job: &f" + plugin.getProfessionPlainDisplayName(activeContract.profession()),
+                    "&7Deliver: &f" + activeContract.requiredAmount() + "x " + plugin.formatMaterialName(activeContract.requestedMaterial()),
+                    "&7Progress: &f" + Math.min(currentAmount, activeContract.requiredAmount()) + "&7/&f" + activeContract.requiredAmount(),
+                    "&7Reward: &f$" + plugin.formatMoney(activeContract.rewardMoney()) + " &8+ &f" + activeContract.rewardXp() + " XP",
+                    "&7Rare Material: &f" + plugin.formatRareContractMaterialName(activeContract.rareMaterialKey()) + " x" + activeContract.rareMaterialAmount(),
+                    "",
+                    currentAmount >= activeContract.requiredAmount()
+                            ? "&eClick to turn in this contract."
+                            : "&7Gather the goods, then come back."
+            )));
+            inventory.setItem(CONTRACT_ABANDON_SLOT, createItem(Material.BARRIER, "&cAbandon Contract", List.of(
+                    "&7Drop your current contract.",
+                    "&7Useful if you want to wait for",
+                    "&7the next rotation."
+            )));
+        }
+
+        List<JobContract> offers = plugin.generateAvailableJobContracts(playerId);
+        for (int i = 0; i < offers.size() && i < CONTRACT_OFFER_SLOTS.length; i++) {
+            JobContract offer = offers.get(i);
+            inventory.setItem(CONTRACT_OFFER_SLOTS[i], createItem(
+                    offer.requestedMaterial(),
+                    "&e" + plugin.getProfessionPlainDisplayName(offer.profession()) + " Contract",
+                    List.of(
+                            "&7Deliver: &f" + offer.requiredAmount() + "x " + plugin.formatMaterialName(offer.requestedMaterial()),
+                            "&7Reward: &f$" + plugin.formatMoney(offer.rewardMoney()) + " &8+ &f" + offer.rewardXp() + " XP",
+                            "&7Rare Material: &f" + plugin.formatRareContractMaterialName(offer.rareMaterialKey()) + " x" + offer.rareMaterialAmount(),
+                            "",
+                            activeContract == null ? "&eClick to accept." : "&7Finish or abandon your active contract first."
+                    )));
+        }
+        inventory.setItem(CONTRACT_REROLL_INFO_SLOT, createItem(Material.CLOCK, "&bOffer Rotation", List.of(
+                "&7Contract offers rotate automatically.",
+                "&7Next refresh in: &f" + plugin.formatLongDurationWords(plugin.getJobContractRefreshMillisRemaining())
         )));
 
         inventory.setItem(BACK_SLOT, createItem(Material.ARROW, "&eBack", List.of("&7Return to the main guide menu.")));
@@ -271,8 +311,51 @@ public final class TerraGuideListener implements Listener {
         }
     }
 
-    private void handleContractsClick(Player player, int slot) {
-        handleBackClose(player, slot);
+    private void handleContractsClick(Player player, InventoryClickEvent event) {
+        int slot = event.getSlot();
+        if (handleBackClose(player, slot)) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        JobContract activeContract = plugin.getActiveJobContract(playerId);
+        if (slot == CONTRACT_ACTIVE_SLOT && activeContract != null) {
+            if (plugin.completeActiveJobContract(player)) {
+                openContractsMenu(player);
+            } else {
+                int currentAmount = plugin.getJobContractInventoryAmount(player, activeContract);
+                player.sendMessage(plugin.colorize("&cYou still need &f"
+                        + Math.max(0, activeContract.requiredAmount() - currentAmount) + "&c more "
+                        + plugin.formatMaterialName(activeContract.requestedMaterial()) + "."));
+            }
+            return;
+        }
+        if (slot == CONTRACT_ABANDON_SLOT && activeContract != null) {
+            plugin.abandonActiveJobContract(playerId);
+            player.sendMessage(plugin.colorize("&cYou abandoned your active contract."));
+            openContractsMenu(player);
+            return;
+        }
+        for (int i = 0; i < CONTRACT_OFFER_SLOTS.length; i++) {
+            if (slot != CONTRACT_OFFER_SLOTS[i]) {
+                continue;
+            }
+            List<JobContract> offers = plugin.generateAvailableJobContracts(playerId);
+            if (i >= offers.size()) {
+                return;
+            }
+            if (activeContract != null) {
+                player.sendMessage(plugin.colorize("&cFinish or abandon your active contract first."));
+                return;
+            }
+            JobContract offer = offers.get(i);
+            if (plugin.acceptGeneratedJobContract(playerId, offer.profession())) {
+                player.sendMessage(plugin.colorize("&aAccepted a &f" + plugin.getProfessionPlainDisplayName(offer.profession())
+                        + "&a contract. Deliver &f" + offer.requiredAmount() + "x "
+                        + plugin.formatMaterialName(offer.requestedMaterial()) + "&a."));
+                openContractsMenu(player);
+            }
+            return;
+        }
     }
 
     private boolean handleBackClose(Player player, int slot) {
