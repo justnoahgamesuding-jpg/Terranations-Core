@@ -3,9 +3,16 @@ package me.meetrow.testproject;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.OfflinePlayer;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 public class TerraPlaceholderExpansion extends PlaceholderExpansion {
+    private static final DateTimeFormatter SERVER_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter SERVER_DATE_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yy");
+    private static final DateTimeFormatter SERVER_DATETIME_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yy HH:mm");
+
     private final Testproject plugin;
 
     public TerraPlaceholderExpansion(Testproject plugin) {
@@ -42,6 +49,9 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
         return switch (normalized) {
             case "balance" -> getBalancePlaceholder(player);
             case "xp" -> String.valueOf(player.getPlayer() != null ? player.getPlayer().getTotalExperience() : 0);
+            case "server_time", "local_time" -> getServerTimePlaceholder();
+            case "server_date", "local_date" -> getServerDatePlaceholder();
+            case "server_datetime", "local_datetime" -> getServerDateTimePlaceholder();
             case "player_country" -> getPlayerCountryPlaceholder(player);
             case "player_country_level" -> getPlayerCountryLevelPlaceholder(player);
             case "player_countrytag" -> getPlayerCountryTagPlaceholder(player);
@@ -87,6 +97,18 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
         }
 
         return plugin.formatMoney(plugin.getBalance(player));
+    }
+
+    private String getServerTimePlaceholder() {
+        return SERVER_TIME_FORMAT.format(LocalDateTime.now(ZoneId.systemDefault()));
+    }
+
+    private String getServerDatePlaceholder() {
+        return SERVER_DATE_FORMAT.format(LocalDateTime.now(ZoneId.systemDefault()));
+    }
+
+    private String getServerDateTimePlaceholder() {
+        return SERVER_DATETIME_FORMAT.format(LocalDateTime.now(ZoneId.systemDefault()));
     }
 
     private String getPlayerCountryPlaceholder(OfflinePlayer player) {
