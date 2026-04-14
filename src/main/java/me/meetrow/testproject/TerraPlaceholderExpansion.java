@@ -52,6 +52,11 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
             case "server_time", "local_time" -> getServerTimePlaceholder();
             case "server_date", "local_date" -> getServerDatePlaceholder();
             case "server_datetime", "local_datetime" -> getServerDateTimePlaceholder();
+            case "climate_temp", "climate_temperature" -> getClimateTemperaturePlaceholder(player);
+            case "climate_name", "climate_type" -> getClimateNamePlaceholder(player);
+            case "climate_season" -> getClimateSeasonPlaceholder(player);
+            case "climate_raining" -> getClimateRainingPlaceholder(player);
+            case "climate_freezing" -> getClimateFreezingPlaceholder(player);
             case "player_country" -> getPlayerCountryPlaceholder(player);
             case "player_country_level" -> getPlayerCountryLevelPlaceholder(player);
             case "player_countrytag" -> getPlayerCountryTagPlaceholder(player);
@@ -109,6 +114,41 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
 
     private String getServerDateTimePlaceholder() {
         return SERVER_DATETIME_FORMAT.format(LocalDateTime.now(ZoneId.systemDefault()));
+    }
+
+    private ClimateSnapshot getClimateSnapshot(OfflinePlayer player) {
+        if (player.getPlayer() == null) {
+            return null;
+        }
+        return plugin.getClimate(player.getPlayer().getLocation());
+    }
+
+    private String getClimateTemperaturePlaceholder(OfflinePlayer player) {
+        ClimateSnapshot snapshot = getClimateSnapshot(player);
+        if (snapshot == null) {
+            return plugin.formatTemperature(20.0D);
+        }
+        return plugin.formatTemperature(snapshot.temperatureCelsius());
+    }
+
+    private String getClimateNamePlaceholder(OfflinePlayer player) {
+        ClimateSnapshot snapshot = getClimateSnapshot(player);
+        return snapshot != null ? snapshot.climateName() : "Temperate";
+    }
+
+    private String getClimateSeasonPlaceholder(OfflinePlayer player) {
+        ClimateSnapshot snapshot = getClimateSnapshot(player);
+        return snapshot != null ? snapshot.season().getDisplayName() : "Spring";
+    }
+
+    private String getClimateRainingPlaceholder(OfflinePlayer player) {
+        ClimateSnapshot snapshot = getClimateSnapshot(player);
+        return String.valueOf(snapshot != null && snapshot.raining());
+    }
+
+    private String getClimateFreezingPlaceholder(OfflinePlayer player) {
+        ClimateSnapshot snapshot = getClimateSnapshot(player);
+        return String.valueOf(snapshot != null && snapshot.freezing());
     }
 
     private String getPlayerCountryPlaceholder(OfflinePlayer player) {
