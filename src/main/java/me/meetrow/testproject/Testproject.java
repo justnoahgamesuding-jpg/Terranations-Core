@@ -193,6 +193,7 @@ public final class Testproject extends JavaPlugin {
     private final Map<UUID, Boolean> secondaryProfessionUnlockOverrides = new ConcurrentHashMap<>();
     private final Map<UUID, Profession> developmentModeProfessions = new ConcurrentHashMap<>();
     private final Map<UUID, Map<Profession, ProfessionProgress>> professionProgress = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<Profession, Integer>> professionSkillPointBonuses = new ConcurrentHashMap<>();
     private final Map<Profession, Map<String, ProfessionSkillNode>> professionSkillNodes = new EnumMap<>(Profession.class);
     private final Map<UUID, Map<Profession, Set<String>>> unlockedProfessionSkillNodes = new ConcurrentHashMap<>();
     private final Map<UUID, Map<Profession, Double>> pendingFractionalProfessionXp = new ConcurrentHashMap<>();
@@ -688,6 +689,7 @@ public final class Testproject extends JavaPlugin {
         secondaryProfessionUnlockOverrides.clear();
         developmentModeProfessions.clear();
         professionProgress.clear();
+        professionSkillPointBonuses.clear();
         professionSkillNodes.clear();
         unlockedProfessionSkillNodes.clear();
         tutorialStages.clear();
@@ -1565,10 +1567,12 @@ public final class Testproject extends JavaPlugin {
         secondaryProfessionUnlockOverrides.remove(playerId);
         developmentModeProfessions.remove(playerId);
         professionProgress.remove(playerId);
+        professionSkillPointBonuses.remove(playerId);
         unlockedProfessionSkillNodes.remove(playerId);
         pendingStarterKitGrants.remove(playerId);
         dataConfig.set("professions." + playerId, null);
         dataConfig.set("profession-progress." + playerId, null);
+        dataConfig.set("profession-skill-points." + playerId, null);
         dataConfig.set("profession-skills." + playerId, null);
         dataConfig.set("starter-kits.pending." + playerId, null);
         saveDataConfig();
@@ -1946,8 +1950,39 @@ public final class Testproject extends JavaPlugin {
             return 0;
         }
         int earned = Math.max(0, getProfessionLevel(playerId, profession) - 1);
+        int bonus = getProfessionSkillPointBonus(playerId, profession);
         int spent = getUnlockedProfessionSkillNodeKeys(playerId, profession).size();
-        return Math.max(0, earned - spent);
+        return Math.max(0, earned + bonus - spent);
+    }
+
+    public int getProfessionSkillPointBonus(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null) {
+            return 0;
+        }
+        Map<Profession, Integer> byProfession = professionSkillPointBonuses.get(playerId);
+        if (byProfession == null) {
+            return 0;
+        }
+        return Math.max(0, byProfession.getOrDefault(profession, 0));
+    }
+
+    public boolean adminAddProfessionSkillPoints(UUID playerId, Profession profession, int amount) {
+        if (playerId == null || profession == null || amount == 0 || !hasProfession(playerId, profession)) {
+            return false;
+        }
+        Map<Profession, Integer> byProfession =
+                professionSkillPointBonuses.computeIfAbsent(playerId, ignored -> new EnumMap<>(Profession.class));
+        int updated = Math.max(0, byProfession.getOrDefault(profession, 0) + amount);
+        if (updated <= 0) {
+            byProfession.remove(profession);
+            if (byProfession.isEmpty()) {
+                professionSkillPointBonuses.remove(playerId);
+            }
+        } else {
+            byProfession.put(profession, updated);
+        }
+        saveProfessionSkillPointBonuses(playerId, profession);
+        return true;
     }
 
     public boolean canUnlockProfessionSkillNode(UUID playerId, Profession profession, ProfessionSkillNode node) {
@@ -12954,6 +12989,7 @@ public final class Testproject extends JavaPlugin {
         reloadProfessions();
         reloadProfessionProgress();
         reloadProfessionSkillDefinitions();
+        reloadProfessionSkillPointBonuses();
         reloadProfessionSkillProgress();
         reloadCountryBorderParticlePreferences();
         reloadStabilityMeterPreferences();
@@ -13390,6 +13426,45 @@ public final class Testproject extends JavaPlugin {
                 }
             }
             professionSkillNodes.put(profession, nodesByKey);
+        }
+    }
+
+    private void reloadProfessionSkillPointBonuses() {
+        professionSkillPointBonuses.clear();
+
+        ConfigurationSection section = dataConfig.getConfigurationSection("profession-skill-points");
+        if (section == null) {
+            return;
+        }
+
+        for (String playerKey : section.getKeys(false)) {
+            UUID playerId;
+            try {
+                playerId = UUID.fromString(playerKey);
+            } catch (IllegalArgumentException exception) {
+                continue;
+            }
+
+            ConfigurationSection playerSection = section.getConfigurationSection(playerKey);
+            if (playerSection == null) {
+                continue;
+            }
+
+            Map<Profession, Integer> bonusesByProfession = new EnumMap<>(Profession.class);
+            for (String professionKey : playerSection.getKeys(false)) {
+                Profession profession = Profession.fromKey(professionKey);
+                if (profession == null) {
+                    continue;
+                }
+                int amount = Math.max(0, playerSection.getInt(professionKey, 0));
+                if (amount > 0) {
+                    bonusesByProfession.put(profession, amount);
+                }
+            }
+
+            if (!bonusesByProfession.isEmpty()) {
+                professionSkillPointBonuses.put(playerId, bonusesByProfession);
+            }
         }
     }
 
@@ -16129,6 +16204,18 @@ public final class Testproject extends JavaPlugin {
         } else {
             dataConfig.set(path, new ArrayList<>(unlocked));
         }
+        saveDataConfig();
+    }
+
+    private void saveProfessionSkillPointBonuses(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null) {
+            return;
+        }
+
+        Map<Profession, Integer> byProfession = professionSkillPointBonuses.get(playerId);
+        int amount = byProfession != null ? Math.max(0, byProfession.getOrDefault(profession, 0)) : 0;
+        String path = "profession-skill-points." + playerId + "." + profession.getKey();
+        dataConfig.set(path, amount > 0 ? amount : null);
         saveDataConfig();
     }
 

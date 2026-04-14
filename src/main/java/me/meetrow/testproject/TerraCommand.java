@@ -568,7 +568,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (action.equals("setlevel") || action.equals("setxp")) {
+        if (action.equals("setlevel") || action.equals("setxp") || action.equals("addskillpoints")) {
             if (args.length < 5) {
                 sender.sendMessage(plugin.getMessage("terra.jobs.admin-usage"));
                 return true;
@@ -602,6 +602,19 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
 
             if (value < 0) {
                 sender.sendMessage(plugin.getMessage("terra.jobs.invalid-xp-min"));
+                return true;
+            }
+            if (action.equals("addskillpoints")) {
+                if (!plugin.adminAddProfessionSkillPoints(target.getUniqueId(), profession, value)) {
+                    sender.sendMessage(plugin.getMessage("profession.not-owned"));
+                    return true;
+                }
+                sender.sendMessage(Component.text(
+                        "Added " + value + " skill point(s) to " + plugin.safeOfflineName(target)
+                                + " for " + plugin.getProfessionPlainDisplayName(profession)
+                                + ". Total bonus: " + plugin.getProfessionSkillPointBonus(target.getUniqueId(), profession),
+                        NamedTextColor.GREEN
+                ));
                 return true;
             }
             if (!plugin.adminSetProfessionXp(target.getUniqueId(), profession, value)) {
@@ -3479,14 +3492,14 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
             List<String> options = new ArrayList<>(getKnownPlayerNames());
-            options.addAll(List.of("info", "setprimary", "setsecondary", "setactive", "setlevel", "setxp", "clearsecondary", "clearall"));
+            options.addAll(List.of("info", "setprimary", "setsecondary", "setactive", "setlevel", "setxp", "addskillpoints", "clearsecondary", "clearall"));
             return partialMatches(args[1], options);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("admin")) {
             return partialMatches(args[2], getKnownPlayerNames());
         }
         if (args.length == 4 && args[0].equalsIgnoreCase("admin")
-                && List.of("setprimary", "setsecondary", "setactive", "setlevel", "setxp").contains(args[1].toLowerCase(Locale.ROOT))) {
+                && List.of("setprimary", "setsecondary", "setactive", "setlevel", "setxp", "addskillpoints").contains(args[1].toLowerCase(Locale.ROOT))) {
             return partialMatches(args[3], getAllJobKeys());
         }
         return Collections.emptyList();
