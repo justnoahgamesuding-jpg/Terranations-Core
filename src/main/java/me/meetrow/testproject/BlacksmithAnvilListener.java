@@ -13,6 +13,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
@@ -22,6 +23,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -32,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BlacksmithAnvilListener implements Listener {
+    private static final String RENAME_ANVIL_TITLE = "Rename Anvil";
     private static final int GUI_SIZE = 54;
     private static final int INFO_SLOT = 4;
     private static final int FORGE_STATUS_SLOT = 7;
@@ -84,6 +87,11 @@ public class BlacksmithAnvilListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getView().getTopInventory().getType() == InventoryType.ANVIL
+                && PlainTextComponentSerializer.plainText().serialize(event.getView().title()).equals(RENAME_ANVIL_TITLE)) {
+            handleRenameAnvilClick(event);
+            return;
+        }
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
@@ -110,12 +118,6 @@ public class BlacksmithAnvilListener implements Listener {
         }
         if (event.getSlot() == MERGE_SLOT) {
             openMergeMenu(player);
-            return;
-        }
-
-        BlacksmithCategory category = BlacksmithCategory.fromSlot(event.getSlot());
-        if (category != null) {
-            openMenu(player, category);
             return;
         }
 
@@ -162,10 +164,38 @@ public class BlacksmithAnvilListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInventoryDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getType() == InventoryType.ANVIL
+                && PlainTextComponentSerializer.plainText().serialize(event.getView().title()).equals(RENAME_ANVIL_TITLE)) {
+            if (event.getRawSlots().contains(1) || event.getRawSlots().contains(2)) {
+                event.setCancelled(true);
+            }
+            return;
+        }
         if (event.getView().getTopInventory().getHolder() instanceof BlacksmithMenuHolder
                 || event.getView().getTopInventory().getHolder() instanceof MergeMenuHolder) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPrepareAnvil(PrepareAnvilEvent event) {
+        if (!PlainTextComponentSerializer.plainText().serialize(event.getView().title()).equals(RENAME_ANVIL_TITLE)) {
+            return;
+        }
+        ItemStack base = event.getInventory().getFirstItem();
+        ItemStack extra = event.getInventory().getSecondItem();
+        if (base == null || base.getType().isAir() || (extra != null && !extra.getType().isAir())) {
+            event.setResult(null);
+            return;
+        }
+        String renameText = event.getView().getRenameText();
+        if (renameText == null || renameText.isBlank()) {
+            event.setResult(null);
+            return;
+        }
+        ItemStack result = base.clone();
+        result.editMeta(meta -> meta.displayName(plugin.legacyComponent("&f" + renameText)));
+        event.setResult(result);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -190,29 +220,18 @@ public class BlacksmithAnvilListener implements Listener {
         );
 
         fillForgeLayout(inventory);
-        for (BlacksmithCategory value : BlacksmithCategory.values()) {
-            inventory.setItem(value.slot, createCategoryItem(player, value, value == category));
-        }
-        inventory.setItem(INFO_SLOT, createInfoItem(player, category));
-        inventory.setItem(FORGE_STATUS_SLOT, createForgeStatusItem(player));
-        inventory.setItem(CATEGORY_INFO_SLOT, createSimpleItem(Material.CHAIN, "&6Forge Station Layout", List.of(
-                "&7Top row: forge groups",
-                "&7Center: live forge recipes",
-                "&7Bottom: merge station and exit"
+        inventory.setItem(NORMAL_ANVIL_SLOT, createSimpleItem(Material.ANVIL, "&fRename Anvil", List.of(
+                "&7Open a rename-only anvil.",
+                "&7No repairing or combining."
         )));
-        inventory.setItem(NORMAL_ANVIL_SLOT, createSimpleItem(Material.ANVIL, "&bUse Normal Anvil", List.of(
-                "&7Use vanilla repair and rename.",
-                "&7This does not use forge rolls."
-        )));
-        inventory.setItem(MERGE_SLOT, createSimpleItem(Material.NETHER_STAR, "&6Forge Merge", List.of(
-                "&7Open the merge station.",
-                "&7Feed 10 matching forged items",
-                "&7into the center rack and risk",
-                "&7a higher-tier result."
+        inventory.setItem(MERGE_SLOT, createSimpleItem(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&6Merge Forge", List.of(
+                "&7Open the merging forge.",
+                "&7Use 10 matching forged items",
+                "&7to risk a higher tier."
         )));
         inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close the forge menu.")));
 
-        List<Testproject.BlacksmithRecipe> recipes = getRecipes(category);
+        List<Testproject.BlacksmithRecipe> recipes = getVisibleForgeRecipes();
         for (int i = 0; i < RECIPE_SLOTS.length && i < recipes.size(); i++) {
             inventory.setItem(RECIPE_SLOTS[i], createRecipeItem(player, recipes.get(i)));
         }
@@ -220,70 +239,32 @@ public class BlacksmithAnvilListener implements Listener {
         player.openInventory(inventory);
     }
 
-    private List<Testproject.BlacksmithRecipe> getRecipes(BlacksmithCategory category) {
+    private List<Testproject.BlacksmithRecipe> getVisibleForgeRecipes() {
         List<Testproject.BlacksmithRecipe> recipes = new ArrayList<>();
         for (Testproject.BlacksmithRecipe recipe : plugin.getBlacksmithAnvilRecipes()) {
-            if (recipe.category().equalsIgnoreCase(category.key)) {
-                recipes.add(recipe);
+            if (recipe.result().name().startsWith("NETHERITE_") || recipe.category().equalsIgnoreCase("netherite")) {
+                continue;
             }
+            recipes.add(recipe);
         }
-        recipes.sort((left, right) -> Integer.compare(left.slot(), right.slot()));
+        recipes.sort((left, right) -> {
+            int levelCompare = Integer.compare(left.level(), right.level());
+            if (levelCompare != 0) {
+                return levelCompare;
+            }
+            return left.result().name().compareTo(right.result().name());
+        });
         return recipes;
     }
 
     private Testproject.BlacksmithRecipe getRecipeForSlot(BlacksmithCategory category, int slot) {
-        List<Testproject.BlacksmithRecipe> recipes = getRecipes(category);
+        List<Testproject.BlacksmithRecipe> recipes = getVisibleForgeRecipes();
         for (int i = 0; i < RECIPE_SLOTS.length && i < recipes.size(); i++) {
             if (RECIPE_SLOTS[i] == slot) {
                 return recipes.get(i);
             }
         }
         return null;
-    }
-
-    private ItemStack createInfoItem(Player player, BlacksmithCategory category) {
-        boolean blacksmith = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH);
-        int level = blacksmith ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH) : 0;
-        return createSimpleItem(Material.BLAST_FURNACE, "&6Blacksmith Forge", List.of(
-                "&7Selected Category: &f" + category.display,
-                "&7Forge Access: &f" + (blacksmith ? "Blacksmith Lv." + level : "Public Smithing"),
-                "",
-                "&7Everyone can forge the basics here.",
-                "&7Blacksmiths roll stronger results",
-                "&7and work the merge station faster."
-        ));
-    }
-
-    private ItemStack createForgeStatusItem(Player player) {
-        boolean blacksmith = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH);
-        int level = blacksmith ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH) : 0;
-        int cooldown = plugin.getActionCooldownSeconds(player.getUniqueId(), blacksmith ? Profession.BLACKSMITH : null);
-        return createSimpleItem(Material.SMITHING_TABLE, "&eForge Status", List.of(
-                "&7Role: &f" + (blacksmith ? "Blacksmith" : "Crafter"),
-                "&7Level: &f" + (blacksmith ? level : "-"),
-                "&7Action Cooldown: &f" + cooldown + "s",
-                "",
-                "&7Blacksmith bonuses affect:",
-                "&7- forge action speed",
-                "&7- forged tier rolls",
-                "&7- forged rarity rolls"
-        ));
-    }
-
-    private ItemStack createCategoryItem(Player player, BlacksmithCategory category, boolean selected) {
-        int level = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH)
-                ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH)
-                : 0;
-        List<String> lore = new ArrayList<>();
-        lore.add("&7Recipe Group: &f" + category.display);
-        lore.add("&7Access: &aOpen to everyone");
-        lore.add(level >= category.requiredLevel
-                ? "&aBlacksmith quality bonus active"
-                : "&7Quality bonus starts at Lv." + category.requiredLevel);
-        lore.add("");
-        lore.add(selected ? "&eCurrently selected." : "&7Click to show these recipes.");
-        Material material = selected ? Material.YELLOW_STAINED_GLASS_PANE : category.icon;
-        return createSimpleItem(material, category.displayName(level), lore);
     }
 
     private ItemStack createRecipeItem(Player player, Testproject.BlacksmithRecipe recipe) {
@@ -355,26 +336,38 @@ public class BlacksmithAnvilListener implements Listener {
 
     private void fillForgeLayout(Inventory inventory) {
         ItemStack filler = createUiItem(Material.GRAY_STAINED_GLASS_PANE, "&7", "filler", List.of());
-        ItemStack border = createUiItem(Material.BLACK_STAINED_GLASS_PANE, "&8", "filler", List.of());
-        ItemStack panel = createUiItem(Material.BROWN_STAINED_GLASS_PANE, "&7", "filler", List.of());
-        ItemStack accent = createUiItem(Material.YELLOW_STAINED_GLASS_PANE, "&6", "filler", List.of());
+        ItemStack border = createUiItem(Material.LIGHT_GRAY_STAINED_GLASS_PANE, "&7", "filler", List.of());
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             inventory.setItem(slot, filler);
         }
-        for (int slot : new int[]{0, 1, 2, 3, 5, 6, 8, 9, 18, 27, 36, 45, 46, 47, 51, 53}) {
+        for (int slot : new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 18, 27, 36, 45, 46, 47, 51, 53}) {
             inventory.setItem(slot, border);
         }
-        for (int slot : new int[]{10, 19, 28, 37, 38, 39, 40, 41, 42, 43, 44}) {
-            inventory.setItem(slot, panel);
-        }
-        for (int slot : new int[]{7, 16, 17, 25, 26, 34, 35}) {
-            inventory.setItem(slot, accent);
+        for (int slot : new int[]{37, 38, 39, 40, 41, 42, 43, 44, 48, 49, 50, 52}) {
+            inventory.setItem(slot, border);
         }
     }
 
     private void openVanillaAnvil(Player player) {
-        Inventory anvilInventory = Bukkit.createInventory(player, InventoryType.ANVIL, plugin.legacyComponent("&8Anvil"));
+        Inventory anvilInventory = Bukkit.createInventory(player, InventoryType.ANVIL, plugin.legacyComponent("&8" + RENAME_ANVIL_TITLE));
         player.openInventory(anvilInventory);
+    }
+
+    private void handleRenameAnvilClick(InventoryClickEvent event) {
+        if (event.getClickedInventory() == null) {
+            return;
+        }
+        int rawSlot = event.getRawSlot();
+        if (rawSlot == 1) {
+            event.setCancelled(true);
+            return;
+        }
+        if (rawSlot == 2) {
+            ItemStack extra = event.getView().getTopInventory().getItem(1);
+            if (extra != null && !extra.getType().isAir()) {
+                event.setCancelled(true);
+            }
+        }
     }
 
     private void openMergeMenu(Player player) {
