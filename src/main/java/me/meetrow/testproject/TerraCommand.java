@@ -253,6 +253,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handleClearInventoryCommand(sender, args);
         }
 
+        if (args[0].equalsIgnoreCase("catalyst")) {
+            return handleCatalystCommand(sender, args);
+        }
+
         if (args[0].equalsIgnoreCase("quests")) {
             return handleQuestsCommand(sender, args);
         }
@@ -331,6 +335,51 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Cleared " + target.getName() + "'s inventory and kept the Terra Guide.", NamedTextColor.GREEN));
         if (sender != target) {
             target.sendMessage(Component.text("Your inventory was cleared. Your Terra Guide was kept.", NamedTextColor.RED));
+        }
+        return true;
+    }
+
+    private boolean handleCatalystCommand(CommandSender sender, String[] args) {
+        if (args.length < 3 || args.length > 4) {
+            sender.sendMessage(Component.text("Usage: /terra catalyst <player> <forge_shard|tempered_flux|binding_thread|runic_prism|ancient_core> [amount]", NamedTextColor.RED));
+            return true;
+        }
+
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target == null) {
+            sender.sendMessage(plugin.getMessage("general.player-not-found"));
+            return true;
+        }
+
+        String catalystKey = args[2].toLowerCase(Locale.ROOT);
+        if (!List.of("forge_shard", "tempered_flux", "binding_thread", "runic_prism", "ancient_core").contains(catalystKey)) {
+            sender.sendMessage(Component.text("Unknown catalyst. Use forge_shard, tempered_flux, binding_thread, runic_prism, or ancient_core.", NamedTextColor.RED));
+            return true;
+        }
+
+        int amount = 1;
+        if (args.length == 4) {
+            try {
+                amount = Integer.parseInt(args[3]);
+            } catch (NumberFormatException exception) {
+                sender.sendMessage(Component.text("Amount must be a whole number.", NamedTextColor.RED));
+                return true;
+            }
+            if (amount <= 0) {
+                sender.sendMessage(Component.text("Amount must be above 0.", NamedTextColor.RED));
+                return true;
+            }
+        }
+
+        Map<Integer, ItemStack> leftovers = target.getInventory().addItem(plugin.createRareContractMaterial(catalystKey, amount));
+        for (ItemStack leftover : leftovers.values()) {
+            target.getWorld().dropItemNaturally(target.getLocation(), leftover);
+        }
+
+        String catalystName = plugin.formatRareContractMaterialName(catalystKey);
+        sender.sendMessage(Component.text("Gave " + target.getName() + " " + amount + "x " + catalystName + ".", NamedTextColor.GREEN));
+        if (sender != target) {
+            target.sendMessage(Component.text("You received " + amount + "x " + catalystName + ".", NamedTextColor.GOLD));
         }
         return true;
     }
@@ -2895,6 +2944,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         entries.add(new HelpEntry("/terra lag <status|clearitems|stacknow|itemclear|mobstack|itemmerge>", "Manage lag-reduction tools.", ignored -> true));
         entries.add(new HelpEntry("/terra maintenance <on|off|status|add|remove|list>", "Manage maintenance mode access.", ignored -> true));
         entries.add(new HelpEntry("/terra clearinventory <player>", "Clear a player's inventory but keep the Terra Guide.", ignored -> true));
+        entries.add(new HelpEntry("/terra catalyst <player> <type> [amount]", "Give forge catalysts for merge testing.", ignored -> true));
         entries.add(new HelpEntry("/terra realtimeclock <on|off|status|sync>", "Control the real-time day/night clock.", ignored -> true));
         entries.add(new HelpEntry("/terra hungerspeed <multiplier|status>", "Set the global hunger drain speed.", ignored -> true));
         entries.add(new HelpEntry("/terra stability <status|enable|disable|scan|debug|meter|radius|delay|span|supportradius|debugradius|supports|strictness>", "Manage cave-in and support rules.", ignored -> true));
@@ -3296,6 +3346,19 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         if (args[0].equalsIgnoreCase("clearinventory")) {
             if (args.length == 2) {
                 return partialMatches(args[1], getKnownPlayerNames());
+            }
+            return Collections.emptyList();
+        }
+
+        if (args[0].equalsIgnoreCase("catalyst")) {
+            if (args.length == 2) {
+                return partialMatches(args[1], getKnownPlayerNames());
+            }
+            if (args.length == 3) {
+                return partialMatches(args[2], List.of("forge_shard", "tempered_flux", "binding_thread", "runic_prism", "ancient_core"));
+            }
+            if (args.length == 4) {
+                return partialMatches(args[3], List.of("1", "5", "10", "16", "32", "64"));
             }
             return Collections.emptyList();
         }
