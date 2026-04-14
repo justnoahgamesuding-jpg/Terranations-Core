@@ -5,7 +5,7 @@ slot: 16
 player-cap: 10
 
 progression:
-  max-level: 10
+  max-level: 15
   base-xp: 100
   xp-multiplier: 1.72
   level-up-money-base: 19.0
@@ -20,6 +20,57 @@ starter-kit:
     amount: 1
   - material: COAL
     amount: 16
+
+skill-tree:
+  nodes:
+    reinforced_tools:
+      name: "Reinforced Tools"
+      branch: "Quality"
+      icon: IRON_PICKAXE
+      slot: 19
+      secondary-allowed: true
+      description:
+        - "Planned durability quality branch."
+    masterwork_items:
+      name: "Masterwork Items"
+      branch: "Quality"
+      icon: DIAMOND_CHESTPLATE
+      slot: 20
+      requires: [ reinforced_tools ]
+      description:
+        - "Planned premium crafted item branch."
+    bulk_crafting:
+      name: "Bulk Crafting"
+      branch: "Production"
+      icon: CRAFTING_TABLE
+      slot: 23
+      secondary-allowed: true
+      description:
+        - "Planned mass-production branch."
+    fast_smelting:
+      name: "Fast Smelting"
+      branch: "Production"
+      icon: BLAST_FURNACE
+      slot: 24
+      requires: [ bulk_crafting ]
+      description:
+        - "Planned furnace throughput bonus."
+    fuel_saver:
+      name: "Fuel Saver"
+      branch: "Efficiency"
+      icon: COAL
+      slot: 28
+      secondary-allowed: true
+      description:
+        - "Planned smelting fuel efficiency."
+    resource_refinement:
+      name: "Resource Refinement"
+      branch: "Efficiency"
+      icon: IRON_INGOT
+      slot: 29
+      requires: [ fuel_saver ]
+      description:
+        - "Planned higher-yield refinement branch."
 
 custom-anvil:
   title: "&8Blacksmith Forge"

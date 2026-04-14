@@ -5,7 +5,7 @@ slot: 13
 player-cap: 10
 
 progression:
-  max-level: 10
+  max-level: 15
   base-xp: 100
   xp-multiplier: 1.7
   cooldown-reduction-seconds-per-level: 1
@@ -19,6 +19,57 @@ starter-kit:
     amount: 32
   - material: BRICKS
     amount: 16
+
+skill-tree:
+  nodes:
+    faster_placement_i:
+      name: "Faster Placement I"
+      branch: "Speed"
+      icon: BRICKS
+      slot: 19
+      secondary-allowed: true
+      description:
+        - "Reduce builder placement cooldown by 2 seconds."
+    faster_placement_ii:
+      name: "Faster Placement II"
+      branch: "Speed"
+      icon: BRICK
+      slot: 20
+      secondary-allowed: true
+      requires: [ faster_placement_i ]
+      description:
+        - "Reduce builder placement cooldown by 2 more seconds."
+    multi_place:
+      name: "Multi Place"
+      branch: "Scale"
+      icon: SCAFFOLDING
+      slot: 23
+      description:
+        - "Planned multi-place construction ability."
+    blueprint_system:
+      name: "Blueprint System"
+      branch: "Scale"
+      icon: MAP
+      slot: 24
+      requires: [ multi_place ]
+      description:
+        - "Planned saved-build system."
+    reduced_materials:
+      name: "Reduced Materials"
+      branch: "Cost"
+      icon: CHEST
+      slot: 28
+      secondary-allowed: true
+      description:
+        - "Planned material efficiency node."
+    structure_bonus:
+      name: "Structural Bonus"
+      branch: "Cost"
+      icon: IRON_BARS
+      slot: 29
+      requires: [ reduced_materials ]
+      description:
+        - "Planned structure durability node."
 
 levels:
   1:

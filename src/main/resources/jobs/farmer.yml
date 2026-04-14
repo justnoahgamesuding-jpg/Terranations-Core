@@ -5,7 +5,7 @@ slot: 12
 player-cap: 10
 
 progression:
-  max-level: 10
+  max-level: 15
   base-xp: 85
   xp-multiplier: 1.6
   level-up-money-base: 16.0
@@ -21,6 +21,74 @@ starter-kit:
 
 rewards:
   double-drop-chance: 0.10
+
+skill-tree:
+  nodes:
+    fast_growth:
+      name: "Fast Growth"
+      branch: "Production"
+      icon: BONE_MEAL
+      slot: 19
+      secondary-allowed: true
+      description:
+        - "Adds extra instant-growth chance."
+    double_harvest:
+      name: "Double Harvest"
+      branch: "Production"
+      icon: WHEAT
+      slot: 20
+      secondary-allowed: true
+      requires: [ fast_growth ]
+      description:
+        - "Adds 10% extra harvest yield chance."
+    mega_yield:
+      name: "Mega Yield"
+      branch: "Production"
+      icon: HAY_BLOCK
+      slot: 21
+      requires: [ double_harvest ]
+      description:
+        - "Adds another 10% extra harvest yield chance."
+    basic_meals:
+      name: "Basic Meals"
+      branch: "Cooking"
+      icon: BREAD
+      slot: 23
+      secondary-allowed: true
+      description:
+        - "Planned meal crafting branch."
+    advanced_meals:
+      name: "Advanced Meals"
+      branch: "Cooking"
+      icon: COOKED_BEEF
+      slot: 24
+      requires: [ basic_meals ]
+      description:
+        - "Planned stronger food utility."
+    no_hunger_drain:
+      name: "No Hunger Drain"
+      branch: "Survival"
+      icon: GOLDEN_CARROT
+      slot: 28
+      secondary-allowed: true
+      description:
+        - "Planned farming sustain node."
+    biome_adaptation:
+      name: "Biome Adaptation"
+      branch: "Survival"
+      icon: LEATHER_BOOTS
+      slot: 29
+      requires: [ no_hunger_drain ]
+      description:
+        - "Planned climate resilience node."
+    fishing_specialization:
+      name: "Fishing Specialization"
+      branch: "Fishing"
+      icon: FISHING_ROD
+      slot: 31
+      requires: [ double_harvest ]
+      description:
+        - "Farmer level 5 unlock fantasy branch."
   farmland-create-xp: 3
   coarse-dirt-convert-xp: 2
 

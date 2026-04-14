@@ -32,11 +32,15 @@ public class ProfessionSelectionListener implements Listener {
     private static final int DETAIL_INFO_SLOT = 13;
     private static final int DETAIL_JOIN_SLOT = 49;
     private static final int DETAIL_BACK_SLOT = 45;
-    private static final int[] DETAIL_LEVEL_SLOTS = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
+    private static final int DETAIL_SKILLS_SLOT = 53;
+    private static final int[] DETAIL_LEVEL_SLOTS = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37};
     private static final int LEVEL_DETAIL_INFO_SLOT = 4;
     private static final int LEVEL_DETAIL_BACK_SLOT = 45;
     private static final int[] LEVEL_DETAIL_ACTION_SLOTS = {19, 20, 21, 22, 23, 24, 25};
     private static final int[] LEVEL_DETAIL_BLOCK_SLOTS = {28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43};
+    private static final int SKILL_TREE_SIZE = 54;
+    private static final int SKILL_TREE_INFO_SLOT = 4;
+    private static final int SKILL_TREE_BACK_SLOT = 45;
 
     private final Testproject plugin;
 
@@ -84,7 +88,41 @@ public class ProfessionSelectionListener implements Listener {
                 "&eBack",
                 List.of("&7Return to the jobs list.")
         ));
+        inventory.setItem(DETAIL_SKILLS_SLOT, createSkillTreeButton(player, profession));
         inventory.setItem(DETAIL_JOIN_SLOT, createJoinItem(player, profession));
+        player.openInventory(inventory);
+    }
+
+    public void openProfessionSkillTreeMenu(Player player, Profession profession) {
+        Inventory inventory = Bukkit.createInventory(
+                new ProfessionSkillTreeMenuHolder(profession),
+                SKILL_TREE_SIZE,
+                plugin.legacyComponent("&8" + plugin.getProfessionPlainDisplayName(profession) + " Skill Tree")
+        );
+
+        fillEmptySlots(inventory);
+        UUID playerId = player.getUniqueId();
+        inventory.setItem(SKILL_TREE_INFO_SLOT, createSimpleItem(
+                plugin.getProfessionIcon(profession),
+                plugin.getProfessionDisplayName(profession) + " &7Skills",
+                List.of(
+                        "&7Available points: &f" + plugin.getAvailableProfessionSkillPoints(playerId, profession),
+                        "&7Role: &f" + (profession == plugin.getSecondaryProfession(playerId) ? "Secondary job" : "Main job"),
+                        profession == plugin.getSecondaryProfession(playerId)
+                                ? "&7Secondary jobs can only unlock &fcore&7 nodes."
+                                : "&7Main jobs can unlock the full tree."
+                )
+        ));
+
+        for (ProfessionSkillNode node : plugin.getProfessionSkillNodes(profession)) {
+            inventory.setItem(node.getSlot(), createSkillNodeItem(player, profession, node));
+        }
+
+        inventory.setItem(SKILL_TREE_BACK_SLOT, createSimpleItem(
+                Material.ARROW,
+                "&eBack",
+                List.of("&7Return to the profession overview.")
+        ));
         player.openInventory(inventory);
     }
 
@@ -192,11 +230,23 @@ public class ProfessionSelectionListener implements Listener {
                 }
                 return;
             }
+            if (professionHolder instanceof ProfessionSkillTreeMenuHolder skillTreeHolder) {
+                if (event.getSlot() == SKILL_TREE_BACK_SLOT) {
+                    openProfessionDetailMenu(player, skillTreeHolder.profession());
+                    return;
+                }
+                handleSkillTreeClick(player, skillTreeHolder.profession(), event.getSlot());
+                return;
+            }
             return;
         }
 
         if (event.getSlot() == DETAIL_BACK_SLOT) {
             openSelectionMenu(player);
+            return;
+        }
+        if (event.getSlot() == DETAIL_SKILLS_SLOT) {
+            openProfessionSkillTreeMenu(player, detailHolder.profession());
             return;
         }
 
@@ -212,19 +262,25 @@ public class ProfessionSelectionListener implements Listener {
 
         ProfessionSelectionResult result = plugin.selectProfession(player.getUniqueId(), detailHolder.profession());
         if (result == ProfessionSelectionResult.JOB_FULL
+                || result == ProfessionSelectionResult.PROFESSION_LOCKED
                 || result == ProfessionSelectionResult.SECOND_SLOT_LOCKED
                 || result == ProfessionSelectionResult.NO_FREE_SLOT) {
-            player.sendMessage(plugin.getMessage(
-                    result == ProfessionSelectionResult.JOB_FULL
-                            ? "profession.job-full"
-                            : result == ProfessionSelectionResult.SECOND_SLOT_LOCKED
-                            ? "profession.second-slot-locked"
-                            : "profession.no-free-slot",
-                    plugin.placeholders(
-                            "profession", plugin.getProfessionPlainDisplayName(detailHolder.profession()),
-                            "cap", String.valueOf(plugin.getProfessionPlayerCap(detailHolder.profession()))
-                    )
-            ));
+            if (result == ProfessionSelectionResult.PROFESSION_LOCKED) {
+                player.sendMessage(plugin.colorize("&cThis job is locked. Requirement: &f"
+                        + plugin.getProfessionUnlockRequirementText(player.getUniqueId(), detailHolder.profession())));
+            } else {
+                player.sendMessage(plugin.getMessage(
+                        result == ProfessionSelectionResult.JOB_FULL
+                                ? "profession.job-full"
+                                : result == ProfessionSelectionResult.SECOND_SLOT_LOCKED
+                                ? "profession.second-slot-locked"
+                                : "profession.no-free-slot",
+                        plugin.placeholders(
+                                "profession", plugin.getProfessionPlainDisplayName(detailHolder.profession()),
+                                "cap", String.valueOf(plugin.getProfessionPlayerCap(detailHolder.profession()))
+                        )
+                ));
+            }
             return;
         }
 
@@ -390,6 +446,16 @@ public class ProfessionSelectionListener implements Listener {
                     "&7Use the forge systems to craft higher-tier",
                     "&7gear that other jobs cannot make normally."
             );
+            case TRADER -> List.of(
+                    "&7Role: drive markets and logistics.",
+                    "&7Profit from trade loops, route goods,",
+                    "&7and support country economies."
+            );
+            case SOLDIER -> List.of(
+                    "&7Role: late-game combat and control.",
+                    "&7Unlocked after mastering multiple jobs",
+                    "&7to prevent early combat dominance."
+            );
         };
     }
 
@@ -465,6 +531,13 @@ public class ProfessionSelectionListener implements Listener {
             ));
         }
 
+        if (!plugin.canUnlockProfession(playerId, profession)) {
+            return createSimpleItem(Material.GRAY_DYE, "&7Locked Job", List.of(
+                    "&7Requirement:",
+                    "&f" + plugin.getProfessionUnlockRequirementText(playerId, profession)
+            ));
+        }
+
         return createSimpleItem(Material.EMERALD, "&aJoin Job", List.of(
                 "&7Unlock this job in your next free slot.",
                 "&7If this is your first job, it becomes your primary.",
@@ -475,6 +548,70 @@ public class ProfessionSelectionListener implements Listener {
 
     private String formatCap(int cap) {
         return cap <= 0 ? "Unlimited" : String.valueOf(cap);
+    }
+
+    private ItemStack createSkillTreeButton(Player player, Profession profession) {
+        if (!plugin.hasProfession(player.getUniqueId(), profession)) {
+            return createSimpleItem(Material.GRAY_DYE, "&7Skill Tree Locked", List.of(
+                    "&7Unlock this job first to access",
+                    "&7its specialization tree."
+            ));
+        }
+        return createSimpleItem(Material.EXPERIENCE_BOTTLE, "&6Open Skill Tree", List.of(
+                "&7Spend points earned from leveling",
+                "&7this job on specialization nodes.",
+                "",
+                "&7Available points: &f" + plugin.getAvailableProfessionSkillPoints(player.getUniqueId(), profession)
+        ));
+    }
+
+    private ItemStack createSkillNodeItem(Player player, Profession profession, ProfessionSkillNode node) {
+        boolean unlocked = plugin.hasProfessionSkillNode(player.getUniqueId(), profession, node.getKey());
+        boolean unlockable = plugin.canUnlockProfessionSkillNode(player.getUniqueId(), profession, node);
+        List<String> lore = new ArrayList<>();
+        lore.add("&7Branch: &f" + node.getBranch());
+        for (String line : node.getDescriptionLines()) {
+            lore.add("&7" + line);
+        }
+        if (!node.getRequirements().isEmpty()) {
+            lore.add("");
+            lore.add("&7Requires:");
+            for (String requirement : node.getRequirements()) {
+                ProfessionSkillNode requiredNode = plugin.getProfessionSkillNode(profession, requirement);
+                lore.add("&f- " + (requiredNode != null ? requiredNode.getDisplayName() : requirement));
+            }
+        }
+        if (profession == plugin.getSecondaryProfession(player.getUniqueId()) && !node.isSecondaryAllowed()) {
+            lore.add("");
+            lore.add("&cMain-job only node.");
+        } else if (unlocked) {
+            lore.add("");
+            lore.add("&aUnlocked.");
+        } else if (unlockable) {
+            lore.add("");
+            lore.add("&eClick to unlock.");
+        } else {
+            lore.add("");
+            lore.add("&7Locked.");
+        }
+
+        Material icon = unlocked ? Material.ENCHANTED_BOOK : node.getIcon();
+        return createSimpleItem(icon, (unlocked ? "&a" : unlockable ? "&e" : "&7") + node.getDisplayName(), lore);
+    }
+
+    private void handleSkillTreeClick(Player player, Profession profession, int slot) {
+        for (ProfessionSkillNode node : plugin.getProfessionSkillNodes(profession)) {
+            if (node.getSlot() != slot) {
+                continue;
+            }
+            if (plugin.unlockProfessionSkillNode(player, profession, node.getKey())) {
+                player.sendMessage(plugin.colorize("&aUnlocked &f" + node.getDisplayName() + "&a for &f" + plugin.getProfessionPlainDisplayName(profession) + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cYou cannot unlock that node yet."));
+            }
+            openProfessionSkillTreeMenu(player, profession);
+            return;
+        }
     }
 
     private ItemStack createSimpleItem(Material material, String displayName, List<String> loreLines) {
@@ -542,6 +679,13 @@ public class ProfessionSelectionListener implements Listener {
     }
 
     private record ProfessionLevelDetailMenuHolder(Profession profession, int level) implements ProfessionInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record ProfessionSkillTreeMenuHolder(Profession profession) implements ProfessionInventoryHolder {
         @Override
         public Inventory getInventory() {
             return null;

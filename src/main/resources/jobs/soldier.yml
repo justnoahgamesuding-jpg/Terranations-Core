@@ -1,0 +1,54 @@
+enabled: true
+display-name: "&cSoldier"
+icon: IRON_SWORD
+slot: 16
+player-cap: 0
+
+progression:
+  max-level: 15
+  base-xp: 120
+  xp-multiplier: 1.85
+  level-up-money-base: 26.0
+  level-up-money-multiplier: 1.2
+
+starter-kit:
+  - material: SHIELD
+    amount: 1
+  - material: COOKED_BEEF
+    amount: 8
+
+skill-tree:
+  nodes:
+    combat_drills:
+      name: "Combat Drills"
+      branch: "Combat"
+      icon: IRON_SWORD
+      slot: 19
+      secondary-allowed: true
+      description:
+        - "Planned melee combat branch."
+    shield_wall:
+      name: "Shield Wall"
+      branch: "Defense"
+      icon: SHIELD
+      slot: 23
+      description:
+        - "Planned defensive formation branch."
+    territory_control:
+      name: "Territory Control"
+      branch: "Control"
+      icon: RED_BANNER
+      slot: 28
+      description:
+        - "Planned country warfare support branch."
+
+levels:
+  1:
+    unlocks:
+      - Late-game combat profession unlocked
+  10:
+    unlocks:
+      - Advanced soldier progression
+  15:
+    unlocks:
+      - Veteran soldier status

@@ -9,7 +9,9 @@ public enum Profession {
     LUMBERJACK("Lumberjack", Material.IRON_AXE, 11),
     FARMER("Farmer", Material.GOLDEN_HOE, 12),
     BUILDER("Builder", Material.BRICKS, 13),
-    BLACKSMITH("Blacksmith", Material.ANVIL, 16);
+    BLACKSMITH("Blacksmith", Material.ANVIL, 14),
+    TRADER("Trader", Material.EMERALD, 15),
+    SOLDIER("Soldier", Material.IRON_SWORD, 16);
 
     private final String displayName;
     private final Material icon;

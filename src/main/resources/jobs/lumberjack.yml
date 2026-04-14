@@ -5,7 +5,7 @@ slot: 11
 player-cap: 10
 
 progression:
-  max-level: 10
+  max-level: 15
   base-xp: 90
   xp-multiplier: 1.65
   level-up-money-base: 16.0
@@ -21,6 +21,74 @@ starter-kit:
 
 rewards:
   double-drop-chance: 0.10
+
+skill-tree:
+  nodes:
+    fast_chop:
+      name: "Fast Chop"
+      branch: "Speed"
+      icon: SUGAR
+      slot: 19
+      secondary-allowed: true
+      description:
+        - "Foundation speed node for lumber work."
+    chain_chop:
+      name: "Chain Chop"
+      branch: "Speed"
+      icon: IRON_AXE
+      slot: 20
+      secondary-allowed: true
+      requires: [ fast_chop ]
+      description:
+        - "Adds extra lumber yield chance."
+    overcut:
+      name: "Overcut"
+      branch: "Speed"
+      icon: CLOCK
+      slot: 21
+      requires: [ chain_chop ]
+      description:
+        - "Planned active speed burst."
+    tree_feller:
+      name: "Tree Feller"
+      branch: "Area"
+      icon: OAK_LOG
+      slot: 23
+      description:
+        - "Planned full-tree break specialization."
+    wide_swing:
+      name: "Wide Swing"
+      branch: "Area"
+      icon: STONE_AXE
+      slot: 24
+      requires: [ tree_feller ]
+      description:
+        - "Planned multi-log breaking."
+    durable_axe:
+      name: "Durable Axe"
+      branch: "Survival"
+      icon: ANVIL
+      slot: 28
+      secondary-allowed: true
+      description:
+        - "Planned durability efficiency passive."
+    energy_saver:
+      name: "Energy Saver"
+      branch: "Survival"
+      icon: BREAD
+      slot: 29
+      secondary-allowed: true
+      requires: [ durable_axe ]
+      description:
+        - "Planned hunger-efficiency passive."
+    regrowth_boost:
+      name: "Regrowth Boost"
+      branch: "Survival"
+      icon: OAK_SAPLING
+      slot: 30
+      requires: [ energy_saver ]
+      description:
+        - "Adds extra instant-regrowth chance."
 
 levels:
   1:

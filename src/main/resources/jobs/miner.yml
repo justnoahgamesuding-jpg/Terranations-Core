@@ -5,7 +5,7 @@ slot: 10
 player-cap: 10
 
 progression:
-  max-level: 10
+  max-level: 15
   base-xp: 100
   xp-multiplier: 1.75
   cooldown-reduction-seconds-per-level: 2
@@ -24,6 +24,74 @@ starter-kit:
 
 rewards:
   double-drop-chance: 0.10
+
+skill-tree:
+  nodes:
+    quick_hands_i:
+      name: "Quick Hands I"
+      branch: "Speed"
+      icon: SUGAR
+      slot: 19
+      secondary-allowed: true
+      description:
+        - "Reduce miner action cooldown by 3 seconds."
+    quick_hands_ii:
+      name: "Quick Hands II"
+      branch: "Speed"
+      icon: SUGAR
+      slot: 20
+      secondary-allowed: true
+      requires: [ quick_hands_i ]
+      description:
+        - "Reduce miner action cooldown by 2 more seconds."
+    overdrive:
+      name: "Overdrive"
+      branch: "Speed"
+      icon: CLOCK
+      slot: 21
+      requires: [ quick_hands_ii ]
+      description:
+        - "Planned active burst mining ability."
+    double_drop_i:
+      name: "Double Drop I"
+      branch: "Yield"
+      icon: RAW_IRON
+      slot: 23
+      secondary-allowed: true
+      description:
+        - "Adds 10% extra double-drop chance."
+    double_drop_ii:
+      name: "Double Drop II"
+      branch: "Yield"
+      icon: RAW_GOLD
+      slot: 24
+      requires: [ double_drop_i ]
+      description:
+        - "Adds another 10% extra double-drop chance."
+    deep_core:
+      name: "Deep Core"
+      branch: "Yield"
+      icon: DIAMOND
+      slot: 25
+      requires: [ double_drop_ii ]
+      description:
+        - "Marks deeper progression specialization."
+    efficient_miner:
+      name: "Efficient Miner"
+      branch: "Survival"
+      icon: BREAD
+      slot: 28
+      secondary-allowed: true
+      description:
+        - "Planned hunger-efficiency passive."
+    stone_skin:
+      name: "Stone Skin"
+      branch: "Survival"
+      icon: SHIELD
+      slot: 29
+      requires: [ efficient_miner ]
+      description:
+        - "Planned cave-survival passive."
 
 levels:
   1:

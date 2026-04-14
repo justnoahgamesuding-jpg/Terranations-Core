@@ -16,3 +16,8 @@ gui:
   lore:
     - "&7Choose your starting profession."
     - "&fClick to inspect this profession."
+
+progression:
+  secondary-unlock-level: 8
+  secondary-max-level: 5
+  soldier-unlock-level: 10

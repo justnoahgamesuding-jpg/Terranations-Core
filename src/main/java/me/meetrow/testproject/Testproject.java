@@ -188,6 +188,8 @@ public final class Testproject extends JavaPlugin {
     private final Map<UUID, Boolean> secondaryProfessionUnlockOverrides = new ConcurrentHashMap<>();
     private final Map<UUID, Profession> developmentModeProfessions = new ConcurrentHashMap<>();
     private final Map<UUID, Map<Profession, ProfessionProgress>> professionProgress = new ConcurrentHashMap<>();
+    private final Map<Profession, Map<String, ProfessionSkillNode>> professionSkillNodes = new EnumMap<>(Profession.class);
+    private final Map<UUID, Map<Profession, Set<String>>> unlockedProfessionSkillNodes = new ConcurrentHashMap<>();
     private final Map<UUID, Map<Profession, Double>> pendingFractionalProfessionXp = new ConcurrentHashMap<>();
     private final Map<UUID, Set<Profession>> pendingStarterKitGrants = new ConcurrentHashMap<>();
     private final Map<UUID, TutorialStage> tutorialStages = new ConcurrentHashMap<>();
@@ -670,6 +672,8 @@ public final class Testproject extends JavaPlugin {
         secondaryProfessionUnlockOverrides.clear();
         developmentModeProfessions.clear();
         professionProgress.clear();
+        professionSkillNodes.clear();
+        unlockedProfessionSkillNodes.clear();
         tutorialStages.clear();
         tutorialIntroIndices.clear();
         for (BukkitTask task : tutorialIntroAdvanceTasks.values()) {
@@ -1349,6 +1353,10 @@ public final class Testproject extends JavaPlugin {
         Profession secondary = getSecondaryProfession(playerId);
         Profession active = getProfession(playerId);
 
+        if (!canUnlockProfession(playerId, profession)) {
+            return ProfessionSelectionResult.PROFESSION_LOCKED;
+        }
+
         if (primary == null) {
             if (!canGrantProfession(playerId, profession)) {
                 return ProfessionSelectionResult.JOB_FULL;
@@ -1467,6 +1475,37 @@ public final class Testproject extends JavaPlugin {
         return cap <= 0 || getProfessionPlayerCount(profession) < cap;
     }
 
+    public boolean canUnlockProfession(UUID playerId, Profession profession) {
+        if (profession == null) {
+            return false;
+        }
+        if (profession != Profession.SOLDIER) {
+            return true;
+        }
+        return getQualifiedProfessionCount(playerId, Math.max(1, jobsConfig.getInt("progression.soldier-unlock-level", 10))) >= 2;
+    }
+
+    public String getProfessionUnlockRequirementText(UUID playerId, Profession profession) {
+        if (profession == null || canUnlockProfession(playerId, profession)) {
+            return "";
+        }
+        if (profession == Profession.SOLDIER) {
+            int requiredLevel = Math.max(1, jobsConfig.getInt("progression.soldier-unlock-level", 10));
+            return "Reach level " + requiredLevel + " on two jobs";
+        }
+        return "Locked";
+    }
+
+    public int getQualifiedProfessionCount(UUID playerId, int minimumLevel) {
+        int count = 0;
+        for (Profession profession : getOwnedProfessions(playerId)) {
+            if (getProfessionLevel(playerId, profession) >= minimumLevel) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public int getProfessionPlayerCap(Profession profession) {
         return Math.max(0, getProfessionConfig(profession).getInt("player-cap", 10));
     }
@@ -1510,9 +1549,11 @@ public final class Testproject extends JavaPlugin {
         secondaryProfessionUnlockOverrides.remove(playerId);
         developmentModeProfessions.remove(playerId);
         professionProgress.remove(playerId);
+        unlockedProfessionSkillNodes.remove(playerId);
         pendingStarterKitGrants.remove(playerId);
         dataConfig.set("professions." + playerId, null);
         dataConfig.set("profession-progress." + playerId, null);
+        dataConfig.set("profession-skills." + playerId, null);
         dataConfig.set("starter-kits.pending." + playerId, null);
         saveDataConfig();
     }
@@ -1703,7 +1744,7 @@ public final class Testproject extends JavaPlugin {
         if (override != null) {
             return override;
         }
-        return getProfessionLevel(playerId, primary) >= getProfessionBaseMaxLevel(primary);
+        return getProfessionLevel(playerId, primary) >= Math.max(1, jobsConfig.getInt("progression.secondary-unlock-level", 8));
     }
 
     public boolean isSecondProfessionNaturallyUnlocked(UUID playerId) {
@@ -1714,7 +1755,7 @@ public final class Testproject extends JavaPlugin {
         if (playtestActive) {
             return true;
         }
-        return getProfessionLevel(playerId, primary) >= getProfessionBaseMaxLevel(primary);
+        return getProfessionLevel(playerId, primary) >= Math.max(1, jobsConfig.getInt("progression.secondary-unlock-level", 8));
     }
 
     public Boolean getSecondProfessionUnlockOverride(UUID playerId) {
@@ -1812,13 +1853,14 @@ public final class Testproject extends JavaPlugin {
     }
 
     public int getProfessionBaseMaxLevel(Profession profession) {
-        return Math.max(1, getProfessionProgressConfig(profession).getInt("progression.max-level", 10));
+        int configured = getProfessionProgressConfig(profession).getInt("progression.max-level", 15);
+        return Math.max(1, configured);
     }
 
     public int getProfessionMaxLevel(UUID playerId, Profession profession) {
         int baseMaxLevel = getProfessionBaseMaxLevel(profession);
         if (profession != null && profession.equals(getSecondaryProfession(playerId))) {
-            return Math.max(1, baseMaxLevel / 2);
+            return Math.max(1, jobsConfig.getInt("progression.secondary-max-level", 5));
         }
         return baseMaxLevel;
     }
@@ -1844,6 +1886,90 @@ public final class Testproject extends JavaPlugin {
             total += getProfessionLevelUpMoneyReward(profession, level);
         }
         return total;
+    }
+
+    public List<ProfessionSkillNode> getProfessionSkillNodes(Profession profession) {
+        Map<String, ProfessionSkillNode> nodes = professionSkillNodes.get(profession);
+        if (nodes == null || nodes.isEmpty()) {
+            return List.of();
+        }
+        return nodes.values().stream()
+                .sorted(Comparator.comparingInt(ProfessionSkillNode::getSlot))
+                .toList();
+    }
+
+    public ProfessionSkillNode getProfessionSkillNode(Profession profession, String nodeKey) {
+        if (profession == null || nodeKey == null || nodeKey.isBlank()) {
+            return null;
+        }
+        Map<String, ProfessionSkillNode> nodes = professionSkillNodes.get(profession);
+        if (nodes == null) {
+            return null;
+        }
+        return nodes.get(nodeKey.trim().toLowerCase(Locale.ROOT));
+    }
+
+    public Set<String> getUnlockedProfessionSkillNodeKeys(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null) {
+            return Set.of();
+        }
+        Map<Profession, Set<String>> byProfession = unlockedProfessionSkillNodes.get(playerId);
+        if (byProfession == null) {
+            return Set.of();
+        }
+        Set<String> unlocked = byProfession.get(profession);
+        return unlocked == null ? Set.of() : Set.copyOf(unlocked);
+    }
+
+    public boolean hasProfessionSkillNode(UUID playerId, Profession profession, String nodeKey) {
+        return getUnlockedProfessionSkillNodeKeys(playerId, profession).contains(nodeKey == null ? "" : nodeKey.trim().toLowerCase(Locale.ROOT));
+    }
+
+    public int getAvailableProfessionSkillPoints(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null || !hasProfession(playerId, profession)) {
+            return 0;
+        }
+        int earned = Math.max(0, getProfessionLevel(playerId, profession) - 1);
+        int spent = getUnlockedProfessionSkillNodeKeys(playerId, profession).size();
+        return Math.max(0, earned - spent);
+    }
+
+    public boolean canUnlockProfessionSkillNode(UUID playerId, Profession profession, ProfessionSkillNode node) {
+        if (playerId == null || profession == null || node == null || !hasProfession(playerId, profession)) {
+            return false;
+        }
+        if (hasProfessionSkillNode(playerId, profession, node.getKey())) {
+            return false;
+        }
+        if (profession.equals(getSecondaryProfession(playerId)) && !node.isSecondaryAllowed()) {
+            return false;
+        }
+        if (getAvailableProfessionSkillPoints(playerId, profession) <= 0) {
+            return false;
+        }
+        for (String requirement : node.getRequirements()) {
+            if (!hasProfessionSkillNode(playerId, profession, requirement)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean unlockProfessionSkillNode(Player player, Profession profession, String nodeKey) {
+        if (player == null || profession == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        ProfessionSkillNode node = getProfessionSkillNode(profession, nodeKey);
+        if (!canUnlockProfessionSkillNode(playerId, profession, node)) {
+            return false;
+        }
+        Map<Profession, Set<String>> byProfession =
+                unlockedProfessionSkillNodes.computeIfAbsent(playerId, ignored -> new EnumMap<>(Profession.class));
+        Set<String> unlocked = byProfession.computeIfAbsent(profession, ignored -> new LinkedHashSet<>());
+        unlocked.add(node.getKey());
+        saveProfessionSkillProgress(playerId, profession);
+        return true;
     }
 
     public List<String> getProfessionUnlockDescriptions(Profession profession, int level) {
@@ -2263,7 +2389,20 @@ public final class Testproject extends JavaPlugin {
     }
 
     public double getProfessionDoubleDropChance(UUID playerId, Profession profession) {
-        return getProfessionDoubleDropChance(profession);
+        double chance = getProfessionDoubleDropChance(profession);
+        if (playerId == null || profession == null) {
+            return chance;
+        }
+        if (profession == Profession.MINER) {
+            chance += countUnlockedProfessionSkillNodes(playerId, profession, "double_drop_i") * 0.10D;
+            chance += countUnlockedProfessionSkillNodes(playerId, profession, "double_drop_ii") * 0.10D;
+        } else if (profession == Profession.LUMBERJACK) {
+            chance += countUnlockedProfessionSkillNodes(playerId, profession, "chain_chop") * 0.08D;
+        } else if (profession == Profession.FARMER) {
+            chance += countUnlockedProfessionSkillNodes(playerId, profession, "double_harvest") * 0.10D;
+            chance += countUnlockedProfessionSkillNodes(playerId, profession, "mega_yield") * 0.10D;
+        }
+        return Math.max(0.0D, Math.min(1.0D, chance));
     }
 
     public void notifyDoubleDrop(Player player, Profession profession) {
@@ -3219,6 +3358,12 @@ public final class Testproject extends JavaPlugin {
             );
             default -> 0.0D;
         };
+        if (profession == Profession.FARMER) {
+            chance += countUnlockedProfessionSkillNodes(playerId, profession, "fast_growth") * 0.04D;
+            chance += countUnlockedProfessionSkillNodes(playerId, profession, "regrowth_boost") * 0.04D;
+        } else if (profession == Profession.LUMBERJACK) {
+            chance += countUnlockedProfessionSkillNodes(playerId, profession, "regrowth_boost") * 0.03D;
+        }
         return chance > 0.0D && ThreadLocalRandom.current().nextDouble() < chance;
     }
 
@@ -6886,6 +7031,19 @@ public final class Testproject extends JavaPlugin {
         return minutes + "m " + seconds + "s";
     }
 
+    public int countUnlockedProfessionSkillNodes(UUID playerId, Profession profession, String... nodeKeys) {
+        if (playerId == null || profession == null || nodeKeys == null || nodeKeys.length == 0) {
+            return 0;
+        }
+        int count = 0;
+        for (String nodeKey : nodeKeys) {
+            if (hasProfessionSkillNode(playerId, profession, nodeKey)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public int getMinerBreakCooldownSeconds(UUID playerId) {
         int baseCooldown = getBlockDelaySeconds();
         int totalProfessionReduction = getTotalProfessionCooldownReductionSeconds(playerId);
@@ -6894,6 +7052,8 @@ public final class Testproject extends JavaPlugin {
             int level = getProfessionLevel(playerId, Profession.MINER);
             int reductionPerLevel = Math.max(0, getProfessionConfig(Profession.MINER).getInt("progression.cooldown-reduction-seconds-per-level", 2));
             minerReduction = Math.max(0, (level - 1) * reductionPerLevel);
+            minerReduction += countUnlockedProfessionSkillNodes(playerId, Profession.MINER, "quick_hands_i") * 3;
+            minerReduction += countUnlockedProfessionSkillNodes(playerId, Profession.MINER, "quick_hands_ii") * 2;
         }
         Country country = getPlayerCountry(playerId);
         int countryReduction = getCountryMinerCooldownReduction(country);
@@ -6901,7 +7061,10 @@ public final class Testproject extends JavaPlugin {
     }
 
     public int getBuilderPlaceCooldownSeconds(UUID playerId) {
-        return getMinerBreakCooldownSeconds(playerId);
+        int baseCooldown = getMinerBreakCooldownSeconds(playerId);
+        int builderReduction = countUnlockedProfessionSkillNodes(playerId, Profession.BUILDER, "faster_placement_i") * 2
+                + countUnlockedProfessionSkillNodes(playerId, Profession.BUILDER, "faster_placement_ii") * 2;
+        return Math.max(3, baseCooldown - builderReduction);
     }
 
     public int getSharedActionCooldownSeconds(UUID playerId) {
@@ -7436,8 +7599,7 @@ public final class Testproject extends JavaPlugin {
         return switch (profession) {
             case FARMER -> material.name().endsWith("_HOE") ? getFarmerHoeRequiredLevel(material) : Math.max(1, getFarmerCraftLevel(material));
             case BLACKSMITH -> Math.max(1, getBlacksmithRequiredLevel(material));
-            case MINER, LUMBERJACK -> 1;
-            case BUILDER -> 1;
+            case MINER, LUMBERJACK, BUILDER, TRADER, SOLDIER -> 1;
         };
     }
 
@@ -8920,6 +9082,13 @@ public final class Testproject extends JavaPlugin {
             rewardXp = Math.max(1, (int) Math.round(rewardXp * 1.2D));
             rewardReputation += 0.10D;
         }
+        int marketNodes = countUnlockedProfessionSkillNodes(playerId, Profession.TRADER, "better_prices_i", "better_prices_ii");
+        if (marketNodes > 0) {
+            double multiplier = 1.0D + (marketNodes * 0.08D);
+            rewardMoney = scaleRewardMoney(rewardMoney * multiplier);
+            rewardXp = Math.max(1, (int) Math.round(rewardXp * multiplier));
+            rewardReputation = sanitizeTraderReputationReward(rewardReputation * multiplier);
+        }
         return new TraderQuestOffer(profession, material, amount, rewardMoney, rewardXp, sanitizeTraderReputationReward(rewardReputation), tier);
     }
 
@@ -9648,7 +9817,9 @@ public final class Testproject extends JavaPlugin {
     }
 
     public long getMerchantTradeCooldownMillis(UUID playerId, Country country) {
-        return getMerchantTradeCooldownMillis(country);
+        long base = getMerchantTradeCooldownMillis(country);
+        int logisticsNodes = countUnlockedProfessionSkillNodes(playerId, Profession.TRADER, "logistics_i", "logistics_ii");
+        return Math.max(1_000L, base - (logisticsNodes * 2_500L));
     }
 
     public int getCountryMinerCooldownReduction(Country country) {
@@ -12615,6 +12786,8 @@ public final class Testproject extends JavaPlugin {
         reloadCountries();
         reloadProfessions();
         reloadProfessionProgress();
+        reloadProfessionSkillDefinitions();
+        reloadProfessionSkillProgress();
         reloadCountryBorderParticlePreferences();
         reloadStabilityMeterPreferences();
         reloadPendingStarterKitGrants();
@@ -13032,6 +13205,67 @@ public final class Testproject extends JavaPlugin {
 
             if (!progressByProfession.isEmpty()) {
                 professionProgress.put(playerId, progressByProfession);
+            }
+        }
+    }
+
+    private void reloadProfessionSkillDefinitions() {
+        professionSkillNodes.clear();
+        for (Profession profession : Profession.values()) {
+            ConfigurationSection nodesSection = getProfessionConfig(profession).getConfigurationSection("skill-tree.nodes");
+            Map<String, ProfessionSkillNode> nodesByKey = new LinkedHashMap<>();
+            if (nodesSection != null) {
+                for (String key : nodesSection.getKeys(false)) {
+                    ProfessionSkillNode node = ProfessionSkillNode.fromConfig(key, nodesSection.getConfigurationSection(key));
+                    if (node != null) {
+                        nodesByKey.put(node.getKey(), node);
+                    }
+                }
+            }
+            professionSkillNodes.put(profession, nodesByKey);
+        }
+    }
+
+    private void reloadProfessionSkillProgress() {
+        unlockedProfessionSkillNodes.clear();
+
+        ConfigurationSection section = dataConfig.getConfigurationSection("profession-skills");
+        if (section == null) {
+            return;
+        }
+
+        for (String playerKey : section.getKeys(false)) {
+            UUID playerId;
+            try {
+                playerId = UUID.fromString(playerKey);
+            } catch (IllegalArgumentException exception) {
+                continue;
+            }
+
+            ConfigurationSection playerSection = section.getConfigurationSection(playerKey);
+            if (playerSection == null) {
+                continue;
+            }
+
+            Map<Profession, Set<String>> unlockedByProfession = new EnumMap<>(Profession.class);
+            for (String professionKey : playerSection.getKeys(false)) {
+                Profession profession = Profession.fromKey(professionKey);
+                if (profession == null) {
+                    continue;
+                }
+                Set<String> unlocked = new LinkedHashSet<>();
+                for (String nodeKey : playerSection.getStringList(professionKey)) {
+                    if (nodeKey != null && !nodeKey.isBlank()) {
+                        unlocked.add(nodeKey.trim().toLowerCase(Locale.ROOT));
+                    }
+                }
+                if (!unlocked.isEmpty()) {
+                    unlockedByProfession.put(profession, unlocked);
+                }
+            }
+
+            if (!unlockedByProfession.isEmpty()) {
+                unlockedProfessionSkillNodes.put(playerId, unlockedByProfession);
             }
         }
     }
@@ -13836,6 +14070,8 @@ public final class Testproject extends JavaPlugin {
         return switch (profession) {
             case MINER, LUMBERJACK, FARMER -> 120;
             case BUILDER, BLACKSMITH -> 90;
+            case TRADER -> 100;
+            case SOLDIER -> 110;
         };
     }
 
@@ -13856,6 +14092,8 @@ public final class Testproject extends JavaPlugin {
             case FARMER -> "Farm, till, plant, or craft food";
             case BUILDER -> "Place builder blocks";
             case BLACKSMITH -> "Smelt or forge materials";
+            case TRADER -> "Complete trader deals and economy loops";
+            case SOLDIER -> "Train through late-game combat systems";
         };
     }
 
@@ -15195,13 +15433,16 @@ public final class Testproject extends JavaPlugin {
             case FARMER -> 12;
             case BUILDER -> 14;
             case BLACKSMITH -> 2;
+            case TRADER -> 8;
+            case SOLDIER -> 6;
         };
     }
 
     private int getTraderQuestAmountStep(Profession profession) {
         return switch (profession) {
             case MINER, BLACKSMITH -> 2;
-            case LUMBERJACK, FARMER, BUILDER -> 4;
+            case LUMBERJACK, FARMER, BUILDER, TRADER -> 4;
+            case SOLDIER -> 2;
         };
     }
 
@@ -15258,6 +15499,17 @@ public final class Testproject extends JavaPlugin {
                 case 4 -> List.of(Material.DIAMOND_PICKAXE, Material.DIAMOND_AXE, Material.DIAMOND_SWORD, Material.DIAMOND_HELMET);
                 case 5 -> List.of(Material.DIAMOND_CHESTPLATE, Material.DIAMOND_BOOTS, Material.ANVIL, Material.BLAST_FURNACE);
                 default -> List.of(Material.ENCHANTING_TABLE, Material.DIAMOND_CHESTPLATE, Material.BELL, Material.BLAST_FURNACE);
+            };
+            case TRADER -> switch (tier) {
+                case 1 -> List.of(Material.PAPER, Material.BOOK, Material.CHEST, Material.EMERALD);
+                case 2 -> List.of(Material.BARREL, Material.ITEM_FRAME, Material.MAP, Material.GOLD_INGOT);
+                case 3 -> List.of(Material.COMPASS, Material.CLOCK, Material.EMERALD_BLOCK, Material.ENDER_CHEST);
+                default -> List.of(Material.EMERALD_BLOCK, Material.ENDER_CHEST, Material.COMPASS, Material.CLOCK);
+            };
+            case SOLDIER -> switch (tier) {
+                case 1 -> List.of(Material.SHIELD, Material.ARROW, Material.IRON_SWORD, Material.COOKED_BEEF);
+                case 2 -> List.of(Material.CROSSBOW, Material.IRON_HELMET, Material.IRON_CHESTPLATE, Material.GOLDEN_APPLE);
+                default -> List.of(Material.DIAMOND_SWORD, Material.SHIELD, Material.GOLDEN_APPLE, Material.CROSSBOW);
             };
         };
     }
@@ -15351,6 +15603,20 @@ public final class Testproject extends JavaPlugin {
                 case ENCHANTING_TABLE -> 9;
                 default -> 1;
             };
+            case TRADER -> switch (material) {
+                case PAPER, BOOK, CHEST, EMERALD -> 1;
+                case BARREL, ITEM_FRAME, MAP, GOLD_INGOT -> 3;
+                case COMPASS, CLOCK, EMERALD_BLOCK -> 5;
+                case ENDER_CHEST -> 7;
+                default -> 1;
+            };
+            case SOLDIER -> switch (material) {
+                case SHIELD, ARROW, IRON_SWORD, COOKED_BEEF -> 1;
+                case CROSSBOW, IRON_HELMET, IRON_CHESTPLATE -> 3;
+                case GOLDEN_APPLE -> 5;
+                case DIAMOND_SWORD -> 7;
+                default -> 1;
+            };
         };
     }
 
@@ -15389,6 +15655,8 @@ public final class Testproject extends JavaPlugin {
             case BUILDER -> Villager.Profession.MASON;
             case LUMBERJACK -> Villager.Profession.FLETCHER;
             case MINER -> Villager.Profession.ARMORER;
+            case TRADER -> Villager.Profession.CARTOGRAPHER;
+            case SOLDIER -> Villager.Profession.WEAPONSMITH;
         };
     }
 
@@ -15420,7 +15688,9 @@ public final class Testproject extends JavaPlugin {
     }
 
     private Profession selectTraderSpecialty(Country hostCountry) {
-        List<Profession> configuredProfessions = getConfiguredProfessions();
+        List<Profession> configuredProfessions = getConfiguredProfessions().stream()
+                .filter(profession -> profession != Profession.SOLDIER)
+                .toList();
         if (!configuredProfessions.isEmpty()) {
             return configuredProfessions.get(ThreadLocalRandom.current().nextInt(configuredProfessions.size()));
         }
@@ -15435,6 +15705,8 @@ public final class Testproject extends JavaPlugin {
             case FARMER -> List.of("Mira", "Elsie", "Tomas", "Greta").get(ThreadLocalRandom.current().nextInt(4));
             case BUILDER -> List.of("Doran", "Petra", "Milo", "Sera").get(ThreadLocalRandom.current().nextInt(4));
             case BLACKSMITH -> List.of("Varric", "Helga", "Toren", "Iris").get(ThreadLocalRandom.current().nextInt(4));
+            case TRADER -> List.of("Soren", "Marta", "Jules", "Corin").get(ThreadLocalRandom.current().nextInt(4));
+            case SOLDIER -> List.of("Rhea", "Cass", "Vigo", "Brant").get(ThreadLocalRandom.current().nextInt(4));
         };
     }
 
@@ -15674,6 +15946,22 @@ public final class Testproject extends JavaPlugin {
         String path = "profession-progress." + playerId + "." + profession.getKey();
         dataConfig.set(path + ".level", progress.getLevel());
         dataConfig.set(path + ".xp", progress.getXp());
+        saveDataConfig();
+    }
+
+    private void saveProfessionSkillProgress(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null) {
+            return;
+        }
+
+        Map<Profession, Set<String>> byProfession = unlockedProfessionSkillNodes.get(playerId);
+        Set<String> unlocked = byProfession != null ? byProfession.get(profession) : null;
+        String path = "profession-skills." + playerId + "." + profession.getKey();
+        if (unlocked == null || unlocked.isEmpty()) {
+            dataConfig.set(path, null);
+        } else {
+            dataConfig.set(path, new ArrayList<>(unlocked));
+        }
         saveDataConfig();
     }
 

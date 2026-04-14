@@ -1,0 +1,103 @@
+enabled: true
+display-name: "&aTrader"
+icon: EMERALD
+slot: 15
+player-cap: 10
+
+progression:
+  max-level: 15
+  base-xp: 100
+  xp-multiplier: 1.75
+  level-up-money-base: 24.0
+  level-up-money-multiplier: 1.18
+
+starter-kit:
+  - material: EMERALD
+    amount: 8
+  - material: CHEST
+    amount: 1
+  - material: PAPER
+    amount: 16
+
+skill-tree:
+  nodes:
+    better_prices_i:
+      name: "Better Prices I"
+      branch: "Market"
+      icon: EMERALD
+      slot: 19
+      secondary-allowed: true
+      description:
+        - "Increase trader quest payout and XP by 8%."
+    better_prices_ii:
+      name: "Better Prices II"
+      branch: "Market"
+      icon: GOLD_INGOT
+      slot: 20
+      secondary-allowed: true
+      requires: [ better_prices_i ]
+      description:
+        - "Increase trader quest payout and XP by another 8%."
+    reduced_tax:
+      name: "Reduced Tax"
+      branch: "Market"
+      icon: PAPER
+      slot: 21
+      requires: [ better_prices_ii ]
+      description:
+        - "Planned broader market fee reduction."
+    logistics_i:
+      name: "Logistics I"
+      branch: "Logistics"
+      icon: CHEST_MINECART
+      slot: 23
+      secondary-allowed: true
+      description:
+        - "Reduce merchant trade cooldown by 2.5 seconds."
+    logistics_ii:
+      name: "Logistics II"
+      branch: "Logistics"
+      icon: BARREL
+      slot: 24
+      secondary-allowed: true
+      requires: [ logistics_i ]
+      description:
+        - "Reduce merchant trade cooldown by another 2.5 seconds."
+    shared_storage:
+      name: "Shared Storage"
+      branch: "Logistics"
+      icon: ENDER_CHEST
+      slot: 25
+      requires: [ logistics_ii ]
+      description:
+        - "Planned shared logistics feature."
+    black_market:
+      name: "Black Market"
+      branch: "Risk"
+      icon: BLACK_DYE
+      slot: 28
+      description:
+        - "Planned risky trade route feature."
+    smuggling_bonus:
+      name: "Smuggling Bonus"
+      branch: "Risk"
+      icon: HOPPER
+      slot: 29
+      requires: [ black_market ]
+      description:
+        - "Planned contraband reward bonus."
+
+levels:
+  1:
+    unlocks:
+      - Start handling local trade routes
+      - Access entry trader rewards
+  5:
+    unlocks:
+      - Improved merchant and trader payouts
+  10:
+    unlocks:
+      - High-tier logistics progression
+  15:
+    unlocks:
+      - Master trader status
