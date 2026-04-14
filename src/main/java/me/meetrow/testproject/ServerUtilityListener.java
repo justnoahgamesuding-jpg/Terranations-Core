@@ -26,7 +26,10 @@ public final class ServerUtilityListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerJoin(PlayerJoinEvent event) {
-        plugin.getServer().getScheduler().runTask(plugin, () -> plugin.ensurePlayerGuidanceItem(event.getPlayer()));
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            plugin.ensurePlayerGuidanceItem(event.getPlayer());
+            plugin.applyPersonalSkillEffects(event.getPlayer());
+        });
         if (plugin.isJoinLeaveMessagesEnabled() && plugin.hasMessage("presence.join")) {
             event.joinMessage(plugin.legacyComponent(plugin.getPlayerMessage("presence.join", event.getPlayer(), plugin.placeholders(
                     "player", event.getPlayer().getName()

@@ -126,6 +126,7 @@ public final class Testproject extends JavaPlugin {
     private static final boolean DEFAULT_PLAYTEST_SAVE_PLAYER_PROGRESSION = false;
     private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("(?i)&?#([0-9a-f]{6})");
     private static final int SCOREBOARD_CONFIG_VERSION = 7;
+    private static final long PERSONAL_SKILL_POINT_PLAYTIME_INTERVAL_MILLIS = 15L * 60L * 1000L;
     private static final DateTimeFormatter PLAYTEST_DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
     public static final String ADMIN_PERMISSION = "terra.admin";
@@ -214,6 +215,10 @@ public final class Testproject extends JavaPlugin {
     private final Map<String, Integer> merchantSharedStock = new ConcurrentHashMap<>();
     private final Map<String, Integer> merchantDailySoldAmounts = new ConcurrentHashMap<>();
     private final Map<UUID, Long> merchantTradeCooldowns = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> personalSkillPoints = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<PersonalSkill, Integer>> personalSkillLevels = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> personalSkillPlaytimeMillis = new ConcurrentHashMap<>();
+    private final Map<UUID, PersonalWorkOrder> personalWorkOrders = new ConcurrentHashMap<>();
     private final Map<UUID, Long> globalChatCooldowns = new ConcurrentHashMap<>();
     private final Map<String, List<Location>> countryBorderLocationCache = new ConcurrentHashMap<>();
     private final Set<UUID> countryChatEnabledPlayers = ConcurrentHashMap.newKeySet();
@@ -236,6 +241,7 @@ public final class Testproject extends JavaPlugin {
     private BukkitTask oreVisionTask;
     private BukkitTask playtestCountdownTask;
     private BukkitTask playtestTickTask;
+    private BukkitTask personalGuideProgressionTask;
     private BukkitTask traderRuntimeTask;
     private BukkitTask tutorialActionBarTask;
     private BukkitTask persistentActionBarTask;
@@ -417,6 +423,7 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ClimateGuiListener(this), this);
         getServer().getPluginManager().registerEvents(new SoulboundListener(this), this);
         getServer().getPluginManager().registerEvents(new GuidanceItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new TerraGuideListener(this), this);
         getServer().getPluginManager().registerEvents(new ServerUtilityListener(this), this);
         professionSelectionListener = new ProfessionSelectionListener(this);
         getServer().getPluginManager().registerEvents(professionSelectionListener, this);
@@ -600,6 +607,15 @@ public final class Testproject extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        for (UUID playerId : new ArrayList<>(personalSkillPoints.keySet())) {
+            savePersonalGuideData(playerId);
+        }
+        for (UUID playerId : new ArrayList<>(personalSkillPlaytimeMillis.keySet())) {
+            savePersonalGuideData(playerId);
+        }
+        for (UUID playerId : new ArrayList<>(personalWorkOrders.keySet())) {
+            savePersonalGuideData(playerId);
+        }
         for (Player player : getServer().getOnlinePlayers()) {
             setVanished(player, false);
             setFrozen(player.getUniqueId(), false);
@@ -612,6 +628,7 @@ public final class Testproject extends JavaPlugin {
         shutdownGlobalXpBoostRuntime();
         shutdownCooldownDebugRuntime();
         shutdownOreVisionRuntime();
+        stopPersonalGuideProgressionRuntime();
         shutdownPersistentActionBarRuntime();
         shutdownClimateRuntime();
         stopItemsAdderTopStatusHud();
@@ -693,6 +710,10 @@ public final class Testproject extends JavaPlugin {
         merchantSharedStock.clear();
         merchantDailySoldAmounts.clear();
         merchantTradeCooldowns.clear();
+        personalSkillPoints.clear();
+        personalSkillLevels.clear();
+        personalSkillPlaytimeMillis.clear();
+        personalWorkOrders.clear();
         globalChatCooldowns.clear();
         countryBorderLocationCache.clear();
         countryChatEnabledPlayers.clear();
@@ -1579,6 +1600,14 @@ public final class Testproject extends JavaPlugin {
         dataConfig.set("money." + playerId, null);
         dataConfig.set("traders.reputation." + playerId, null);
         dataConfig.set("traders.quests." + playerId, null);
+        dataConfig.set("personal-guide.skill-points." + playerId, null);
+        dataConfig.set("personal-guide.playtime-millis." + playerId, null);
+        dataConfig.set("personal-guide.skills." + playerId, null);
+        dataConfig.set("personal-guide.work-orders." + playerId, null);
+        personalSkillPoints.remove(playerId);
+        personalSkillLevels.remove(playerId);
+        personalSkillPlaytimeMillis.remove(playerId);
+        personalWorkOrders.remove(playerId);
         saveDataConfig();
     }
 
@@ -1637,6 +1666,14 @@ public final class Testproject extends JavaPlugin {
             dataConfig.set("money." + playerId, null);
             dataConfig.set("traders.reputation." + playerId, null);
             dataConfig.set("traders.quests." + playerId, null);
+            dataConfig.set("personal-guide.skill-points." + playerId, null);
+            dataConfig.set("personal-guide.playtime-millis." + playerId, null);
+            dataConfig.set("personal-guide.skills." + playerId, null);
+            dataConfig.set("personal-guide.work-orders." + playerId, null);
+            personalSkillPoints.remove(playerId);
+            personalSkillLevels.remove(playerId);
+            personalSkillPlaytimeMillis.remove(playerId);
+            personalWorkOrders.remove(playerId);
         }
 
         saveDataConfig();
@@ -2003,6 +2040,7 @@ public final class Testproject extends JavaPlugin {
 
         int previousLevel = getProfessionLevel(playerId, profession);
         int levelUps = addProfessionXp(playerId, profession, amount);
+        recordPersonalWorkOrderProgress(playerId, profession, amount);
         if (onlinePlayer != null) {
             handleTutorialProfessionXpGain(onlinePlayer, profession, amount);
         }
@@ -2017,6 +2055,10 @@ public final class Testproject extends JavaPlugin {
                     "profession", getProfessionPlainDisplayName(profession),
                     "level", String.valueOf(newLevel)
             )));
+        }
+        addPersonalSkillPoints(playerId, levelUps);
+        if (onlinePlayer != null) {
+            onlinePlayer.sendMessage(colorize("&6[Terra Guide] &aYou gained &f" + levelUps + " &askill point" + (levelUps == 1 ? "" : "s") + "&a."));
         }
 
         double rewardMoney = roundMoney(getProfessionLevelUpMoneyRewardTotal(profession, previousLevel + 1, newLevel)
@@ -2046,6 +2088,8 @@ public final class Testproject extends JavaPlugin {
         if (profession.equals(getSecondaryProfession(playerId))) {
             adjustedAmount = Math.max(1, adjustedAmount / 2);
         }
+
+        adjustedAmount = Math.max(1, (int) Math.round(adjustedAmount * getPersonalProfessionXpMultiplier(playerId)));
 
         return adjustedAmount;
     }
@@ -2078,6 +2122,175 @@ public final class Testproject extends JavaPlugin {
             return 0;
         }
         return rewardProfessionXp(player, profession, wholeXp);
+    }
+
+    public int getPersonalSkillPoints(UUID playerId) {
+        return playerId == null ? 0 : Math.max(0, personalSkillPoints.getOrDefault(playerId, 0));
+    }
+
+    public int getPersonalSkillLevel(UUID playerId, PersonalSkill skill) {
+        if (playerId == null || skill == null) {
+            return 0;
+        }
+        Map<PersonalSkill, Integer> levels = personalSkillLevels.get(playerId);
+        if (levels == null) {
+            return 0;
+        }
+        return Math.max(0, levels.getOrDefault(skill, 0));
+    }
+
+    public long getPersonalSkillPointPlaytimeRemainingMillis(UUID playerId) {
+        long current = Math.max(0L, personalSkillPlaytimeMillis.getOrDefault(playerId, 0L));
+        return Math.max(0L, PERSONAL_SKILL_POINT_PLAYTIME_INTERVAL_MILLIS - current);
+    }
+
+    public boolean upgradePersonalSkill(Player player, PersonalSkill skill) {
+        if (player == null || skill == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (getPersonalSkillPoints(playerId) <= 0) {
+            return false;
+        }
+        int currentLevel = getPersonalSkillLevel(playerId, skill);
+        if (currentLevel >= skill.getMaxLevel()) {
+            return false;
+        }
+
+        personalSkillPoints.put(playerId, getPersonalSkillPoints(playerId) - 1);
+        Map<PersonalSkill, Integer> levels = personalSkillLevels.computeIfAbsent(playerId, ignored -> new EnumMap<>(PersonalSkill.class));
+        levels.put(skill, currentLevel + 1);
+        applyPersonalSkillEffects(player);
+        savePersonalGuideData(playerId);
+        return true;
+    }
+
+    public void addPersonalSkillPoints(UUID playerId, int amount) {
+        if (playerId == null || amount <= 0) {
+            return;
+        }
+        personalSkillPoints.put(playerId, getPersonalSkillPoints(playerId) + amount);
+        savePersonalGuideData(playerId);
+    }
+
+    public double getPersonalProfessionXpMultiplier(UUID playerId) {
+        return 1.0D + (getPersonalSkillLevel(playerId, PersonalSkill.XP_MASTERY) * 0.05D);
+    }
+
+    public int getPersonalCooldownReductionSeconds(UUID playerId) {
+        return getPersonalSkillLevel(playerId, PersonalSkill.COOLDOWN_MASTERY);
+    }
+
+    public double getPersonalTraderRewardMultiplier(UUID playerId) {
+        return 1.0D + (getPersonalSkillLevel(playerId, PersonalSkill.TRADER_INSTINCT) * 0.08D);
+    }
+
+    public long getPersonalMerchantCooldownReductionMillis(UUID playerId) {
+        return getPersonalSkillLevel(playerId, PersonalSkill.MERCHANT_HAGGLER) * 2_000L;
+    }
+
+    public double getPersonalDoubleDropBonus(UUID playerId, Profession profession) {
+        if (profession != Profession.MINER && profession != Profession.FARMER && profession != Profession.LUMBERJACK) {
+            return 0.0D;
+        }
+        return getPersonalSkillLevel(playerId, PersonalSkill.HARVEST_MASTERY) * 0.03D;
+    }
+
+    public double getPersonalInstantGrowBonus(UUID playerId, Profession profession) {
+        if (profession != Profession.FARMER && profession != Profession.LUMBERJACK) {
+            return 0.0D;
+        }
+        return getPersonalSkillLevel(playerId, PersonalSkill.GREEN_THUMB) * 0.03D;
+    }
+
+    public boolean hasOreSenseUnlocked(UUID playerId) {
+        return getPersonalSkillLevel(playerId, PersonalSkill.ORE_SENSE) > 0;
+    }
+
+    public void applyPersonalSkillEffects(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        if (player.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null) {
+            double baseHealth = 20.0D + (getPersonalSkillLevel(player.getUniqueId(), PersonalSkill.HEARTY) * 2.0D);
+            player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(baseHealth);
+            if (player.getHealth() > baseHealth) {
+                player.setHealth(baseHealth);
+            }
+        }
+    }
+
+    public PersonalWorkOrder getOrCreatePersonalWorkOrder(UUID playerId) {
+        if (playerId == null) {
+            return null;
+        }
+        PersonalWorkOrder existing = personalWorkOrders.get(playerId);
+        Profession activeProfession = getProfession(playerId);
+        if (activeProfession == null) {
+            return null;
+        }
+        if (existing == null || existing.getProfession() != activeProfession) {
+            existing = createPersonalWorkOrder(playerId, activeProfession);
+            personalWorkOrders.put(playerId, existing);
+            savePersonalGuideData(playerId);
+        }
+        return existing;
+    }
+
+    public boolean claimPersonalWorkOrder(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        PersonalWorkOrder order = personalWorkOrders.get(playerId);
+        if (order == null || !order.isComplete()) {
+            return false;
+        }
+
+        if (order.getRewardMoney() > 0.0D) {
+            depositBalance(playerId, order.getRewardMoney());
+        }
+        addPersonalSkillPoints(playerId, order.getRewardSkillPoints());
+        player.sendMessage(colorize("&6[Terra Guide] &aCompleted work order for &f" + getProfessionPlainDisplayName(order.getProfession())
+                + "&a. Rewards: &f$" + formatMoney(order.getRewardMoney()) + " &7and &f" + order.getRewardSkillPoints() + " skill point" + (order.getRewardSkillPoints() == 1 ? "" : "s") + "&a."));
+        PersonalWorkOrder next = createPersonalWorkOrder(playerId, getProfession(playerId));
+        if (next != null) {
+            personalWorkOrders.put(playerId, next);
+        } else {
+            personalWorkOrders.remove(playerId);
+        }
+        savePersonalGuideData(playerId);
+        return true;
+    }
+
+    private PersonalWorkOrder createPersonalWorkOrder(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null) {
+            return null;
+        }
+        int level = Math.max(1, getProfessionLevel(playerId, profession));
+        int targetXp = Math.max(60, 80 + (level * 25));
+        double rewardMoney = roundMoney(18.0D + (level * 6.0D));
+        int rewardSkillPoints = level >= 5 ? 2 : 1;
+        return new PersonalWorkOrder(profession, targetXp, 0, rewardMoney, rewardSkillPoints, System.currentTimeMillis());
+    }
+
+    private void recordPersonalWorkOrderProgress(UUID playerId, Profession profession, int amount) {
+        if (playerId == null || profession == null || amount <= 0) {
+            return;
+        }
+        PersonalWorkOrder order = getOrCreatePersonalWorkOrder(playerId);
+        if (order == null || order.getProfession() != profession || order.isComplete()) {
+            return;
+        }
+        order.addProgress(amount);
+        savePersonalGuideData(playerId);
+        if (order.isComplete()) {
+            Player player = getServer().getPlayer(playerId);
+            if (player != null && player.isOnline()) {
+                player.sendMessage(colorize("&6[Terra Guide] &eWork order ready to claim. Open your Terra Guide."));
+                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.7F, 1.1F);
+            }
+        }
     }
 
     public List<ItemStack> getProfessionStarterKit(Profession profession) {
@@ -2252,6 +2465,10 @@ public final class Testproject extends JavaPlugin {
         }
         double chance = getProfessionConfig(profession).getDouble("rewards.double-drop-chance", 0.0D);
         return Math.max(0.0D, Math.min(1.0D, chance));
+    }
+
+    public double getProfessionDoubleDropChance(UUID playerId, Profession profession) {
+        return Math.max(0.0D, Math.min(1.0D, getProfessionDoubleDropChance(profession) + getPersonalDoubleDropBonus(playerId, profession)));
     }
 
     public void notifyDoubleDrop(Player player, Profession profession) {
@@ -3207,6 +3424,7 @@ public final class Testproject extends JavaPlugin {
             );
             default -> 0.0D;
         };
+        chance += getPersonalInstantGrowBonus(playerId, profession);
         return chance > 0.0D && ThreadLocalRandom.current().nextDouble() < chance;
     }
 
@@ -6893,7 +7111,7 @@ public final class Testproject extends JavaPlugin {
     }
 
     public int getSharedActionCooldownSeconds(UUID playerId) {
-        return Math.min(getMinerBreakCooldownSeconds(playerId), getBuilderPlaceCooldownSeconds(playerId));
+        return Math.max(0, Math.min(getMinerBreakCooldownSeconds(playerId), getBuilderPlaceCooldownSeconds(playerId)) - getPersonalCooldownReductionSeconds(playerId));
     }
 
     private int getTotalProfessionCooldownReductionSeconds(UUID playerId) {
@@ -8907,6 +9125,10 @@ public final class Testproject extends JavaPlugin {
             rewardXp = Math.max(1, (int) Math.round(rewardXp * 1.2D));
             rewardReputation += 0.10D;
         }
+        double personalMultiplier = getPersonalTraderRewardMultiplier(playerId);
+        rewardMoney = scaleRewardMoney(rewardMoney * personalMultiplier);
+        rewardXp = Math.max(1, (int) Math.round(rewardXp * personalMultiplier));
+        rewardReputation = sanitizeTraderReputationReward(rewardReputation * personalMultiplier);
         return new TraderQuestOffer(profession, material, amount, rewardMoney, rewardXp, sanitizeTraderReputationReward(rewardReputation), tier);
     }
 
@@ -9632,6 +9854,10 @@ public final class Testproject extends JavaPlugin {
             base = Math.max(1_000L, base - 5_000L);
         }
         return base;
+    }
+
+    public long getMerchantTradeCooldownMillis(UUID playerId, Country country) {
+        return Math.max(1_000L, getMerchantTradeCooldownMillis(country) - getPersonalMerchantCooldownReductionMillis(playerId));
     }
 
     public int getCountryMinerCooldownReduction(Country country) {
@@ -11487,7 +11713,7 @@ public final class Testproject extends JavaPlugin {
         withdrawBalance(player.getUniqueId(), price);
         player.getInventory().addItem(new ItemStack(offer.getMaterial(), offer.getAmount()));
         merchantSharedStock.put(offer.getKey(), remaining - 1);
-        merchantTradeCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + getMerchantTradeCooldownMillis(getPlayerCountry(player.getUniqueId())));
+        merchantTradeCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + getMerchantTradeCooldownMillis(player.getUniqueId(), getPlayerCountry(player.getUniqueId())));
         saveMerchantData();
         player.sendMessage(getMessage("merchant.bought", placeholders(
                 "amount", String.valueOf(offer.getAmount()),
@@ -11523,7 +11749,7 @@ public final class Testproject extends JavaPlugin {
         double total = roundMoney(payoutPerItem * removed);
         depositBalance(player.getUniqueId(), total);
         merchantDailySoldAmounts.merge(offer.getMaterial().name(), removed, Integer::sum);
-        merchantTradeCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + getMerchantTradeCooldownMillis(getPlayerCountry(player.getUniqueId())));
+        merchantTradeCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + getMerchantTradeCooldownMillis(player.getUniqueId(), getPlayerCountry(player.getUniqueId())));
         saveMerchantData();
         player.sendMessage(getMessage("merchant.sold", placeholders(
                 "amount", String.valueOf(removed),
@@ -11539,6 +11765,10 @@ public final class Testproject extends JavaPlugin {
 
     private long getMerchantTradeCooldownRemainingMillis(UUID playerId) {
         return Math.max(0L, merchantTradeCooldowns.getOrDefault(playerId, 0L) - System.currentTimeMillis());
+    }
+
+    public long getMerchantTradeCooldownRemainingMillisPublic(UUID playerId) {
+        return getMerchantTradeCooldownRemainingMillis(playerId);
     }
 
     private void resetMerchantDailySalesIfNeeded(long now) {
@@ -12600,10 +12830,12 @@ public final class Testproject extends JavaPlugin {
         reloadTutorialQuestDefinitions();
         reloadTutorialStages();
         reloadAssignedQuestStates();
+        reloadPersonalGuideData();
         reloadFixedOreBlocks();
         reloadFurnaceSessions();
         reloadTraderData();
         reloadMerchantData();
+        restartPersonalGuideProgressionRuntime();
     }
 
     private void ensureMerchantShopConfigDefaults() {
@@ -13331,6 +13563,164 @@ public final class Testproject extends JavaPlugin {
                     }
                 }
             } catch (IllegalArgumentException ignored) {
+            }
+        }
+    }
+
+    private void reloadPersonalGuideData() {
+        personalSkillPoints.clear();
+        personalSkillLevels.clear();
+        personalSkillPlaytimeMillis.clear();
+        personalWorkOrders.clear();
+
+        ConfigurationSection pointsSection = dataConfig.getConfigurationSection("personal-guide.skill-points");
+        if (pointsSection != null) {
+            for (String key : pointsSection.getKeys(false)) {
+                try {
+                    UUID playerId = UUID.fromString(key);
+                    int points = Math.max(0, pointsSection.getInt(key, 0));
+                    if (points > 0) {
+                        personalSkillPoints.put(playerId, points);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+
+        ConfigurationSection playtimeSection = dataConfig.getConfigurationSection("personal-guide.playtime-millis");
+        if (playtimeSection != null) {
+            for (String key : playtimeSection.getKeys(false)) {
+                try {
+                    UUID playerId = UUID.fromString(key);
+                    long millis = Math.max(0L, playtimeSection.getLong(key, 0L));
+                    if (millis > 0L) {
+                        personalSkillPlaytimeMillis.put(playerId, millis);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+
+        ConfigurationSection skillsSection = dataConfig.getConfigurationSection("personal-guide.skills");
+        if (skillsSection != null) {
+            for (String key : skillsSection.getKeys(false)) {
+                try {
+                    UUID playerId = UUID.fromString(key);
+                    ConfigurationSection playerSection = skillsSection.getConfigurationSection(key);
+                    if (playerSection == null) {
+                        continue;
+                    }
+                    Map<PersonalSkill, Integer> levels = new EnumMap<>(PersonalSkill.class);
+                    for (String skillKey : playerSection.getKeys(false)) {
+                        PersonalSkill skill = PersonalSkill.fromKey(skillKey);
+                        if (skill == null) {
+                            continue;
+                        }
+                        int level = Math.max(0, Math.min(skill.getMaxLevel(), playerSection.getInt(skillKey, 0)));
+                        if (level > 0) {
+                            levels.put(skill, level);
+                        }
+                    }
+                    if (!levels.isEmpty()) {
+                        personalSkillLevels.put(playerId, levels);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+
+        ConfigurationSection orderSection = dataConfig.getConfigurationSection("personal-guide.work-orders");
+        if (orderSection != null) {
+            for (String key : orderSection.getKeys(false)) {
+                try {
+                    UUID playerId = UUID.fromString(key);
+                    ConfigurationSection playerSection = orderSection.getConfigurationSection(key);
+                    if (playerSection == null) {
+                        continue;
+                    }
+                    Profession profession = Profession.fromKey(playerSection.getString("profession"));
+                    if (profession == null) {
+                        continue;
+                    }
+                    PersonalWorkOrder order = new PersonalWorkOrder(
+                            profession,
+                            Math.max(1, playerSection.getInt("target-xp", 100)),
+                            Math.max(0, playerSection.getInt("progress-xp", 0)),
+                            Math.max(0.0D, playerSection.getDouble("reward-money", 0.0D)),
+                            Math.max(0, playerSection.getInt("reward-skill-points", 1)),
+                            Math.max(0L, playerSection.getLong("generated-at", System.currentTimeMillis()))
+                    );
+                    personalWorkOrders.put(playerId, order);
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+
+        for (Player player : getServer().getOnlinePlayers()) {
+            applyPersonalSkillEffects(player);
+        }
+    }
+
+    private void savePersonalGuideData(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+
+        int skillPoints = Math.max(0, personalSkillPoints.getOrDefault(playerId, 0));
+        dataConfig.set("personal-guide.skill-points." + playerId, skillPoints > 0 ? skillPoints : null);
+
+        long playtimeMillis = Math.max(0L, personalSkillPlaytimeMillis.getOrDefault(playerId, 0L));
+        dataConfig.set("personal-guide.playtime-millis." + playerId, playtimeMillis > 0L ? playtimeMillis : null);
+
+        Map<PersonalSkill, Integer> levels = personalSkillLevels.get(playerId);
+        dataConfig.set("personal-guide.skills." + playerId, null);
+        if (levels != null && !levels.isEmpty()) {
+            for (Map.Entry<PersonalSkill, Integer> entry : levels.entrySet()) {
+                int level = Math.max(0, Math.min(entry.getKey().getMaxLevel(), entry.getValue()));
+                if (level > 0) {
+                    dataConfig.set("personal-guide.skills." + playerId + "." + entry.getKey().getKey(), level);
+                }
+            }
+        }
+
+        PersonalWorkOrder order = personalWorkOrders.get(playerId);
+        dataConfig.set("personal-guide.work-orders." + playerId, null);
+        if (order != null && order.getProfession() != null) {
+            String path = "personal-guide.work-orders." + playerId;
+            dataConfig.set(path + ".profession", order.getProfession().getKey());
+            dataConfig.set(path + ".target-xp", order.getTargetXp());
+            dataConfig.set(path + ".progress-xp", order.getProgressXp());
+            dataConfig.set(path + ".reward-money", order.getRewardMoney());
+            dataConfig.set(path + ".reward-skill-points", order.getRewardSkillPoints());
+            dataConfig.set(path + ".generated-at", order.getGeneratedAtMillis());
+        }
+
+        saveDataConfig();
+    }
+
+    private void restartPersonalGuideProgressionRuntime() {
+        stopPersonalGuideProgressionRuntime();
+        personalGuideProgressionTask = getServer().getScheduler().runTaskTimer(this, this::tickPersonalGuideProgression, 1200L, 1200L);
+    }
+
+    private void stopPersonalGuideProgressionRuntime() {
+        if (personalGuideProgressionTask != null) {
+            personalGuideProgressionTask.cancel();
+            personalGuideProgressionTask = null;
+        }
+    }
+
+    private void tickPersonalGuideProgression() {
+        long increment = 60_000L;
+        for (Player player : getServer().getOnlinePlayers()) {
+            UUID playerId = player.getUniqueId();
+            long total = personalSkillPlaytimeMillis.getOrDefault(playerId, 0L) + increment;
+            int earned = (int) (total / PERSONAL_SKILL_POINT_PLAYTIME_INTERVAL_MILLIS);
+            long remainder = total % PERSONAL_SKILL_POINT_PLAYTIME_INTERVAL_MILLIS;
+            personalSkillPlaytimeMillis.put(playerId, remainder);
+            if (earned > 0) {
+                addPersonalSkillPoints(playerId, earned);
+                player.sendMessage(colorize("&6[Terra Guide] &aYou earned &f" + earned + " &askill point" + (earned == 1 ? "" : "s") + " &afrom playtime."));
             }
         }
     }

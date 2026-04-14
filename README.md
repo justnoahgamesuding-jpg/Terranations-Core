@@ -11,7 +11,7 @@ Terra Nations Core is a Paper 1.21 plugin that combines profession-based progres
 - Traveling trader and wandering merchant systems
 - Local, country, and opt-in global chat routing
 - Terra-owned player balances and country treasury support
-- A locked hotbar guide item used as the future player hub for guidance, management, and progression
+- A locked hotbar guide item that opens player stats, personal skills, contracts, and hub menus
 - Staff tools, vanish, fly speed, lag reduction, maintenance mode, and utility commands
 
 ## Platform

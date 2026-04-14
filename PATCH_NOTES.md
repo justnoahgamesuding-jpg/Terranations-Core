@@ -4,6 +4,9 @@ This file keeps the more detailed feature ledger for the current code snapshot. 
 
 | Date | Feature | Notes |
 | --- | --- | --- |
+| 2026-04-14 | Terra Guide main menu | The locked guide item now opens player stats, jobs access, personal skills, contracts, country access, and ore-sense controls. |
+| 2026-04-14 | personal skills | Players now earn skill points from level-ups and playtime and can spend them on permanent gameplay bonuses. |
+| 2026-04-14 | personal work orders | The guide now surfaces personal profession work orders that reward money and skill points. |
 | 2026-04-14 | Terra Guide slot item | Players now receive a locked soulbound `Terra Guide` nether star in hotbar slot 9. |
 | 2026-04-14 | guide slot lock rules | The guide item cannot be moved, dropped, offhand-swapped, hotbar-swapped, or placed into containers. |
 | 2026-04-14 | country level placeholders | `%terra_player_country_level%` and `%terra_current_country_level%` were added for external UI use. |

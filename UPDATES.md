@@ -14,7 +14,8 @@ This file is the short, high-level timeline for the current repository snapshot.
 
 - Every player now receives a locked `Terra Guide` item in hotbar slot 9.
 - The guide item is soulbound and cannot be moved, dropped, swapped, or stored.
-- This is the new foundation for future guidance, management, and progression menus.
+- The guide now opens the first real player hub with stats, personal skills, contracts, jobs access, country access, and ore-sense toggles.
+- Players now earn skill points from level-ups and playtime, and can spend them on permanent progression bonuses.
 
 ## 2026-04-06
 

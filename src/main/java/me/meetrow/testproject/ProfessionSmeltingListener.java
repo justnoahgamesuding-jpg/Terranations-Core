@@ -58,7 +58,7 @@ public class ProfessionSmeltingListener implements Listener {
             if (profession != null
                     && profession == requiredProfession
                     && supportsDoubleDrop(profession)
-                    && ThreadLocalRandom.current().nextDouble() < plugin.getProfessionDoubleDropChance(profession)) {
+                    && ThreadLocalRandom.current().nextDouble() < plugin.getProfessionDoubleDropChance(player.getUniqueId(), profession)) {
                 collectedDrops.add(itemEntity.getItemStack().clone());
                 doubled = true;
             }

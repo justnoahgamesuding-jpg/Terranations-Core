@@ -259,7 +259,14 @@ Key behavior:
 - Every player receives a `Terra Guide` nether star in hotbar slot 9.
 - The item is soulbound and additionally locked to that slot.
 - It cannot be moved, dropped, hotbar-swapped, offhand-swapped, or placed into containers.
-- It is intended to become the main player hub for guidance, management, and progression menus.
+- Right-clicking it opens the main player hub.
+- The current guide includes player stats, jobs access, personal skills, contracts, country access, and ore-sense toggles.
+
+### Personal Skills And Work Orders
+
+- Players earn skill points from profession level-ups and from playtime.
+- Skill points can be spent on health, XP gain, cooldown reduction, trader bonuses, merchant cooldown reduction, double-drop bonuses, growth proc bonuses, and ore-sense unlocks.
+- The guide also exposes a personal work-order system that rewards money and skill points for profession XP progress.
 
 ### Countries
 

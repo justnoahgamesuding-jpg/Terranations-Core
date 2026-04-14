@@ -138,7 +138,7 @@ The `Terra Guide` is stricter than normal soulbound items:
 - it always lives in hotbar slot 9
 - it cannot be moved to another slot
 - it cannot be placed in inventories or containers
-- it is intended to become the main access point for guidance and progression features
+- it opens your main player hub for stats, skills, contracts, jobs, and country access
 
 ## Good Early Priorities
 
