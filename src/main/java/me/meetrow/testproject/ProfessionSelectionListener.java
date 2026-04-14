@@ -32,7 +32,6 @@ public class ProfessionSelectionListener implements Listener {
     private static final int DETAIL_INFO_SLOT = 13;
     private static final int DETAIL_JOIN_SLOT = 49;
     private static final int DETAIL_BACK_SLOT = 45;
-    private static final int DETAIL_SKILLS_SLOT = 53;
     private static final int[] DETAIL_LEVEL_SLOTS = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37};
     private static final int LEVEL_DETAIL_INFO_SLOT = 4;
     private static final int LEVEL_DETAIL_BACK_SLOT = 45;
@@ -88,7 +87,6 @@ public class ProfessionSelectionListener implements Listener {
                 "&eBack",
                 List.of("&7Return to the jobs list.")
         ));
-        inventory.setItem(DETAIL_SKILLS_SLOT, createSkillTreeButton(player, profession));
         inventory.setItem(DETAIL_JOIN_SLOT, createJoinItem(player, profession));
         player.openInventory(inventory);
     }
@@ -245,11 +243,6 @@ public class ProfessionSelectionListener implements Listener {
             openSelectionMenu(player);
             return;
         }
-        if (event.getSlot() == DETAIL_SKILLS_SLOT) {
-            openProfessionSkillTreeMenu(player, detailHolder.profession());
-            return;
-        }
-
         int clickedLevel = getLevelBySlot(event.getSlot(), plugin.getProfessionBaseMaxLevel(detailHolder.profession()));
         if (clickedLevel > 0) {
             openProfessionLevelDetailMenu(player, detailHolder.profession(), clickedLevel);
@@ -548,21 +541,6 @@ public class ProfessionSelectionListener implements Listener {
 
     private String formatCap(int cap) {
         return cap <= 0 ? "Unlimited" : String.valueOf(cap);
-    }
-
-    private ItemStack createSkillTreeButton(Player player, Profession profession) {
-        if (!plugin.hasProfession(player.getUniqueId(), profession)) {
-            return createSimpleItem(Material.GRAY_DYE, "&7Skill Tree Locked", List.of(
-                    "&7Unlock this job first to access",
-                    "&7its specialization tree."
-            ));
-        }
-        return createSimpleItem(Material.EXPERIENCE_BOTTLE, "&6Open Skill Tree", List.of(
-                "&7Spend points earned from leveling",
-                "&7this job on specialization nodes.",
-                "",
-                "&7Available points: &f" + plugin.getAvailableProfessionSkillPoints(player.getUniqueId(), profession)
-        ));
     }
 
     private ItemStack createSkillNodeItem(Player player, Profession profession, ProfessionSkillNode node) {

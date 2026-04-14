@@ -7781,6 +7781,15 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
+    public void openProfessionSkillTreeMenu(Player player, Profession profession) {
+        if (player == null || profession == null) {
+            return;
+        }
+        if (professionSelectionListener != null) {
+            professionSelectionListener.openProfessionSkillTreeMenu(player, profession);
+        }
+    }
+
     public void preparePlayerForProfessionSelection(Player player) {
         if (player == null) {
             return;

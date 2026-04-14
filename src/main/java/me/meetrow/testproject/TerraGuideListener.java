@@ -26,6 +26,7 @@ public final class TerraGuideListener implements Listener {
     private static final int GUI_SIZE = 54;
     private static final int CLOSE_SLOT = 49;
     private static final int BACK_SLOT = 45;
+    private static final int SKILL_SELECTOR_INFO_SLOT = 4;
 
     private final Testproject plugin;
 
@@ -70,6 +71,7 @@ public final class TerraGuideListener implements Listener {
         switch (((TerraGuideHolder) holder).page()) {
             case MAIN -> handleMainClick(player, event.getSlot());
             case STATS -> handleBackClose(player, event.getSlot());
+            case SKILL_SELECTOR -> handleSkillSelectorClick(player, event.getSlot());
             case CONTRACTS -> handleContractsClick(player, event.getSlot());
         }
     }
@@ -99,7 +101,11 @@ public final class TerraGuideListener implements Listener {
                 "&7Open your job selection and",
                 "&7profession progression menu."
         )));
-        inventory.setItem(14, createItem(Material.WRITABLE_BOOK, "&6Contracts", List.of(
+        inventory.setItem(14, createItem(Material.EXPERIENCE_BOTTLE, "&eJob Skills", List.of(
+                "&7Open your specialization trees",
+                "&7without going through the jobs menu."
+        )));
+        inventory.setItem(16, createItem(Material.WRITABLE_BOOK, "&6Contracts", List.of(
                 "&7Track your active quest and",
                 "&7future personal work systems."
         )));
@@ -178,12 +184,50 @@ public final class TerraGuideListener implements Listener {
         player.openInventory(inventory);
     }
 
+    private void openSkillSelectorMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(new TerraGuideHolder(GuidePage.SKILL_SELECTOR), GUI_SIZE, plugin.legacyComponent("&8Job Skills"));
+        fillEmpty(inventory);
+
+        UUID playerId = player.getUniqueId();
+        List<Profession> ownedProfessions = plugin.getOwnedProfessions(playerId);
+        inventory.setItem(SKILL_SELECTOR_INFO_SLOT, createItem(Material.EXPERIENCE_BOTTLE, "&6Job Skills", List.of(
+                "&7Choose one of your jobs to open",
+                "&7its specialization tree."
+        )));
+
+        if (ownedProfessions.isEmpty()) {
+            inventory.setItem(22, createItem(Material.BARRIER, "&cNo Jobs", List.of(
+                    "&7You need a profession before",
+                    "&7you can use job skills."
+            )));
+        } else {
+            int[] slots = {20, 24, 29, 31};
+            for (int i = 0; i < ownedProfessions.size() && i < slots.length; i++) {
+                Profession profession = ownedProfessions.get(i);
+                inventory.setItem(slots[i], createItem(plugin.getProfessionIcon(profession), plugin.getProfessionDisplayName(profession), List.of(
+                        "&7Level: &f" + plugin.getProfessionLevel(playerId, profession),
+                        "&7Available points: &f" + plugin.getAvailableProfessionSkillPoints(playerId, profession),
+                        profession == plugin.getSecondaryProfession(playerId)
+                                ? "&7Role: &fSecondary"
+                                : "&7Role: &fMain",
+                        "",
+                        "&eClick to open skill tree."
+                )));
+            }
+        }
+
+        inventory.setItem(BACK_SLOT, createItem(Material.ARROW, "&eBack", List.of("&7Return to the main guide menu.")));
+        inventory.setItem(CLOSE_SLOT, createItem(Material.BARRIER, "&cClose", List.of("&7Close the Terra Guide.")));
+        player.openInventory(inventory);
+    }
+
     private void handleMainClick(Player player, int slot) {
         Country country = plugin.getPlayerCountry(player.getUniqueId());
         switch (slot) {
             case 10 -> openStatsMenu(player);
             case 12 -> plugin.openProfessionMenu(player);
-            case 14 -> openContractsMenu(player);
+            case 14 -> openSkillSelectorMenu(player);
+            case 16 -> openContractsMenu(player);
             case 28 -> {
                 if (country != null) {
                     plugin.openCountryMenu(player);
@@ -199,6 +243,31 @@ public final class TerraGuideListener implements Listener {
             case CLOSE_SLOT -> player.closeInventory();
             default -> {
             }
+        }
+    }
+
+    private void handleSkillSelectorClick(Player player, int slot) {
+        if (handleBackClose(player, slot)) {
+            return;
+        }
+
+        UUID playerId = player.getUniqueId();
+        Profession selected = switch (slot) {
+            case 20, 24, 29, 31 -> {
+                List<Profession> ownedProfessions = plugin.getOwnedProfessions(playerId);
+                int index = switch (slot) {
+                    case 20 -> 0;
+                    case 24 -> 1;
+                    case 29 -> 2;
+                    case 31 -> 3;
+                    default -> -1;
+                };
+                yield index >= 0 && index < ownedProfessions.size() ? ownedProfessions.get(index) : null;
+            }
+            default -> null;
+        };
+        if (selected != null) {
+            plugin.openProfessionSkillTreeMenu(player, selected);
         }
     }
 
@@ -240,6 +309,7 @@ public final class TerraGuideListener implements Listener {
     private enum GuidePage {
         MAIN,
         STATS,
+        SKILL_SELECTOR,
         CONTRACTS
     }
 
