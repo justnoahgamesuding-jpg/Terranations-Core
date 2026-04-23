@@ -4,6 +4,10 @@ This file keeps the more detailed feature ledger for the current code snapshot. 
 
 | Date | Feature | Notes |
 | --- | --- | --- |
+| 2026-04-23 | Terra workbench playtest system | Added a standalone Terra crafting subsystem with placeable specialist workbenches, floating bench labels, saved placed-block identities, and dedicated crafting GUIs. |
+| 2026-04-23 | `/terra catalog` | Added an admin GUI for spawning Terra workbench, ore, material, block, armor, and tool playtest items. |
+| 2026-04-23 | placeholder Terra content set | Added a first placeholder batch of Terra ores, refined materials, blocks, armor, and tools intended to be reskinned through ItemsAdder later. |
+| 2026-04-23 | crafting table redirect | Vanilla crafting tables are now blocked on interaction so the new Terra workbench layer can drive the crafting playtest flow. |
 | 2026-04-14 | Terra Guide main menu | The locked guide item now opens player stats, jobs access, personal skills, contracts, country access, and ore-sense controls. |
 | 2026-04-14 | personal skills | Players now earn skill points from level-ups and playtime and can spend them on permanent gameplay bonuses. |
 | 2026-04-14 | personal work orders | The guide now surfaces personal profession work orders that reward money and skill points. |

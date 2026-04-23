@@ -2,6 +2,16 @@
 
 This file is the short, high-level timeline for the current repository snapshot.
 
+## 2026-04-23
+
+### Terra crafting moved toward a standalone workbench model
+
+- A new playtest-only Terra crafting layer was added to separate progression from the vanilla crafting table.
+- Seven specialist workbenches were introduced as placeable blocks with floating name labels and dedicated right-click crafting menus.
+- Each workbench now supports general recipes for anyone plus specialist output bonuses and one specialist-only recipe for its linked job.
+- A first placeholder batch of Terra ores, refined materials, blocks, tools, and armor was added so ItemsAdder visuals can be swapped in later.
+- `/terra catalog` now opens an admin spawn GUI for the current Terra crafting categories and content entries.
+
 ## 2026-04-14
 
 ### UI and player guidance shifted away from the old pack-driven approach

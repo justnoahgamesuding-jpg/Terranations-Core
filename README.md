@@ -4,10 +4,11 @@ Terra Nations Core is a Paper 1.21 plugin that combines profession-based progres
 
 ## What It Includes
 
-- Five core professions: Miner, Lumberjack, Farmer, Builder, and Blacksmith
+- Seven core professions: Miner, Lumberjack, Farmer, Builder, Blacksmith, Trader, and Soldier
 - Country management with territory links, homes, treasury, resources, roles, upgrades, boosts, and trader access
 - Climate, seasons, rainfall, altitude, and biome-aware crop or sapling growth
 - Stability and support-structure rules for excavation and large builds
+- A standalone Terra workbench playtest system with placeable specialist benches, placeholder custom ores, materials, armor, tools, and blocks
 - Traveling trader and wandering merchant systems
 - Local, country, and opt-in global chat routing
 - Terra-owned player balances and country treasury support
@@ -55,6 +56,14 @@ The shaded jar is produced in `target/`.
 - `/globalchat` (`/gc`)
 - `/rollbackarea`
 - `/undoarea`
+
+## Current Playtest Crafting Layer
+
+- `/terra catalog` opens an admin GUI for spawning Terra workbenches, placeholder ores, materials, blocks, armor, and tools.
+- Vanilla crafting tables are blocked on interaction so players are pushed toward Terra workbenches instead.
+- Placed Terra workbenches show a floating title above the block and open a dedicated crafting GUI on right-click.
+- Each workbench has a linked specialist profession that gets extra output on eligible recipes and one specialist-only pattern.
+- The current content set is intentionally placeholder-driven so ItemsAdder models, blocks, armor, and textures can be swapped in later without rebuilding the logic.
 
 ## Documentation
 

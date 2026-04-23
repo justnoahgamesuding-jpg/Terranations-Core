@@ -10,6 +10,7 @@ Terra combines these major systems:
 - country management with roles, treasury, upgrades, boosts, and territory
 - climate-aware farming and sapling growth
 - structural stability and support logic
+- a standalone Terra workbench crafting playtest layer with placeable specialist benches and placeholder custom content
 - trader routes and merchant waves
 - Terra-owned balance storage
 - a locked player guide item in hotbar slot 9 for future gameplay navigation
@@ -37,6 +38,8 @@ Primary admin root. Most subcommands require `terra.admin`.
   Sets per-job population caps.
 - `playtest`
   Starts, extends, stops, or inspects playtest sessions.
+- `catalog`
+  Opens the Terra crafting catalog GUI for spawning workbenches and placeholder Terra content items.
 - `cooldowndebug`
   Toggles admin cooldown bossbars.
 - `setworldspawn`
@@ -73,6 +76,7 @@ Notes:
 - Break and place cooldowns are separate.
 - `/terra reload` also refreshes climate-lore items and soulbound starter items in loaded inventories.
 - The Terra Guide item is restored to slot 9 for online players and stays locked there.
+- `/terra catalog` is the current admin entry point for the standalone Terra workbench playtest items.
 - `lag clearitems` intentionally excludes Terra trader and merchant entities.
 - The stability meter always runs in the background even when its chat display is off.
 
@@ -244,6 +248,8 @@ The active professions are:
 - Farmer
 - Builder
 - Blacksmith
+- Trader
+- Soldier
 
 Key behavior:
 
@@ -253,6 +259,20 @@ Key behavior:
 - Starter kits and many progression rules come from `src/main/resources/jobs/`.
 - Farmer and Lumberjack have instant-growth proc systems.
 - Blacksmith and Farmer use furnace collaboration and output tagging.
+
+### Terra Workbench Crafting
+
+- Vanilla crafting tables are blocked on interaction for the current playtest flow.
+- Terra workbenches are placeable managed blocks that keep their Terra identity when broken and replaced.
+- Each placed workbench spawns a floating title label above the block so the bench type is obvious in-world.
+- The current playtest set includes seven benches:
+  `Prospector Bench`, `Timber Bench`, `Field Kitchen`, `Mason Bench`, `Forge Bench`, `Trade Desk`, and `War Table`.
+- Each workbench has:
+  general recipes any player can use,
+  a linked specialist profession that gets extra output on eligible recipes,
+  and one specialist-only placeholder recipe.
+- The current outputs are placeholder Terra ores, materials, blocks, tools, and armor meant to be swapped to ItemsAdder assets later.
+- `/terra catalog` is the admin spawn GUI for the current Terra crafting categories.
 
 ### Terra Guide
 

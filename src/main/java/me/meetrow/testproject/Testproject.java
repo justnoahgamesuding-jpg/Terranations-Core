@@ -277,6 +277,7 @@ public final class Testproject extends JavaPlugin {
     private PlaytestGuiListener playtestGuiListener;
     private StabilityGuiListener stabilityGuiListener;
     private QuestAdminGuiListener questAdminGuiListener;
+    private TerraCraftingManager terraCraftingManager;
     private BossBar globalXpBoostBossBar;
     private final Set<UUID> cooldownDebugPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, BossBar> breakCooldownDebugBars = new ConcurrentHashMap<>();
@@ -472,6 +473,8 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(staffMenuListener, this);
         getServer().getPluginManager().registerEvents(new FixedOreToolListener(this), this);
         getServer().getPluginManager().registerEvents(new RestrictedItemListener(this), this);
+        terraCraftingManager = new TerraCraftingManager(this);
+        getServer().getPluginManager().registerEvents(terraCraftingManager, this);
 
         TerraCommand terraCommand = new TerraCommand(this);
         PluginCommand terraRootCommand = getCommand("terra");
@@ -654,6 +657,10 @@ public final class Testproject extends JavaPlugin {
         stopCountryBorderParticlesRuntime();
         stopStabilityDebugRuntime();
         stopLagReductionRuntime();
+        if (terraCraftingManager != null) {
+            terraCraftingManager.shutdown();
+            terraCraftingManager = null;
+        }
         breakCooldowns.clear();
         placeCooldowns.clear();
         blockRewards.clear();
@@ -7038,6 +7045,13 @@ public final class Testproject extends JavaPlugin {
             }
         }
         player.openInventory(inventory);
+    }
+
+    public void openTerraCraftCatalog(Player player) {
+        if (player == null || terraCraftingManager == null) {
+            return;
+        }
+        terraCraftingManager.openCatalogRoot(player);
     }
 
     public ItemStack refreshDescriptiveItemDetails(ItemStack itemStack) {

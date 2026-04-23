@@ -265,6 +265,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handleQuestsCommand(sender, args);
         }
 
+        if (args[0].equalsIgnoreCase("catalog")) {
+            return handleCatalogCommand(sender);
+        }
+
         if (args[0].equalsIgnoreCase("questdebug")) {
             return handleQuestDebugCommand(sender, args);
         }
@@ -306,6 +310,15 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         plugin.openQuestAdminMenu(player);
+        return true;
+    }
+
+    private boolean handleCatalogCommand(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can open the Terra catalog.", NamedTextColor.RED));
+            return true;
+        }
+        plugin.openTerraCraftCatalog(player);
         return true;
     }
 
@@ -2959,6 +2972,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
 
         entries.add(new HelpEntry("/terra reload", "Reload Terra configs.", ignored -> true));
         entries.add(new HelpEntry("/terra quests", "Open the quest admin GUI.", ignored -> sender instanceof Player));
+        entries.add(new HelpEntry("/terra catalog", "Open the Terra crafting catalog GUI.", ignored -> sender instanceof Player));
         entries.add(new HelpEntry("/terra questdebug", "Show the active quest debug info.", ignored -> sender instanceof Player));
         entries.add(new HelpEntry("/terra hardrestart", "Queue the hard restart flow.", ignored -> true));
         entries.add(new HelpEntry("/terra blockdelay <enable|disable>", "Toggle block delay.", ignored -> true));
@@ -3390,6 +3404,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             if (args.length == 3 && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove"))) {
                 return partialMatches(args[2], getKnownPlayerNames());
             }
+            return Collections.emptyList();
+        }
+
+        if (args[0].equalsIgnoreCase("catalog")) {
             return Collections.emptyList();
         }
 
