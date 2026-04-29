@@ -4,11 +4,20 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
+import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Display;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -26,10 +35,13 @@ import org.bukkit.scheduler.BukkitTask;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.util.ArrayList;
+import java.io.File;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -54,11 +66,22 @@ public class BlacksmithAnvilListener implements Listener {
 
     private final Testproject plugin;
     private final NamespacedKey mergeUiKey;
+    private final NamespacedKey forgeDisplayKey;
+    private final NamespacedKey forgeDisplayBlockKey;
     private final Map<UUID, BukkitTask> activeMergeAnimations = new ConcurrentHashMap<>();
+    private final Map<String, ItemStack[]> guiLayoutOverrides = new ConcurrentHashMap<>();
+    private final Map<UUID, ForgeGuiEditorSession> guiEditorSessions = new ConcurrentHashMap<>();
+    private final File layoutDataFile;
+    private final YamlConfiguration layoutDataConfig;
 
     public BlacksmithAnvilListener(Testproject plugin) {
         this.plugin = plugin;
         this.mergeUiKey = new NamespacedKey(plugin, "merge_ui_marker");
+        this.forgeDisplayKey = new NamespacedKey(plugin, "blacksmith_forge_label");
+        this.forgeDisplayBlockKey = new NamespacedKey(plugin, "blacksmith_forge_label_block");
+        this.layoutDataFile = new File(plugin.getDataFolder(), "blacksmith_gui_layouts.yml");
+        this.layoutDataConfig = YamlConfiguration.loadConfiguration(layoutDataFile);
+        loadGuiLayouts();
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -74,11 +97,34 @@ public class BlacksmithAnvilListener implements Listener {
         }
 
         event.setCancelled(true);
+        ensureForgeLabel(event.getClickedBlock());
         openMenu(event.getPlayer(), BlacksmithCategory.BASICS);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (isAnvil(event.getBlockPlaced().getType())) {
+            ensureForgeLabel(event.getBlockPlaced());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (isAnvil(event.getBlock().getType())) {
+            removeForgeLabel(event.getBlock());
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof ForgeGuiEditorHolder editorHolder) {
+            handleGuiEditorClick(event, editorHolder);
+            return;
+        }
+        if (event.getView().getTopInventory().getHolder() instanceof ForgeGuiEditorConfirmHolder confirmHolder) {
+            handleGuiEditorConfirmClick(event, confirmHolder);
+            return;
+        }
         if (event.getView().getTopInventory().getType() == InventoryType.ANVIL
                 && PlainTextComponentSerializer.plainText().serialize(event.getView().title()).equals(RENAME_ANVIL_TITLE)) {
             handleRenameAnvilClick(event);
@@ -100,45 +146,49 @@ public class BlacksmithAnvilListener implements Listener {
             return;
         }
 
-        if (event.getSlot() == CLOSE_SLOT) {
+        String marker = getUiMarker(event.getCurrentItem());
+        if ("action:close".equalsIgnoreCase(marker)) {
             player.closeInventory();
             return;
         }
-        if (event.getSlot() == NORMAL_ANVIL_SLOT) {
+        if ("action:rename".equalsIgnoreCase(marker)) {
             openVanillaAnvil(player);
             return;
         }
-        if (event.getSlot() == MERGE_SLOT) {
+        if ("action:merge".equalsIgnoreCase(marker)) {
             openMergeMenu(player);
             return;
         }
 
-        BlacksmithCategory category = BlacksmithCategory.fromSlot(event.getSlot());
+        BlacksmithCategory category = BlacksmithCategory.fromMarker(marker);
         if (category != null) {
             openMenu(player, category);
             return;
         }
 
-        Testproject.BlacksmithRecipe recipe = getRecipeForSlot(holder.category(), event.getSlot());
+        Testproject.BlacksmithRecipe recipe = getRecipeForItem(holder.category(), event.getCurrentItem());
         if (recipe == null) {
             return;
         }
 
-        if (!plugin.canCraftBlacksmithRecipe(player.getUniqueId(), recipe)) {
+        boolean bypass = plugin.hasCraftingBypass(player.getUniqueId());
+        if (!bypass && !plugin.canCraftBlacksmithRecipe(player.getUniqueId(), recipe)) {
             player.sendMessage(getRecipeLockMessage(player, recipe));
             return;
         }
-        if (!hasIngredients(player, recipe.ingredients())) {
+        if (!bypass && !hasIngredients(player, recipe.ingredients())) {
             player.sendMessage(plugin.getMessage("profession.blacksmith.anvil-no-materials", plugin.placeholders(
                     "item", plugin.formatMaterialName(recipe.result())
             )));
             return;
         }
-        if (!plugin.tryConsumeSharedActionCooldown(player, plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH) ? Profession.BLACKSMITH : null)) {
+        if (!bypass && !plugin.tryConsumeSharedActionCooldown(player, plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH) ? Profession.BLACKSMITH : null)) {
             return;
         }
 
-        removeIngredients(player, recipe.ingredients());
+        if (!bypass) {
+            removeIngredients(player, recipe.ingredients());
+        }
         ItemStack result = plugin.createForgedEquipment(player, recipe);
         Map<Integer, ItemStack> leftovers = player.getInventory().addItem(result);
         for (ItemStack leftover : leftovers.values()) {
@@ -162,6 +212,16 @@ public class BlacksmithAnvilListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInventoryDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof ForgeGuiEditorHolder editorHolder) {
+            if (event.getRawSlots().stream().anyMatch(slot -> slot < event.getView().getTopInventory().getSize()
+                    && isLockedEditorSlot(editorHolder.screenKey(), slot))) {
+                event.setCancelled(true);
+            }
+            return;
+        }
+        if (event.getView().getTopInventory().getHolder() instanceof ForgeGuiEditorConfirmHolder) {
+            return;
+        }
         if (event.getView().getTopInventory().getType() == InventoryType.ANVIL
                 && PlainTextComponentSerializer.plainText().serialize(event.getView().title()).equals(RENAME_ANVIL_TITLE)) {
             if (event.getRawSlots().contains(1) || event.getRawSlots().contains(2)) {
@@ -201,6 +261,19 @@ public class BlacksmithAnvilListener implements Listener {
         if (!(event.getPlayer() instanceof Player player)) {
             return;
         }
+        if (event.getInventory().getHolder() instanceof ForgeGuiEditorHolder editorHolder) {
+            ForgeGuiEditorSession session = guiEditorSessions.get(player.getUniqueId());
+            if (session != null && session.confirmContents == null) {
+                ItemStack[] edited = cloneContents(event.getInventory().getContents());
+                if (contentsEqual(session.originalContents, edited)) {
+                    guiEditorSessions.remove(player.getUniqueId());
+                    return;
+                }
+                guiEditorSessions.put(player.getUniqueId(), new ForgeGuiEditorSession(editorHolder.screenKey, session.originalContents, edited));
+                Bukkit.getScheduler().runTask(plugin, () -> openGuiEditorConfirm(player, editorHolder.screenKey));
+                return;
+            }
+        }
         if (!(event.getInventory().getHolder() instanceof MergeMenuHolder)) {
             return;
         }
@@ -211,6 +284,50 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private void openMenu(Player player, BlacksmithCategory category) {
+        player.openInventory(buildForgeMenu(player, category, true));
+    }
+
+    public List<String> editableScreenKeys() {
+        List<String> keys = new ArrayList<>();
+        for (BlacksmithCategory category : BlacksmithCategory.values()) {
+            keys.add("blacksmith_forge_" + category.key);
+        }
+        keys.add("blacksmith_forge_merge");
+        return keys;
+    }
+
+    public boolean openGuiEditor(Player player, String screenKey) {
+        if (player == null) {
+            return false;
+        }
+        Inventory source = buildEditableScreen(player, screenKey, true);
+        if (source == null) {
+            return false;
+        }
+        Inventory editor = Bukkit.createInventory(new ForgeGuiEditorHolder(normalizeScreenKey(screenKey)), source.getSize(),
+                plugin.legacyComponent("&8Forge GUI Editor: " + prettyScreenName(screenKey)));
+        editor.setContents(cloneContents(source.getContents()));
+        guiEditorSessions.put(player.getUniqueId(), new ForgeGuiEditorSession(normalizeScreenKey(screenKey), cloneContents(source.getContents()), null));
+        player.openInventory(editor);
+        player.sendMessage(plugin.colorize("&eEdit the forge screen, then close it to confirm or discard the changes."));
+        return true;
+    }
+
+    public boolean resetGuiLayout(String screenKey) {
+        String normalized = normalizeScreenKey(screenKey);
+        if (!editableScreenKeys().contains(normalized)) {
+            return false;
+        }
+        guiLayoutOverrides.remove(normalized);
+        saveGuiLayouts();
+        return true;
+    }
+
+    public void shutdown() {
+        saveGuiLayouts();
+    }
+
+    private Inventory buildForgeMenu(Player player, BlacksmithCategory category, boolean applyLayout) {
         Inventory inventory = Bukkit.createInventory(
                 new BlacksmithMenuHolder(category),
                 GUI_SIZE,
@@ -221,23 +338,23 @@ public class BlacksmithAnvilListener implements Listener {
         for (BlacksmithCategory value : BlacksmithCategory.values()) {
             inventory.setItem(value.slot, createCategoryItem(player, value, value == category));
         }
-        inventory.setItem(NORMAL_ANVIL_SLOT, createSimpleItem(Material.ANVIL, "&fRename Anvil", List.of(
+        inventory.setItem(NORMAL_ANVIL_SLOT, createUiItem(Material.ANVIL, "&fRename Anvil", "action:rename", List.of(
                 "&7Open a rename-only anvil.",
                 "&7No repairing or combining."
         )));
-        inventory.setItem(MERGE_SLOT, createSimpleItem(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&6Merge Forge", List.of(
+        inventory.setItem(MERGE_SLOT, createUiItem(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&6Merge Forge", "action:merge", List.of(
                 "&7Open the merging forge.",
                 "&7Use 10 matching forged items",
                 "&7to risk a higher tier."
         )));
-        inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close the forge menu.")));
+        inventory.setItem(CLOSE_SLOT, createUiItem(Material.BARRIER, "&cClose", "action:close", List.of("&7Close the forge menu.")));
 
         List<Testproject.BlacksmithRecipe> recipes = getRecipes(category);
         for (int i = 0; i < RECIPE_SLOTS.length && i < recipes.size(); i++) {
             inventory.setItem(RECIPE_SLOTS[i], createRecipeItem(player, recipes.get(i)));
         }
 
-        player.openInventory(inventory);
+        return applyLayout ? applySavedLayout("blacksmith_forge_" + category.key, inventory) : inventory;
     }
 
     private List<Testproject.BlacksmithRecipe> getRecipes(BlacksmithCategory category) {
@@ -356,6 +473,22 @@ public class BlacksmithAnvilListener implements Listener {
         return null;
     }
 
+    private Testproject.BlacksmithRecipe getRecipeForItem(BlacksmithCategory category, ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return null;
+        }
+        String marker = getUiMarker(itemStack);
+        if (marker == null || !marker.startsWith("recipe:")) {
+            return null;
+        }
+        for (Testproject.BlacksmithRecipe recipe : getRecipes(category)) {
+            if (Objects.equals(marker, recipeMarker(recipe))) {
+                return recipe;
+            }
+        }
+        return null;
+    }
+
     private ItemStack createCategoryItem(Player player, BlacksmithCategory category, boolean selected) {
         int level = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH)
                 ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH)
@@ -367,11 +500,12 @@ public class BlacksmithAnvilListener implements Listener {
                 : "&7Quality bonus starts at Lv." + category.requiredLevel);
         lore.add("");
         lore.add(selected ? "&eCurrently selected." : "&7Click to switch rack.");
-        return createSimpleItem(selected ? category.icon : category.selectorIcon, category.displayName(level), lore);
+        return createUiItem(selected ? category.icon : category.selectorIcon, category.displayName(level), "category:" + category.key, lore);
     }
 
     private ItemStack createRecipeItem(Player player, Testproject.BlacksmithRecipe recipe) {
-        boolean unlocked = plugin.canCraftBlacksmithRecipe(player.getUniqueId(), recipe);
+        boolean bypass = plugin.hasCraftingBypass(player.getUniqueId());
+        boolean unlocked = bypass || plugin.canCraftBlacksmithRecipe(player.getUniqueId(), recipe);
         boolean blacksmith = plugin.hasProfession(player.getUniqueId(), Profession.BLACKSMITH);
         int level = blacksmith ? plugin.getProfessionLevel(player.getUniqueId(), Profession.BLACKSMITH) : 0;
         List<String> lore = new ArrayList<>();
@@ -393,9 +527,11 @@ public class BlacksmithAnvilListener implements Listener {
         } else {
             lore.add("&7Blacksmiths get better rolls here.");
         }
+        lore.add("");
+        lore.add(bypass ? "&6Craft bypass active." : unlocked ? "&eClick to forge." : "&cLocked right now.");
         Material icon = unlocked ? recipe.result() : Material.RED_STAINED_GLASS_PANE;
         String name = "&f" + plugin.formatMaterialName(recipe.result());
-        return createSimpleItem(icon, name, lore);
+        return createUiItem(icon, name, recipeMarker(recipe), lore);
     }
 
     private String getRecipeLockMessage(Player player, Testproject.BlacksmithRecipe recipe) {
@@ -437,6 +573,54 @@ public class BlacksmithAnvilListener implements Listener {
                 || material == Material.DAMAGED_ANVIL;
     }
 
+    private void ensureForgeLabel(Block block) {
+        if (block == null || !isAnvil(block.getType()) || findForgeLabel(block) != null) {
+            return;
+        }
+        block.getWorld().spawn(block.getLocation().add(0.5D, 1.2D, 0.5D), TextDisplay.class, entity -> {
+            entity.setPersistent(true);
+            entity.setBillboard(Display.Billboard.CENTER);
+            entity.setSeeThrough(true);
+            entity.setShadowed(false);
+            entity.setAlignment(TextDisplay.TextAlignment.CENTER);
+            entity.setText(plugin.colorize("&6Blacksmith Forge"));
+            entity.getPersistentDataContainer().set(forgeDisplayKey, PersistentDataType.BYTE, (byte) 1);
+            entity.getPersistentDataContainer().set(forgeDisplayBlockKey, PersistentDataType.STRING, serializeBlockKey(block));
+        });
+    }
+
+    private void removeForgeLabel(Block block) {
+        TextDisplay display = findForgeLabel(block);
+        if (display != null) {
+            display.remove();
+        }
+    }
+
+    private TextDisplay findForgeLabel(Block block) {
+        if (block == null) {
+            return null;
+        }
+        World world = block.getWorld();
+        String blockKey = serializeBlockKey(block);
+        for (TextDisplay display : world.getEntitiesByClass(TextDisplay.class)) {
+            String storedKey = display.getPersistentDataContainer().get(forgeDisplayBlockKey, PersistentDataType.STRING);
+            if (blockKey.equalsIgnoreCase(storedKey) || matchesForgeLabel(display, blockKey)) {
+                return display;
+            }
+        }
+        return null;
+    }
+
+    private boolean matchesForgeLabel(Entity entity, String blockKey) {
+        return entity instanceof TextDisplay
+                && entity.getPersistentDataContainer().has(forgeDisplayKey, PersistentDataType.BYTE)
+                && blockKey.equalsIgnoreCase(entity.getPersistentDataContainer().get(forgeDisplayBlockKey, PersistentDataType.STRING));
+    }
+
+    private String serializeBlockKey(Block block) {
+        return block.getWorld().getName() + ";" + block.getX() + ";" + block.getY() + ";" + block.getZ();
+    }
+
     private void fillForgeLayout(Inventory inventory) {
         ItemStack black = createUiItem(Material.BLACK_STAINED_GLASS_PANE, "&8", "filler", List.of());
         ItemStack gray = createUiItem(Material.GRAY_STAINED_GLASS_PANE, "&7", "filler", List.of());
@@ -474,10 +658,14 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private void openMergeMenu(Player player) {
+        player.openInventory(buildMergeMenu(true));
+    }
+
+    private Inventory buildMergeMenu(boolean applyLayout) {
         Inventory inventory = Bukkit.createInventory(new MergeMenuHolder(), MERGE_GUI_SIZE, plugin.legacyComponent("&8Forge Merge"));
         fillMergeLayout(inventory);
         refreshMergeDisplay(inventory);
-        player.openInventory(inventory);
+        return applyLayout ? applySavedLayout("blacksmith_forge_merge", inventory) : inventory;
     }
 
     private void handleMergeMenuClick(InventoryClickEvent event, Player player) {
@@ -490,27 +678,28 @@ public class BlacksmithAnvilListener implements Listener {
         }
 
         int slot = event.getSlot();
+        String marker = getUiMarker(event.getCurrentItem());
         if (activeMergeAnimations.containsKey(player.getUniqueId())) {
             event.setCancelled(true);
             return;
         }
-        if (slot == MERGE_CLOSE_SLOT) {
+        if ("merge:close".equalsIgnoreCase(marker)) {
             event.setCancelled(true);
             player.closeInventory();
             return;
         }
-        if (slot == MERGE_BACK_SLOT) {
+        if ("merge:back".equalsIgnoreCase(marker)) {
             event.setCancelled(true);
             returnMergeInputs(player, event.getView().getTopInventory());
             openMenu(player, BlacksmithCategory.BASICS);
             return;
         }
-        if (slot == MERGE_ACTION_SLOT) {
+        if ("merge:action".equalsIgnoreCase(marker)) {
             event.setCancelled(true);
             runMergeAttempt(player, event.getView().getTopInventory());
             return;
         }
-        if (slot == MERGE_INFO_SLOT) {
+        if ("merge:info".equalsIgnoreCase(marker)) {
             event.setCancelled(true);
             return;
         }
@@ -553,6 +742,247 @@ public class BlacksmithAnvilListener implements Listener {
         return stored != null && stored.equalsIgnoreCase(marker);
     }
 
+    private String getUiMarker(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return null;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null) {
+            return null;
+        }
+        return meta.getPersistentDataContainer().get(mergeUiKey, PersistentDataType.STRING);
+    }
+
+    private String recipeMarker(Testproject.BlacksmithRecipe recipe) {
+        return "recipe:" + recipe.category().toLowerCase(Locale.ROOT) + ":" + recipe.result().name().toLowerCase(Locale.ROOT) + ":" + recipe.level();
+    }
+
+    private void handleGuiEditorClick(InventoryClickEvent event, ForgeGuiEditorHolder holder) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getClickedInventory() == event.getView().getTopInventory() && isLockedEditorSlot(holder.screenKey, event.getSlot())) {
+            event.setCancelled(true);
+            player.sendMessage(plugin.colorize("&cThat slot is locked in the editor because it is used by the live forge."));
+            return;
+        }
+        if (event.isShiftClick() && event.getClickedInventory() == event.getView().getBottomInventory()
+                && hasAnyLockedEditorSlots(holder.screenKey)) {
+            event.setCancelled(true);
+            player.sendMessage(plugin.colorize("&cShift-moving is disabled for this forge editor screen because it has locked functional slots."));
+            return;
+        }
+        guiEditorSessions.computeIfPresent(player.getUniqueId(), (ignored, session) ->
+                new ForgeGuiEditorSession(holder.screenKey, session.originalContents, session.confirmContents));
+    }
+
+    private void handleGuiEditorConfirmClick(InventoryClickEvent event, ForgeGuiEditorConfirmHolder holder) {
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player) || event.getClickedInventory() != event.getView().getTopInventory()) {
+            return;
+        }
+        if (event.getSlot() == 11) {
+            ForgeGuiEditorSession session = guiEditorSessions.remove(player.getUniqueId());
+            if (session == null || session.confirmContents == null) {
+                player.closeInventory();
+                return;
+            }
+            guiLayoutOverrides.put(holder.screenKey, cloneContents(session.confirmContents));
+            saveGuiLayouts();
+            player.sendMessage(plugin.colorize("&aSaved forge GUI layout for &f" + prettyScreenName(holder.screenKey) + "&a."));
+            player.closeInventory();
+            return;
+        }
+        if (event.getSlot() == 15) {
+            guiEditorSessions.remove(player.getUniqueId());
+            player.sendMessage(plugin.colorize("&7Discarded forge GUI changes for &f" + prettyScreenName(holder.screenKey) + "&7."));
+            player.closeInventory();
+        }
+    }
+
+    private void openGuiEditorConfirm(Player player, String screenKey) {
+        Inventory inventory = Bukkit.createInventory(new ForgeGuiEditorConfirmHolder(screenKey), 27, plugin.legacyComponent("&8Confirm Forge GUI"));
+        ItemStack filler = createUiItem(Material.BLACK_STAINED_GLASS_PANE, "&8", "editor:filler", List.of());
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            inventory.setItem(slot, filler);
+        }
+        inventory.setItem(11, createUiItem(Material.LIME_CONCRETE, "&aSave Layout", "editor:save", List.of(
+                "&7Apply these forge GUI changes now."
+        )));
+        inventory.setItem(13, createUiItem(Material.BOOK, "&f" + prettyScreenName(screenKey), "editor:info", List.of(
+                "&7Save to keep the edited layout,",
+                "&7or discard to keep the old one."
+        )));
+        inventory.setItem(15, createUiItem(Material.RED_CONCRETE, "&cDiscard Changes", "editor:discard", List.of(
+                "&7Throw away the staged forge changes."
+        )));
+        player.openInventory(inventory);
+    }
+
+    private Inventory buildEditableScreen(Player player, String screenKey, boolean applyLayout) {
+        String normalized = normalizeScreenKey(screenKey);
+        if ("blacksmith_forge_merge".equalsIgnoreCase(normalized)) {
+            return buildMergeMenu(applyLayout);
+        }
+        for (BlacksmithCategory category : BlacksmithCategory.values()) {
+            if (normalized.equalsIgnoreCase("blacksmith_forge_" + category.key)) {
+                return buildForgeMenu(player, category, applyLayout);
+            }
+        }
+        return null;
+    }
+
+    private Inventory applySavedLayout(String screenKey, Inventory inventory) {
+        ItemStack[] saved = guiLayoutOverrides.get(normalizeScreenKey(screenKey));
+        if (saved == null || saved.length == 0) {
+            return inventory;
+        }
+        List<ForgeLayoutEntry> baseEntries = new ArrayList<>();
+        ItemStack[] baseContents = cloneContents(inventory.getContents());
+        for (int slot = 0; slot < baseContents.length; slot++) {
+            ItemStack itemStack = baseContents[slot];
+            if (itemStack == null || itemStack.getType().isAir()) {
+                continue;
+            }
+            baseEntries.add(new ForgeLayoutEntry(slot, layoutItemKey(itemStack), itemStack));
+        }
+        ItemStack[] rebuilt = new ItemStack[inventory.getSize()];
+        boolean[] usedEntries = new boolean[baseEntries.size()];
+        for (int slot = 0; slot < Math.min(rebuilt.length, saved.length); slot++) {
+            ItemStack savedItem = saved[slot];
+            if (savedItem == null || savedItem.getType().isAir()) {
+                continue;
+            }
+            String key = layoutItemKey(savedItem);
+            int matchedIndex = -1;
+            for (int index = 0; index < baseEntries.size(); index++) {
+                if (!usedEntries[index] && Objects.equals(baseEntries.get(index).key, key)) {
+                    matchedIndex = index;
+                    break;
+                }
+            }
+            rebuilt[slot] = matchedIndex >= 0 ? baseEntries.get(matchedIndex).itemStack.clone() : savedItem.clone();
+            if (matchedIndex >= 0) {
+                usedEntries[matchedIndex] = true;
+            }
+        }
+        inventory.setContents(rebuilt);
+        return inventory;
+    }
+
+    private String layoutItemKey(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return "";
+        }
+        String marker = getUiMarker(itemStack);
+        if (marker != null && !marker.isBlank()) {
+            return "marker:" + marker.toLowerCase(Locale.ROOT);
+        }
+        return "item:" + itemStack.getType().name().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean hasAnyLockedEditorSlots(String screenKey) {
+        return "blacksmith_forge_merge".equalsIgnoreCase(normalizeScreenKey(screenKey));
+    }
+
+    private boolean isLockedEditorSlot(String screenKey, int slot) {
+        if (!"blacksmith_forge_merge".equalsIgnoreCase(normalizeScreenKey(screenKey))) {
+            return false;
+        }
+        if (slot == MERGE_INFO_SLOT || slot == MERGE_RARE_SLOT || slot == MERGE_PREVIEW_SLOT
+                || slot == MERGE_ATTRIBUTE_SLOT || slot == MERGE_BACK_SLOT || slot == MERGE_CLOSE_SLOT) {
+            return true;
+        }
+        for (int inputSlot : MERGE_INPUT_SLOTS) {
+            if (inputSlot == slot) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeScreenKey(String screenKey) {
+        return screenKey == null ? "" : screenKey.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String prettyScreenName(String screenKey) {
+        String normalized = normalizeScreenKey(screenKey);
+        if ("blacksmith_forge_merge".equalsIgnoreCase(normalized)) {
+            return "Blacksmith Merge Forge";
+        }
+        for (BlacksmithCategory category : BlacksmithCategory.values()) {
+            if (normalized.equalsIgnoreCase("blacksmith_forge_" + category.key)) {
+                return "Blacksmith Forge " + category.display;
+            }
+        }
+        return "Blacksmith Forge";
+    }
+
+    private ItemStack[] cloneContents(ItemStack[] contents) {
+        if (contents == null) {
+            return new ItemStack[0];
+        }
+        ItemStack[] clone = new ItemStack[contents.length];
+        for (int index = 0; index < contents.length; index++) {
+            clone[index] = contents[index] == null ? null : contents[index].clone();
+        }
+        return clone;
+    }
+
+    private boolean contentsEqual(ItemStack[] first, ItemStack[] second) {
+        if (first == second) {
+            return true;
+        }
+        if (first == null || second == null || first.length != second.length) {
+            return false;
+        }
+        for (int index = 0; index < first.length; index++) {
+            if (!Objects.equals(first[index], second[index])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void loadGuiLayouts() {
+        guiLayoutOverrides.clear();
+        ConfigurationSection section = layoutDataConfig.getConfigurationSection("screens");
+        if (section == null) {
+            return;
+        }
+        for (String screenKey : section.getKeys(false)) {
+            ItemStack[] contents = new ItemStack[54];
+            boolean hasAny = false;
+            for (int slot = 0; slot < contents.length; slot++) {
+                ItemStack itemStack = layoutDataConfig.getItemStack("screens." + screenKey + "." + slot);
+                contents[slot] = itemStack == null ? null : itemStack.clone();
+                hasAny |= itemStack != null && !itemStack.getType().isAir();
+            }
+            if (hasAny) {
+                guiLayoutOverrides.put(normalizeScreenKey(screenKey), contents);
+            }
+        }
+    }
+
+    private void saveGuiLayouts() {
+        layoutDataConfig.set("screens", null);
+        for (Map.Entry<String, ItemStack[]> entry : guiLayoutOverrides.entrySet()) {
+            ItemStack[] contents = entry.getValue();
+            for (int slot = 0; slot < contents.length; slot++) {
+                ItemStack itemStack = contents[slot];
+                if (itemStack != null && !itemStack.getType().isAir()) {
+                    layoutDataConfig.set("screens." + entry.getKey() + "." + slot, itemStack);
+                }
+            }
+        }
+        try {
+            layoutDataConfig.save(layoutDataFile);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Failed to save blacksmith_gui_layouts.yml: " + exception.getMessage());
+        }
+    }
+
     private interface BlacksmithInventoryHolder extends InventoryHolder {
     }
 
@@ -568,6 +998,26 @@ public class BlacksmithAnvilListener implements Listener {
         public Inventory getInventory() {
             return null;
         }
+    }
+
+    private record ForgeGuiEditorHolder(String screenKey) implements BlacksmithInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record ForgeGuiEditorConfirmHolder(String screenKey) implements BlacksmithInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record ForgeGuiEditorSession(String screenKey, ItemStack[] originalContents, ItemStack[] confirmContents) {
+    }
+
+    private record ForgeLayoutEntry(int slot, String key, ItemStack itemStack) {
     }
 
     private enum BlacksmithCategory {
@@ -596,6 +1046,19 @@ public class BlacksmithAnvilListener implements Listener {
         private static BlacksmithCategory fromSlot(int slot) {
             for (BlacksmithCategory category : values()) {
                 if (category.slot == slot) {
+                    return category;
+                }
+            }
+            return null;
+        }
+
+        private static BlacksmithCategory fromMarker(String marker) {
+            if (marker == null || !marker.startsWith("category:")) {
+                return null;
+            }
+            String key = marker.substring("category:".length());
+            for (BlacksmithCategory category : values()) {
+                if (category.key.equalsIgnoreCase(key)) {
                     return category;
                 }
             }
@@ -823,7 +1286,7 @@ public class BlacksmithAnvilListener implements Listener {
         for (int slot : new int[]{9, 10, 16, 17, 18, 19, 25, 27, 28, 29, 30, 32, 33, 34}) {
             inventory.setItem(slot, gray);
         }
-        inventory.setItem(MERGE_INFO_SLOT, createSimpleItem(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&6Merge Forge", List.of(
+        inventory.setItem(MERGE_INFO_SLOT, createUiItem(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&6Merge Forge", "merge:info", List.of(
                 "&710 matching forged items",
                 "&7Catalyst is optional",
                 "&cFailure destroys all inputs"
@@ -831,11 +1294,14 @@ public class BlacksmithAnvilListener implements Listener {
         for (int slot : MERGE_INPUT_SLOTS) {
             inventory.setItem(slot, null);
         }
-        inventory.setItem(MERGE_PREVIEW_SLOT, yellow);
-        inventory.setItem(MERGE_BACK_SLOT, createSimpleItem(Material.ARROW, "&7Back", List.of("&7Return to the forge board.")));
+        inventory.setItem(MERGE_PREVIEW_SLOT, createUiItem(Material.YELLOW_STAINED_GLASS_PANE, "&6Merge", "merge:action", List.of(
+                "&7Load the rack to preview",
+                "&7and click here to merge."
+        )));
+        inventory.setItem(MERGE_BACK_SLOT, createUiItem(Material.ARROW, "&7Back", "merge:back", List.of("&7Return to the forge board.")));
         inventory.setItem(MERGE_RARE_SLOT, createCatalystPlaceholder());
         inventory.setItem(MERGE_ATTRIBUTE_SLOT, createAttributePlaceholder());
-        inventory.setItem(MERGE_CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close and return items.")));
+        inventory.setItem(MERGE_CLOSE_SLOT, createUiItem(Material.BARRIER, "&cClose", "merge:close", List.of("&7Close and return items.")));
     }
 
     private void refreshMergeDisplay(Inventory inventory) {
@@ -852,7 +1318,7 @@ public class BlacksmithAnvilListener implements Listener {
         ItemStack catalyst = inventory.getItem(MERGE_RARE_SLOT);
         String rareKey = plugin.getRareContractMaterialKey(catalyst);
         if (inputs.length == 0) {
-            inventory.setItem(MERGE_PREVIEW_SLOT, createUiItem(Material.YELLOW_STAINED_GLASS_PANE, "&6Merge", "preview_placeholder", List.of(
+            inventory.setItem(MERGE_PREVIEW_SLOT, createUiItem(Material.YELLOW_STAINED_GLASS_PANE, "&6Merge", "merge:action", List.of(
                     "&7Chance: &f--",
                     "&7Catalyst: &fNone",
                     "&7Load 10 matching items.",
@@ -863,7 +1329,7 @@ public class BlacksmithAnvilListener implements Listener {
 
         ItemStack first = inputs[0];
         if (!allSameForgedType(inputs)) {
-            inventory.setItem(MERGE_PREVIEW_SLOT, createSimpleItem(Material.BARRIER, "&cInvalid Merge", List.of(
+            inventory.setItem(MERGE_PREVIEW_SLOT, createUiItem(Material.BARRIER, "&cInvalid Merge", "merge:action", List.of(
                     "&7All 10 inputs must match",
                     "&7item, rarity, and tier."
             )));
@@ -885,6 +1351,11 @@ public class BlacksmithAnvilListener implements Listener {
                 plugin.legacyComponent("&7Success: &f" + formatPercent(chance)),
                 plugin.legacyComponent(rarityUpgrade ? "&eClick to promote rarity." : "&eClick to merge.")
         )));
+        ItemMeta previewMeta = preview.getItemMeta();
+        if (previewMeta != null) {
+            previewMeta.getPersistentDataContainer().set(mergeUiKey, PersistentDataType.STRING, "merge:action");
+            preview.setItemMeta(previewMeta);
+        }
         inventory.setItem(MERGE_PREVIEW_SLOT, preview);
     }
 
@@ -954,7 +1425,7 @@ public class BlacksmithAnvilListener implements Listener {
     }
 
     private void setMergeActionBusy(Inventory inventory) {
-        inventory.setItem(MERGE_PREVIEW_SLOT, createSimpleItem(Material.YELLOW_STAINED_GLASS_PANE, "&6Merging...", List.of(
+        inventory.setItem(MERGE_PREVIEW_SLOT, createUiItem(Material.YELLOW_STAINED_GLASS_PANE, "&6Merging...", "merge:action", List.of(
                 "&7The forge is rolling the merge.",
                 "&7Wait for the result."
         )));

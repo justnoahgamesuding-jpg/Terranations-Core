@@ -145,6 +145,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handleBypassCommand(sender, args);
         }
 
+        if (args[0].equalsIgnoreCase("craftbypass")) {
+            return handleBypassCommand(sender, withRootSubcommand("bypass", Arrays.copyOfRange(args, 1, args.length)));
+        }
+
         if (args[0].equalsIgnoreCase("bypasslist")) {
             return handleBypassListCommand(sender);
         }
@@ -269,6 +273,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handleCatalogCommand(sender);
         }
 
+        if (args[0].equalsIgnoreCase("guieditor")) {
+            return handleGuiEditorCommand(sender, args);
+        }
+
         if (args[0].equalsIgnoreCase("questdebug")) {
             return handleQuestDebugCommand(sender, args);
         }
@@ -319,6 +327,38 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         plugin.openTerraCraftCatalog(player);
+        return true;
+    }
+
+    private boolean handleGuiEditorCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can open the Terra GUI editor.", NamedTextColor.RED));
+            return true;
+        }
+        if (args.length == 1 || args[1].equalsIgnoreCase("list")) {
+            sender.sendMessage(Component.text("Editable Terra screens: " + String.join(", ", plugin.getTerraGuiEditorScreens()), NamedTextColor.YELLOW));
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("reset")) {
+            if (args.length != 3) {
+                sender.sendMessage(Component.text("Usage: /terra guieditor reset <screen>", NamedTextColor.RED));
+                return true;
+            }
+            if (!plugin.resetTerraGuiEditorScreen(args[2])) {
+                sender.sendMessage(Component.text("Unknown Terra GUI screen. Use /terra guieditor list.", NamedTextColor.RED));
+                return true;
+            }
+            sender.sendMessage(Component.text("Reset the saved layout for " + args[2] + ".", NamedTextColor.GREEN));
+            return true;
+        }
+        if (args.length != 2) {
+            sender.sendMessage(Component.text("Usage: /terra guieditor <screen|list|reset>", NamedTextColor.RED));
+            return true;
+        }
+        if (!plugin.openAnyTerraGuiEditor(player, args[1])) {
+            sender.sendMessage(Component.text("Unknown Terra GUI screen. Use /terra guieditor list.", NamedTextColor.RED));
+            return true;
+        }
         return true;
     }
 
@@ -2981,6 +3021,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         entries.add(new HelpEntry("/terra blockvalue <block>", "View reward values for a block.", ignored -> true));
         entries.add(new HelpEntry("/terra blockvalue <block> set <xp|money> <value>", "Edit block reward values.", ignored -> true));
         entries.add(new HelpEntry("/terra bypass [player]", "Toggle block-delay bypass for yourself or another player.", ignored -> true));
+        entries.add(new HelpEntry("/terra craftbypass [player]", "Toggle crafting-requirement bypass using the same bypass state.", ignored -> true));
         entries.add(new HelpEntry("/terra bypasslist", "List players with bypass enabled.", ignored -> true));
         entries.add(new HelpEntry("/terra wildernessregen", "Show wilderness regeneration timers.", ignored -> true));
         entries.add(new HelpEntry("/terra wildernessregen <break|build> <seconds>", "Set wilderness regeneration timers.", ignored -> true));
@@ -3204,6 +3245,14 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return partialMatches(args[1], playerNames);
         }
 
+        if (args[0].equalsIgnoreCase("craftbypass") && args.length == 2) {
+            List<String> playerNames = new ArrayList<>();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                playerNames.add(player.getName());
+            }
+            return partialMatches(args[1], playerNames);
+        }
+
         if (args[0].equalsIgnoreCase("wildernessregen")) {
             if (args.length == 2) {
                 return partialMatches(args[1], List.of("set"));
@@ -3408,6 +3457,18 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args[0].equalsIgnoreCase("catalog")) {
+            return Collections.emptyList();
+        }
+
+        if (args[0].equalsIgnoreCase("guieditor")) {
+            if (args.length == 2) {
+                List<String> options = new ArrayList<>(plugin.getTerraGuiEditorScreens());
+                options.addAll(List.of("list", "reset"));
+                return partialMatches(args[1], options);
+            }
+            if (args.length == 3 && args[1].equalsIgnoreCase("reset")) {
+                return partialMatches(args[2], plugin.getTerraGuiEditorScreens());
+            }
             return Collections.emptyList();
         }
 

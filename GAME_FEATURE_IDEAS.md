@@ -1,182 +1,211 @@
 # Game Feature Ideas And To-Do
 
-This file is the active backlog for Terra Nations Core.
+This file is the active gameplay backlog for Terra Nations Core.
 
-It should reflect what is still missing from the current game vision, not repeat features that already exist in the plugin.
+It should only track features, polish passes, and loop improvements that are still missing from the live design. If players can already use a system reliably, it does not belong here unless the goal is a major expansion or redesign.
 
-## Current Vision
+## Current Direction
 
-Terra is heading toward a slower, more deliberate multiplayer survival experience built around:
+Terra already has the foundation:
 
-- job specialization instead of everyone doing everything
-- countries that feel like real settlements, not just chat groups
-- environmental pressure through climate, terrain, and geography
-- supply chains between professions
-- long-term nation progression instead of short-term loot rushing
+- professions with specialization pressure
+- countries with progression structure
+- climate and stability as environmental friction
+- merchants and traders as economic systems
+- a Terra-owned crafting layer and player guide hub
 
-The missing pieces now are mostly about cohesion, purpose, and long-term motivation.
+The biggest remaining need is not more disconnected systems. It is stronger loop glue, smoother friction, and better long-term reasons to keep playing inside the world.
 
-## Highest Priority
+## Core Gameplay Gaps
 
-### 1. First-Hour Onboarding
+### 1. Better First-Session Flow
 
-- Affects: new players, solo players, retention
-- Why it matters: the core systems are strong now, but the first hour can still feel like being dropped into a complex world without a clear role.
-- Goal: make the first session feel directed without removing freedom.
+- Problem: new players can access many systems, but the first hour still risks feeling like a list of mechanics instead of a clear survival plan.
+- Goal: turn the first session into a readable path from spawn to profession to country contribution.
 - Candidate work:
-  - first-join guided sequence
-  - profession explanation that is short and practical
-  - one starter goal per profession
-  - direct handoff into country play
-  - early warnings about climate and structural stability
-  - in-world or GUI checklist for the first hour
+  - a staged first-hour checklist tied to the guide item
+  - profession recommendations based on what the player actually does first
+  - clearer "why am I blocked" messages for crafting, climate, and profession restrictions
+  - an early settlement objective that introduces storage, food, crafting, and country value in one arc
+  - a short recovery path when players ignore the intended loop and get stuck
 
-### 2. Stronger Country Purpose
+### 2. Stronger Repeatable Profession Work
 
-- Affects: country leaders, group retention, mid-game progression
-- Why it matters: countries now have homes, treasury, resources, upgrades, boosts, roles, territory, trader access, and farmland pressure, but they still need more shared reasons to exist.
-- Goal: make countries feel like functioning communities with projects and identity.
+- Problem: professions level, but several of them still need more structured repeatable jobs between early survival and late mastery.
+- Goal: make each profession feel employed by the world, not just capable inside it.
 - Candidate work:
-  - country projects that consume treasury plus resources
-  - country prosperity or development score
-  - settlement stages or tiers
-  - public country milestones
-  - shared objectives that need multiple professions
-  - stronger reasons to defend or maintain territory quality
+  - rotating local work orders with timed bonuses
+  - profession task boards at relevant benches or hubs
+  - small chain objectives that convert raw gathering into delivery, refining, and payout
+  - work that asks for quality or category of output instead of only raw quantity
+  - better reasons to keep crafting low and mid-tier items after unlocks
 
-### 3. Profession Loop Depth
+### 3. Countries Need Shared Projects, Not Just Shared Ownership
 
-- Affects: solo players, group economy, progression pacing
-- Why it matters: the professions are already differentiated, but some loops still need more repeatable purpose beyond raw leveling.
-- Goal: make each profession feel like it has meaningful work at every stage.
+- Problem: countries have tools and progression, but still need more cooperative work that naturally pulls multiple players together.
+- Goal: make a country feel like an ongoing settlement project.
 - Candidate work:
-  - farmer supply contracts
-  - builder infrastructure projects
-  - blacksmith work orders
-  - miner extraction objectives
-  - lumberyard or forestry requests
-  - profession-driven country tasks instead of generic grind
+  - public build projects that consume treasury plus materials over time
+  - settlement tiers unlocked through infrastructure, activity, and profession balance
+  - civic projects like granaries, workshops, watch posts, roads, and market halls
+  - visible country milestones that change presentation or unlock new utility
+  - country maintenance tasks that create soft pressure without becoming a chore
 
-### 4. Better Progression Feedback
+### 4. Progression Needs Better Payoff Moments
 
-- Affects: all players
-- Why it matters: Terra has many meaningful systems, but some progression moments still land too quietly.
-- Goal: make advancement easier to understand and more satisfying.
+- Problem: too many unlocks and improvements land quietly.
+- Goal: make progression easier to read and more satisfying to chase.
 - Candidate work:
-  - stronger level-up feedback
-  - clearer unlock summaries
-  - second-job progress visibility
-  - clearer blocked-action explanations
-  - milestone reminders for countries and professions
+  - clearer unlock callouts on profession level-up
+  - "newly available recipes" views in the guide or benches
+  - country milestone announcements with practical rewards attached
+  - stronger contrast between early, mid, and high-tier profession identity
+  - a visible mastery track after normal job leveling slows down
 
-## Near-Term Design Goals
+## Gameplay Polish Backlog
 
-### Country Identity And Presence
+### Friction And Clarity
 
-- Give each country more personality when entering or viewing it.
-- Possible directions:
-  - mottos
-  - banners or insignia
-  - stronger title presentation on entry
-  - country visual identity on maps or GUIs
-  - prestige presentation that players can actually feel
+- bench UIs should explain missing ingredients, missing profession access, and wrong workbench type more directly
+- blocked actions should point players toward the correct next step instead of only denying them
+- guide menus should surface "recommended next actions" based on profession, level, and country status
+- country and profession menus should show pending tasks, not just static data
+- climate feedback should be easier to interpret at a glance during farming
 
-### Living Settlement Gameplay
+### Better World Readability
 
-- Push countries toward feeling inhabited and maintained rather than simply claimed.
-- Possible directions:
-  - upkeep systems tied to activity or projects
-  - settlement bonuses for balanced profession populations
-  - territory condition or fertility systems
-  - localized bonuses around developed hubs
+- settlement entry feedback should feel stronger and more memorable
+- valuable infrastructure should be easier to visually identify
+- profession-relevant locations should be easier to discover through UI or landmarks
+- major progression objects should feel more "placed in the world" and less like hidden menu knowledge
 
-### Trader And Merchant Evolution
+### Reduced Admin-Only Knowledge
 
-- The trader and merchant systems exist, but they can become more central to the world economy.
-- Possible directions:
-  - region-specific demand
-  - merchant preferences based on country development
-  - trade-route rivalry
-  - seasonal trade shifts
-  - supply shortages and surplus events
+- more systems should explain themselves to players without requiring staff explanation
+- playtest-only assumptions should gradually be replaced with player-readable framing
+- hidden balance rules that affect output, restrictions, or survival pacing should be surfaced more cleanly
 
-## World Simulation Ideas
+## Features That Would Improve The Gameplay Loop
 
-### Weather And Season Consequences
+### Local Contracts And Job Boards
 
-- Expand climate from growth-only pressure into broader world behavior.
-- Possible directions:
-  - harsher winter farming windows
-  - heat stress or cold stress on certain activities
-  - weather-influenced profession output
-  - seasonal resource demand
+- Add town or regional contract boards that generate practical requests from the world.
+- Good contract examples:
+  - deliver planks, stone, or food to a nearby settlement board
+  - restock builder stockpiles after large construction activity
+  - fill blacksmith requests for tools needed by new settlers
+  - complete seasonal farmer supply demands before weather shifts
+- Why this matters: contracts turn routine gathering and crafting into directed gameplay with visible payoff.
 
-### Terrain And Infrastructure
+### Country Projects And Infrastructure
 
-- Stability already pushes players toward believable construction, but it could connect more strongly to settlement planning.
-- Possible directions:
-  - preferred support structures with stronger settlement aesthetics
-  - quarry or mine infrastructure bonuses
-  - road or transport advantages between major country locations
-  - infrastructure projects that improve travel or logistics
+- Add long-duration projects that multiple players contribute to over time.
+- Good project categories:
+  - roads that improve movement or route safety
+  - warehouses that improve country storage or trade handling
+  - workshops that boost specific profession output
+  - irrigation or granary projects that stabilize food production
+  - defensive structures that improve country resilience or alerts
+- Why this matters: countries need more than membership and upgrades. They need shared construction goals.
 
-## Long-Term Progression
+### Regional Trade Pressure
 
-### Endgame Goals
+- Push trade toward geography instead of convenience.
+- Candidate directions:
+  - regional demand modifiers
+  - merchant appetite that changes with season or settlement state
+  - local oversupply penalties for one-country self-sufficiency
+  - caravans or shipment tasks that move goods between named points
+  - country prosperity tied partly to export variety, not just raw stockpiles
+- Why this matters: trade becomes more interesting when location matters and full self-sufficiency is inefficient.
 
-- Affects: max-level players, established countries
-- Why it matters: once a player or country is stable, Terra needs larger ambitions than simple level gain.
+### Profession Synergy Chains
+
+- Create recipes, contracts, or upgrades that naturally link professions together.
+- Examples:
+  - miner output feeds refiner or blacksmith demand spikes
+  - lumberjack supplies builder and farmer infrastructure projects
+  - farmer meals create meaningful buffs for gathering or travel
+  - builder projects unlock better workspaces for other professions
+  - trader activity opens higher-value requests for producers
+- Why this matters: the best Terra loop is interdependence, not parallel solo grinding.
+
+### Expedition And Frontier Gameplay
+
+- Add reasons to leave safe settlements and bring materials back.
+- Candidate directions:
+  - frontier surveys for climate-locked or region-locked resources
+  - dangerous extraction zones with better output
+  - temporary wilderness objectives that reward teamwork
+  - transport missions where getting goods home matters as much as finding them
+  - country-sponsored expeditions that produce prestige and materials
+- Why this matters: exploration needs a stronger role in the economy and progression loop.
+
+## Midgame And Endgame Expansion
+
+### Profession Mastery
+
+- Add a post-level-cap track for each profession.
 - Candidate work:
-  - mastery or prestige systems
-  - elite profession branches
-  - country wonders or landmark projects
-  - late-game national bonuses tied to real investment
+  - mastery perks that change playstyle instead of only increasing numbers
+  - prestige resets with permanent account-wide benefits
+  - signature outputs that are visibly better than baseline crafted goods
+  - specialization branches inside each job
 
-### Legendary Or Regional Resources
+### Country Ambition Layer
 
-- Affects: exploration, economy, conflict, cooperation
-- Why it matters: geography should matter more over time.
+- Add large goals that established countries can chase for weeks.
 - Candidate work:
-  - climate-locked crops or trees
-  - region-specific materials
-  - rare industrial or agricultural resources
-  - incentives to trade rather than self-supply everything
+  - wonders and landmark projects
+  - national doctrines or policy choices
+  - prosperity rankings based on multiple real activities
+  - country identity choices that affect bonuses, trade behavior, or civic focus
 
-## Admin And Operations Backlog
+### Resource Scarcity And World Rotation
 
-### Setup And Diagnostics
+- Add controlled scarcity to prevent static optimal routines.
+- Candidate work:
+  - rotating resource hotspots
+  - seasonal shortages
+  - market incentives for neglected goods
+  - rare regional materials that create diplomacy or rivalry
 
-- clearer setup checklist for fresh servers
-- territory sync diagnostics
-- country health or progression diagnostics
-- climate debugging summaries that are easier to read quickly
-- easier playtest preset management
+## High-Value Polish Ideas
 
-### Content Operations
+### Food And Survival Texture
 
-- easier balancing workflow for jobs, rewards, and climate profiles
-- safer live-edit admin tools
-- quicker visibility into broken or underused progression paths
+- campfire and farmer food should differ more clearly in utility, recovery, and travel value
+- hunger and climate systems should occasionally combine into meaningful preparation choices
+- rough survival food should keep players alive, while proper meals should support sustained work
 
-## Things That Are No Longer Backlog Items
+### Travel And Logistics
 
-These are now core implemented systems and should not come back into this file unless they are being replaced or significantly expanded:
+- moving goods should matter more than teleporting progress through menus
+- roads, pack routes, or shipment systems could become real settlement investments
+- countries should feel the difference between local production and imported supply
 
-- country upgrades
-- country treasury and resources
-- country roles
-- trader spawn and trade-access controls
+### Social Glue
+
+- shared boards, public projects, contribution logs, and settlement announcements would help players feel that their work changed something
+- solo players need ways to contribute meaningfully to a country without relying on voice-chat level coordination
+
+## Keep Out Of This File
+
+Do not re-add these as generic backlog items unless the goal is a major redesign:
+
+- the core country system
+- country treasury, resources, roles, upgrades, and boosts
 - local, country, and global chat routing
-- climate crop guide
 - climate-aware crop and sapling growth
-- merchant admin GUI
-- staff utility tooling
-- maintenance mode
-- lag-reduction systems
-- stability meter and debug bursts
+- the player guide item and its current hub role
+- the current Terra workbench and specialist bench framework
+- merchant management tooling
+- staff and server utility basics
+- stability support rules, warnings, meter, and debug visibility
 
 ## Usage Notes
 
-- Keep this file focused on future design and implementation gaps.
-- Move shipped work into [PATCH_NOTES.md](PATCH_NOTES.md) or [UPDATES.md](UPDATES.md).
-- If a feature is implemented enough that players can rely on it, remove it from this backlog.
+- Keep this file future-facing.
+- Remove ideas once players can depend on them in normal play.
+- Move shipped work into [UPDATES.md](UPDATES.md) or [PATCH_NOTES.md](PATCH_NOTES.md).
+- Prefer ideas that strengthen the gameplay loop over ideas that only add more menus.

@@ -172,7 +172,7 @@ public final class TerraGuideListener implements Listener {
         inventory.setItem(4, createItem(Material.WRITABLE_BOOK, "&6Job Contracts", List.of(
                 "&7Take one active contract at a time.",
                 "&7Deliver the requested goods for",
-                "&7money, job XP, and rare materials."
+                "&7money and job XP."
         )));
         JobContract activeContract = plugin.getActiveJobContract(playerId);
         if (activeContract == null) {
@@ -187,7 +187,6 @@ public final class TerraGuideListener implements Listener {
                     "&7Deliver: &f" + activeContract.requiredAmount() + "x " + plugin.formatMaterialName(activeContract.requestedMaterial()),
                     "&7Progress: &f" + Math.min(currentAmount, activeContract.requiredAmount()) + "&7/&f" + activeContract.requiredAmount(),
                     "&7Reward: &f$" + plugin.formatMoney(activeContract.rewardMoney()) + " &8+ &f" + activeContract.rewardXp() + " XP",
-                    "&7Rare Material: &f" + plugin.formatRareContractMaterialName(activeContract.rareMaterialKey()) + " x" + activeContract.rareMaterialAmount(),
                     "",
                     currentAmount >= activeContract.requiredAmount()
                             ? "&eClick to turn in this contract."
@@ -209,7 +208,6 @@ public final class TerraGuideListener implements Listener {
                     List.of(
                             "&7Deliver: &f" + offer.requiredAmount() + "x " + plugin.formatMaterialName(offer.requestedMaterial()),
                             "&7Reward: &f$" + plugin.formatMoney(offer.rewardMoney()) + " &8+ &f" + offer.rewardXp() + " XP",
-                            "&7Rare Material: &f" + plugin.formatRareContractMaterialName(offer.rareMaterialKey()) + " x" + offer.rareMaterialAmount(),
                             "",
                             activeContract == null ? "&eClick to accept." : "&7Finish or abandon your active contract first."
                     )));

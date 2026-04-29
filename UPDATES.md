@@ -2,6 +2,13 @@
 
 This file is the short, high-level timeline for the current repository snapshot.
 
+## 2026-04-29
+
+### Terra workbench stick crafting no longer points players at bamboo
+
+- The Terra workbench stick recipe now consistently uses two planks instead of inheriting broader vanilla wood-choice inputs.
+- Bamboo planks are no longer treated as a valid substitute when crafting sticks through the Terra workbench flow.
+
 ## 2026-04-23
 
 ### Terra crafting moved toward a standalone workbench model

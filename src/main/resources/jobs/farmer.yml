@@ -14,8 +14,6 @@ progression:
 starter-kit:
   - material: WOODEN_HOE
     amount: 1
-  - material: WHEAT_SEEDS
-    amount: 24
   - material: BREAD
     amount: 8
 

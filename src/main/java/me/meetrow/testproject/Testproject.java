@@ -278,6 +278,7 @@ public final class Testproject extends JavaPlugin {
     private StabilityGuiListener stabilityGuiListener;
     private QuestAdminGuiListener questAdminGuiListener;
     private TerraCraftingManager terraCraftingManager;
+    private BlacksmithAnvilListener blacksmithAnvilListener;
     private BossBar globalXpBoostBossBar;
     private final Set<UUID> cooldownDebugPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, BossBar> breakCooldownDebugBars = new ConcurrentHashMap<>();
@@ -433,7 +434,8 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ProfessionSmeltingListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionActionListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionAbilityListener(this), this);
-        getServer().getPluginManager().registerEvents(new BlacksmithAnvilListener(this), this);
+        blacksmithAnvilListener = new BlacksmithAnvilListener(this);
+        getServer().getPluginManager().registerEvents(blacksmithAnvilListener, this);
         getServer().getPluginManager().registerEvents(new ForgedEquipmentListener(this), this);
         getServer().getPluginManager().registerEvents(new StaffModeListener(this), this);
         getServer().getPluginManager().registerEvents(new StaffUtilityListener(this), this);
@@ -660,6 +662,10 @@ public final class Testproject extends JavaPlugin {
         if (terraCraftingManager != null) {
             terraCraftingManager.shutdown();
             terraCraftingManager = null;
+        }
+        if (blacksmithAnvilListener != null) {
+            blacksmithAnvilListener.shutdown();
+            blacksmithAnvilListener = null;
         }
         breakCooldowns.clear();
         placeCooldowns.clear();
@@ -2647,6 +2653,40 @@ public final class Testproject extends JavaPlugin {
         return recipe != null;
     }
 
+    public BlacksmithRecipe getBlacksmithRecipe(Material material) {
+        if (material == null) {
+            return null;
+        }
+        for (BlacksmithRecipe recipe : getBlacksmithAnvilRecipes()) {
+            if (recipe.result() == material) {
+                return recipe;
+            }
+        }
+        return null;
+    }
+
+    public ItemStack createForgedEquipment(Player player, Material material, int amount) {
+        if (material == null) {
+            return null;
+        }
+        BlacksmithRecipe recipe = getBlacksmithRecipe(material);
+        if (recipe != null) {
+            BlacksmithRecipe adjustedRecipe = recipe.amount() == Math.max(1, amount)
+                    ? recipe
+                    : new BlacksmithRecipe(recipe.result(), Math.max(1, amount), recipe.level(), recipe.xp(), recipe.category(), recipe.slot(), recipe.ingredients());
+            return createForgedEquipment(player, adjustedRecipe);
+        }
+        return createForgedEquipment(player, new BlacksmithRecipe(
+                material,
+                Math.max(1, amount),
+                defaultForgeRecipeLevel(material),
+                0,
+                "terra",
+                0,
+                new LinkedHashMap<>()
+        ));
+    }
+
     public ItemStack createForgedEquipment(Player player, BlacksmithRecipe recipe) {
         ItemStack itemStack = applyUsageRequirementLore(new ItemStack(recipe.result(), recipe.amount()));
         if (!isForgeManagedEquipment(recipe.result())) {
@@ -2672,6 +2712,29 @@ public final class Testproject extends JavaPlugin {
         applyForgedItemDisplay(itemStack, meta, recipe.result(), rarity, itemLevel);
         itemStack.setItemMeta(meta);
         return itemStack;
+    }
+
+    private int defaultForgeRecipeLevel(Material material) {
+        if (material == null) {
+            return 1;
+        }
+        String name = material.name();
+        if (name.startsWith("WOODEN_") || name.startsWith("LEATHER_")) {
+            return 1;
+        }
+        if (name.startsWith("STONE_")) {
+            return 2;
+        }
+        if (name.startsWith("IRON_") || name.startsWith("CHAINMAIL_")) {
+            return 4;
+        }
+        if (name.startsWith("GOLDEN_")) {
+            return 5;
+        }
+        if (name.startsWith("DIAMOND_")) {
+            return 7;
+        }
+        return 3;
     }
 
     private void applyForgedItemDisplay(ItemStack itemStack, ItemMeta meta, Material material, ForgedRarity rarity, int itemLevel) {
@@ -3011,16 +3074,10 @@ public final class Testproject extends JavaPlugin {
         if (contract.rewardXp() > 0) {
             rewardProfessionXp(player, contract.profession(), contract.rewardXp());
         }
-        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(createRareContractMaterial(contract.rareMaterialKey(), contract.rareMaterialAmount()));
-        for (ItemStack leftover : leftovers.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-        }
         activeJobContracts.remove(playerId);
         saveJobContract(playerId);
         player.sendMessage(colorize("&6[Contracts] &aCompleted your &f" + getProfessionPlainDisplayName(contract.profession())
                 + "&a contract for &f" + formatMoney(contract.rewardMoney()) + "&a and &f" + contract.rewardXp() + " XP&a."));
-        player.sendMessage(colorize("&7Rare Material: &f" + formatRareContractMaterialName(contract.rareMaterialKey())
-                + " x" + contract.rareMaterialAmount()));
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.9F, 1.0F);
         return true;
     }
@@ -3177,8 +3234,8 @@ public final class Testproject extends JavaPlugin {
         int amount = getJobContractRequiredAmount(requestedMaterial, level, seed);
         int rewardXp = getJobContractRewardXp(profession, requestedMaterial, amount, level);
         double rewardMoney = getJobContractRewardMoney(requestedMaterial, amount, level);
-        String rareKey = getJobContractRareMaterialKey(seed, level);
-        int rareAmount = getJobContractRareMaterialAmount(level, seed);
+        String rareKey = null;
+        int rareAmount = 0;
         return new JobContract(profession, requestedMaterial, amount, rewardXp, rewardMoney, rareKey, rareAmount, 0L);
     }
 
@@ -7054,6 +7111,39 @@ public final class Testproject extends JavaPlugin {
         terraCraftingManager.openCatalogRoot(player);
     }
 
+    public boolean openTerraGuiEditor(Player player, String screenKey) {
+        return player != null && terraCraftingManager != null && terraCraftingManager.openGuiEditor(player, screenKey);
+    }
+
+    public List<String> getTerraGuiEditorScreens() {
+        List<String> screens = new ArrayList<>();
+        if (terraCraftingManager != null) {
+            screens.addAll(terraCraftingManager.editableScreenKeys());
+        }
+        if (blacksmithAnvilListener != null) {
+            screens.addAll(blacksmithAnvilListener.editableScreenKeys());
+        }
+        return screens;
+    }
+
+    public boolean resetTerraGuiEditorScreen(String screenKey) {
+        return (terraCraftingManager != null && terraCraftingManager.resetGuiLayout(screenKey))
+                || (blacksmithAnvilListener != null && blacksmithAnvilListener.resetGuiLayout(screenKey));
+    }
+
+    public boolean openAnyTerraGuiEditor(Player player, String screenKey) {
+        return (terraCraftingManager != null && terraCraftingManager.openGuiEditor(player, screenKey))
+                || (blacksmithAnvilListener != null && blacksmithAnvilListener.openGuiEditor(player, screenKey));
+    }
+
+    public ItemStack createTerraCraftingItem(String contentId, int amount) {
+        return terraCraftingManager == null ? null : terraCraftingManager.createContentItem(contentId, amount);
+    }
+
+    public String getTerraCraftingContentId(ItemStack itemStack) {
+        return terraCraftingManager == null ? null : terraCraftingManager.getContentId(itemStack);
+    }
+
     public ItemStack refreshDescriptiveItemDetails(ItemStack itemStack) {
         if (itemStack == null || itemStack.getType().isAir()) {
             return itemStack;
@@ -9672,6 +9762,10 @@ public final class Testproject extends JavaPlugin {
 
     public boolean bypassesProfessionRestrictions(UUID playerId) {
         return isInStaffMode(playerId);
+    }
+
+    public boolean hasCraftingBypass(UUID playerId) {
+        return playerId != null && (isInStaffMode(playerId) || hasBlockDelayBypass(playerId));
     }
 
     public NamespacedKey getItemSourceOwnerKey() {
