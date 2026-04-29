@@ -666,6 +666,27 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             plugin.advanceTutorialIntro(player);
             return true;
         }
+        if (args.length == 3 && args[1].equalsIgnoreCase("redo")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            OfflinePlayer target = findPlayer(args[2]);
+            if (target == null) {
+                player.sendMessage(plugin.getMessage("general.player-not-found"));
+                return true;
+            }
+            String targetName = target.getName() != null ? target.getName() : args[2];
+            if (plugin.restartPlayerTutorial(target)) {
+                player.sendMessage(plugin.colorize("&aRestarted the tutorial for &f" + targetName + "&a."));
+                if (target.isOnline() && target.getPlayer() != null && target.getPlayer() != player) {
+                    target.getPlayer().sendMessage(plugin.colorize("&eYour tutorial has been restarted by staff."));
+                }
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not restart that player's tutorial."));
+            }
+            return true;
+        }
         if (args.length >= 2 && args[1].equalsIgnoreCase("setlocation")) {
             if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
                 player.sendMessage(plugin.getMessage("general.no-permission"));
@@ -4011,6 +4032,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2) {
             return partialMatches(args[1], List.of(
                     "next",
+                    "redo",
                     "setlocation",
                     "clearlocation",
                     "locations",
@@ -4035,6 +4057,9 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         String action = args[1].toLowerCase(Locale.ROOT);
 
         if (args.length == 3) {
+            if (action.equals("redo")) {
+                return partialMatches(args[2], getKnownPlayerNames());
+            }
             if (action.equals("setlocation")) {
                 List<String> suggestions = new ArrayList<>(plugin.getOnboardingLocationMarkerKeys());
                 suggestions.addAll(List.of("starter_hub", "builder_yard", "farm_plots", "forge_yard", "embassy_board", "trader_stop"));

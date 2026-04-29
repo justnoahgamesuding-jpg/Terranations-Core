@@ -3801,6 +3801,9 @@ public final class Testproject extends JavaPlugin {
         if (player == null || !player.isOnline()) {
             return null;
         }
+        if (isPlayerInOnboardingFocus(player.getUniqueId())) {
+            return null;
+        }
 
         List<String> segments = new ArrayList<>();
         String healthSegment = getPlayerHealthActionBarText(player);
@@ -15323,6 +15326,61 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
+    public boolean restartPlayerTutorial(OfflinePlayer target) {
+        if (target == null) {
+            return false;
+        }
+        UUID playerId = target.getUniqueId();
+        Player onlinePlayer = target.getPlayer();
+
+        Country country = getPlayerCountry(playerId);
+        if (country != null) {
+            removePlayerFromCountry(country, playerId);
+        }
+        for (Country currentCountry : new ArrayList<>(countriesByKey.values())) {
+            if (currentCountry.getInvitedPlayers().remove(playerId)) {
+                saveCountry(currentCountry);
+            }
+        }
+        pendingCountryTransfers.entrySet().removeIf(entry ->
+                playerId.equals(entry.getKey())
+                        || playerId.equals(entry.getValue().currentOwnerId())
+                        || playerId.equals(entry.getValue().targetPlayerId()));
+
+        adminClearAllProfessions(playerId);
+        pendingStarterKitGrants.remove(playerId);
+        tutorialStages.remove(playerId);
+        tutorialStarterXpProgress.remove(playerId);
+        completedTutorialQuestIds.remove(playerId);
+        tutorialQuestProgress.remove(playerId);
+        onboardingPhases.remove(playerId);
+        onboardingStartedAtMillis.remove(playerId);
+        completedOnboardingTrialKeys.remove(playerId);
+        onboardingObjectiveProgress.remove(playerId);
+        tutorialQuestHudIdCache.remove(playerId);
+        tutorialQuestHudPercentCache.remove(playerId);
+        tutorialQuestHudStepCache.remove(playerId);
+
+        BukkitTask introTask = tutorialIntroAdvanceTasks.remove(playerId);
+        if (introTask != null) {
+            introTask.cancel();
+        }
+        tutorialIntroIndices.remove(playerId);
+        cancelOnboardingFocus(playerId);
+
+        dataConfig.set("starter-kits.pending." + playerId, null);
+        dataConfig.set("tutorial." + playerId, null);
+        saveDataConfig();
+
+        if (onlinePlayer != null && onlinePlayer.isOnline()) {
+            clearTutorialIntroLock(onlinePlayer);
+            clearTutorialChecklist(onlinePlayer);
+            ensurePlayerGuidanceItem(onlinePlayer);
+            handleTutorialJoin(onlinePlayer);
+        }
+        return true;
+    }
+
     private void ensureOnboardingProfile(Player player) {
         if (player == null || !player.isOnline() || !isOnboardingActive(player.getUniqueId())) {
             return;
@@ -16402,8 +16460,6 @@ public final class Testproject extends JavaPlugin {
         float originalWalkSpeed = player.getWalkSpeed();
         float originalFlySpeed = player.getFlySpeed();
         PotionEffect originalSlowness = player.getPotionEffect(PotionEffectType.SLOWNESS);
-        player.setWalkSpeed(0.0F);
-        player.setFlySpeed(0.0F);
         applyOnboardingFocusZoomEffect(player);
         OnboardingFocusSession session = new OnboardingFocusSession(
                 player.getUniqueId(),
