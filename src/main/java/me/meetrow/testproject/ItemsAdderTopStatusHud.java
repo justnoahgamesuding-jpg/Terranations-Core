@@ -172,7 +172,7 @@ public final class ItemsAdderTopStatusHud {
     }
 
     private String getLocationLabel(Player player) {
-        Country country = plugin.getVisibleCountryAt(player.getLocation());
+        Country country = plugin.getPlayerTerritoryCountryAt(player.getLocation());
         if (country == null) {
             return plugin.getConfig().getString(CONFIG_ROOT + ".wilderness-label", "Wilderness");
         }

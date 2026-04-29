@@ -10054,6 +10054,17 @@ public final class Testproject extends JavaPlugin {
         return isPlayerVisibleCountry(country) ? country : null;
     }
 
+    public Country getPlayerTerritoryCountryAt(Location location) {
+        Country country = getCountryAt(location);
+        if (country == null) {
+            return null;
+        }
+        if (isPlayerVisibleCountry(country) || isConfiguredStarterHubCountry(country)) {
+            return country;
+        }
+        return null;
+    }
+
     public boolean isSystemCountry(Country country) {
         return country != null && (country.isSystemCountry() || isConfiguredStarterHubCountry(country));
     }
@@ -15894,6 +15905,51 @@ public final class Testproject extends JavaPlugin {
         return new ArrayList<>(ids);
     }
 
+    public boolean spawnAndBindOnboardingFancyNpc(Player creator, String fancyNpcId, String questKey, String dialogueKey, String displayName, Location location) {
+        if (creator == null || location == null || location.getWorld() == null) {
+            return false;
+        }
+        if (getServer().getPluginManager().getPlugin("FancyNpcs") == null) {
+            return false;
+        }
+        String normalizedQuestKey = normalizeQuestKey(questKey);
+        if (fancyNpcId == null || fancyNpcId.isBlank() || normalizedQuestKey == null) {
+            return false;
+        }
+        try {
+            de.oliver.fancynpcs.api.NpcManager npcManager = de.oliver.fancynpcs.api.FancyNpcsPlugin.get().getNpcManager();
+            if (npcManager == null || !npcManager.isLoaded()) {
+                return false;
+            }
+            String existingId = resolveAvailableFancyNpcId(fancyNpcId);
+            if (existingId != null) {
+                return false;
+            }
+            de.oliver.fancynpcs.api.NpcData npcData = new de.oliver.fancynpcs.api.NpcData(
+                    fancyNpcId,
+                    creator.getUniqueId(),
+                    location.clone()
+            );
+            String effectiveDisplayName = displayName == null || displayName.isBlank() ? fancyNpcId : displayName;
+            npcData.setDisplayName(effectiveDisplayName);
+            npcData.setTurnToPlayer(true);
+            npcData.setInteractionCooldown(0.25F);
+            npcData.setVisibilityDistance(32);
+            de.oliver.fancynpcs.api.Npc npc = de.oliver.fancynpcs.api.FancyNpcsPlugin.get().getNpcAdapter().apply(npcData);
+            if (npc == null) {
+                return false;
+            }
+            npcManager.registerNpc(npc);
+            npc.create();
+            npc.spawnForAll();
+            npcManager.saveNpcs(false);
+            return bindOnboardingFancyNpc(fancyNpcId, normalizedQuestKey, dialogueKey, effectiveDisplayName);
+        } catch (Throwable throwable) {
+            getLogger().warning("Failed to spawn FancyNpcs onboarding NPC '" + fancyNpcId + "': " + throwable.getMessage());
+            return false;
+        }
+    }
+
     public boolean bindOnboardingFancyNpc(String fancyNpcId, String questKey, String dialogueKey, String displayName) {
         String resolvedFancyNpcId = resolveAvailableFancyNpcId(fancyNpcId);
         String normalizedQuestKey = normalizeQuestKey(questKey);
@@ -15910,6 +15966,34 @@ public final class Testproject extends JavaPlugin {
         ));
         saveOnboardingFancyNpcBindings();
         return true;
+    }
+
+    public boolean setOnboardingFancyNpcSkin(String fancyNpcId, String skinName) {
+        String resolvedFancyNpcId = resolveAvailableFancyNpcId(fancyNpcId);
+        if (resolvedFancyNpcId == null || skinName == null || skinName.isBlank()) {
+            return false;
+        }
+        if (getServer().getPluginManager().getPlugin("FancyNpcs") == null) {
+            return false;
+        }
+        try {
+            de.oliver.fancynpcs.api.NpcManager npcManager = de.oliver.fancynpcs.api.FancyNpcsPlugin.get().getNpcManager();
+            if (npcManager == null || !npcManager.isLoaded()) {
+                return false;
+            }
+            de.oliver.fancynpcs.api.Npc npc = npcManager.getNpcById(resolvedFancyNpcId);
+            if (npc == null || npc.getData() == null) {
+                return false;
+            }
+            npc.getData().setSkin(skinName.trim());
+            npc.getData().setDirty(true);
+            npc.updateForAll();
+            npcManager.saveNpcs(false);
+            return true;
+        } catch (Throwable throwable) {
+            getLogger().warning("Failed to update FancyNpcs skin for '" + fancyNpcId + "': " + throwable.getMessage());
+            return false;
+        }
     }
 
     public boolean unbindOnboardingFancyNpc(String fancyNpcId) {
@@ -15958,7 +16042,7 @@ public final class Testproject extends JavaPlugin {
                 completionAction.run();
             }
         };
-        if (!isOnboardingActive(playerId) || !isOnboardingNpcFocusEnabled()) {
+        if (!isOnboardingNpcFocusEnabled()) {
             finalAction.run();
             return false;
         }
@@ -16214,7 +16298,7 @@ public final class Testproject extends JavaPlugin {
                 completionAction.run();
             }
         };
-        if (!isOnboardingActive(playerId) || !isOnboardingNpcFocusEnabled()) {
+        if (!isOnboardingNpcFocusEnabled()) {
             finalAction.run();
             return false;
         }

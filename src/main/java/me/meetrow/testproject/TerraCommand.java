@@ -835,6 +835,39 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
+        if (args.length >= 4 && args[1].equalsIgnoreCase("spawnfancynpc")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            String fancyNpcId = args[2];
+            String questKey = args[3];
+            String dialogueKey = args.length >= 5 && !args[4].equals("-") ? args[4] : null;
+            int displayNameStart = args.length >= 5 ? 5 : 4;
+            String displayName = args.length > displayNameStart
+                    ? String.join(" ", Arrays.copyOfRange(args, displayNameStart, args.length))
+                    : fancyNpcId;
+            if (plugin.spawnAndBindOnboardingFancyNpc(player, fancyNpcId, questKey, dialogueKey, displayName, player.getLocation())) {
+                player.sendMessage(plugin.colorize("&aSpawned and bound FancyNpcs NPC &f" + fancyNpcId + "&a to onboarding key &f" + questKey + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not spawn that FancyNpcs onboarding NPC. Check that FancyNpcs is loaded and the NPC id is not already in use."));
+            }
+            return true;
+        }
+        if (args.length >= 4 && args[1].equalsIgnoreCase("skinfancynpc")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            String fancyNpcId = args[2];
+            String skinName = args[3];
+            if (plugin.setOnboardingFancyNpcSkin(fancyNpcId, skinName)) {
+                player.sendMessage(plugin.colorize("&aUpdated FancyNpcs skin for &f" + fancyNpcId + "&a to &f" + skinName + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not update that FancyNpcs skin. Check that the NPC exists, FancyNpcs is loaded, and the skin identifier is valid."));
+            }
+            return true;
+        }
         if (args.length == 3 && args[1].equalsIgnoreCase("unbindfancynpc")) {
             if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
                 player.sendMessage(plugin.getMessage("general.no-permission"));
@@ -3959,6 +3992,8 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                     "registernpc",
                     "removenpc",
                     "npcs",
+                    "spawnfancynpc",
+                    "skinfancynpc",
                     "bindfancynpc",
                     "unbindfancynpc",
                     "fancynpcs"
@@ -3984,7 +4019,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             if (action.equals("removenpc") || action.equals("spawnnpc") || action.equals("registernpc")) {
                 return partialMatches(args[2], getSuggestedTutorialNpcIds());
             }
-            if (action.equals("bindfancynpc") || action.equals("unbindfancynpc")) {
+            if (action.equals("bindfancynpc") || action.equals("unbindfancynpc") || action.equals("spawnfancynpc") || action.equals("skinfancynpc")) {
                 return partialMatches(args[2], getSuggestedFancyNpcIds());
             }
         }
@@ -3998,6 +4033,12 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             if (action.equals("bindfancynpc")) {
                 return partialMatches(args[3], getSuggestedTutorialQuestKeys());
             }
+            if (action.equals("spawnfancynpc")) {
+                return partialMatches(args[3], getSuggestedTutorialQuestKeys());
+            }
+            if (action.equals("skinfancynpc")) {
+                return partialMatches(args[3], getKnownPlayerNames());
+            }
         }
         if (args.length == 5 && (action.equals("spawnnpc") || action.equals("registernpc"))) {
             return partialMatches(args[4], List.of(
@@ -4009,6 +4050,12 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             ));
         }
         if (args.length == 5 && action.equals("bindfancynpc")) {
+            List<String> suggestions = new ArrayList<>();
+            suggestions.add("-");
+            suggestions.addAll(getSuggestedTutorialDialogueKeys());
+            return partialMatches(args[4], dedupeSuggestions(suggestions));
+        }
+        if (args.length == 5 && action.equals("spawnfancynpc")) {
             List<String> suggestions = new ArrayList<>();
             suggestions.add("-");
             suggestions.addAll(getSuggestedTutorialDialogueKeys());
@@ -4030,6 +4077,15 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             ));
         }
         if (args.length >= 6 && action.equals("bindfancynpc")) {
+            return partialMatches(args[args.length - 1], List.of(
+                    "Starter Guide",
+                    "Embassy Guide",
+                    "Trader Guide",
+                    "Merchant Guide",
+                    "Country Recruiter"
+            ));
+        }
+        if (args.length >= 6 && action.equals("spawnfancynpc")) {
             return partialMatches(args[args.length - 1], List.of(
                     "Starter Guide",
                     "Embassy Guide",

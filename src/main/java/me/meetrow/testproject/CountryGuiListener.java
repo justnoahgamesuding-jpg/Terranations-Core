@@ -130,7 +130,7 @@ public class CountryGuiListener implements Listener {
 
         fillEmptySlots(inventory);
         Country playerCountry = plugin.getPlayerCountry(player.getUniqueId());
-        Country locationCountry = plugin.getVisibleCountryAt(player.getLocation());
+        Country locationCountry = plugin.getPlayerTerritoryCountryAt(player.getLocation());
         boolean ownerView = canSeeOwnerControls(player, playerCountry);
 
         inventory.setItem(INFO_SLOT, createDashboardInfoItem(player, playerCountry, locationCountry));

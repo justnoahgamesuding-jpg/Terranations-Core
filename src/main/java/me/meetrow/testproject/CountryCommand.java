@@ -211,7 +211,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
         } else {
             country = plugin.getPlayerCountry(player.getUniqueId());
             if (country == null) {
-                country = plugin.getVisibleCountryAt(player.getLocation());
+                country = plugin.getPlayerTerritoryCountryAt(player.getLocation());
             }
             if (country == null) {
                 player.sendMessage(plugin.getMessage("country.not-in-country"));
@@ -701,7 +701,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleInfo(Player player, String[] args) {
-        Country country = args.length >= 2 ? plugin.getVisibleCountry(joinName(args, 1)) : plugin.getVisibleCountryAt(player.getLocation());
+        Country country = args.length >= 2 ? plugin.getVisibleCountry(joinName(args, 1)) : plugin.getPlayerTerritoryCountryAt(player.getLocation());
         if (country == null) {
             player.sendMessage(plugin.getMessage(args.length >= 2 ? "country.not-found" : "country.info.here-none"));
             return true;
@@ -788,7 +788,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleFarmland(Player player, String[] args) {
-        Country country = args.length >= 2 ? plugin.getVisibleCountry(joinName(args, 1)) : plugin.getVisibleCountryAt(player.getLocation());
+        Country country = args.length >= 2 ? plugin.getVisibleCountry(joinName(args, 1)) : plugin.getPlayerTerritoryCountryAt(player.getLocation());
         if (country == null) {
             player.sendMessage(plugin.getMessage(args.length >= 2 ? "country.not-found" : "country.info.here-none"));
             return true;
