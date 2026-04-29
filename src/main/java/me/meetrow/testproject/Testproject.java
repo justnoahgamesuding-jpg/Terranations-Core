@@ -454,6 +454,7 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new CommandProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new CountryTerritoryListener(this), this);
         getServer().getPluginManager().registerEvents(new CountryFarmlandListener(this), this);
+        getServer().getPluginManager().registerEvents(new StarterHubBuildListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionCraftListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionSmeltingListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionActionListener(this), this);
@@ -10096,6 +10097,29 @@ public final class Testproject extends JavaPlugin {
         }
         String starterHubKey = getStarterHubCountryKey();
         return !starterHubKey.isBlank() && starterHubKey.equals(normalizeCountryName(country.getName()));
+    }
+
+    public boolean isStarterHubBuildProtected(Location location) {
+        Country country = getCountryAt(location);
+        return isConfiguredStarterHubCountry(country);
+    }
+
+    public boolean canBypassStarterHubBuildProtection(Player player) {
+        return player != null && (player.isOp()
+                || player.hasPermission(ADMIN_PERMISSION)
+                || player.hasPermission(COUNTRY_ADMIN_PERMISSION)
+                || bypassesProfessionRestrictions(player.getUniqueId())
+                || hasBlockDelayBypass(player.getUniqueId()));
+    }
+
+    public boolean isStarterHubAllowedCropBlock(Material material) {
+        return material != null && (isFarmerCrop(material)
+                || material == Material.NETHER_WART
+                || material == Material.SWEET_BERRY_BUSH
+                || material == Material.COCOA
+                || material == Material.SUGAR_CANE
+                || material == Material.CACTUS
+                || material == Material.BAMBOO);
     }
 
     public void createCountry(String countryName, OfflinePlayer owner) {

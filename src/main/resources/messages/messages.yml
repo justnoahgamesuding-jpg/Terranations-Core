@@ -193,6 +193,8 @@ tutorial:
     - "&fNow that you joined a country, head there by using Dynmap and walking there, or use &e/country home &fif you really need the faster route."
     - "&eBe careful: /country home costs money, which you may need early on, and it has a 1 hour cooldown."
     - "&fYour long-term goal is to level your primary job, help your country grow, and max that first job to unlock your second."
+  starter-hub:
+    build-blocked: "&cYou cannot build in the starter hub. Only crop planting is allowed here."
 # Passive server-wide tip broadcasts.
 tips:
   border: "&8&m                                                  "
