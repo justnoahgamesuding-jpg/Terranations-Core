@@ -16341,8 +16341,10 @@ public final class Testproject extends JavaPlugin {
         clearPlayerChatWindow(player);
         float originalWalkSpeed = player.getWalkSpeed();
         float originalFlySpeed = player.getFlySpeed();
+        PotionEffect originalSlowness = player.getPotionEffect(PotionEffectType.SLOWNESS);
         player.setWalkSpeed(0.0F);
         player.setFlySpeed(0.0F);
+        applyOnboardingFocusZoomEffect(player);
         OnboardingFocusSession session = new OnboardingFocusSession(
                 player.getUniqueId(),
                 entityId,
@@ -16351,9 +16353,12 @@ public final class Testproject extends JavaPlugin {
                 speakerName,
                 new ArrayList<>(dialogueLines),
                 -1,
+                0,
+                0L,
                 0L,
                 originalWalkSpeed,
                 originalFlySpeed,
+                originalSlowness,
                 completionAction
         );
         onboardingFocusSessions.put(player.getUniqueId(), session);
@@ -16375,6 +16380,7 @@ public final class Testproject extends JavaPlugin {
                 continue;
             }
             player.lookAt(focusLocation.getX(), focusLocation.getY(), focusLocation.getZ(), LookAnchor.EYES);
+            tickOnboardingFocusTypewriter(player, session, now);
             if (session.nextAdvanceAtMillis() > 0L && now >= session.nextAdvanceAtMillis()) {
                 advanceOnboardingFocusLine(player, session);
             }
@@ -16404,17 +16410,13 @@ public final class Testproject extends JavaPlugin {
             endOnboardingFocus(player.getUniqueId(), true);
             return;
         }
-        String line = session.dialogueLines().get(nextLineIndex);
-        player.showTitle(Title.title(
-                legacyComponent("&6" + session.speakerName()),
-                legacyComponent("&f" + line),
-                Title.Times.times(Duration.ofMillis(150L), Duration.ofMillis(Math.max(900L, getOnboardingNpcFocusLineMillis() - 300L)), Duration.ofMillis(250L))
-        ));
-        player.sendActionBar(legacyComponent("&7Focus on the conversation..."));
+        long now = System.currentTimeMillis();
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.45F, 1.6F);
         onboardingFocusSessions.put(player.getUniqueId(), session.withLineState(
                 nextLineIndex,
-                System.currentTimeMillis() + getOnboardingNpcFocusLineMillis()
+                0,
+                now,
+                now + getOnboardingNpcFocusLineMillis()
         ));
     }
 
@@ -16427,8 +16429,12 @@ public final class Testproject extends JavaPlugin {
         if (player != null && player.isOnline()) {
             player.setWalkSpeed(session.originalWalkSpeed());
             player.setFlySpeed(session.originalFlySpeed());
+            restoreOnboardingFocusZoomEffect(player, session.originalSlownessEffect());
             player.clearTitle();
             player.sendActionBar(Component.empty());
+            if (runCompletion) {
+                sendOnboardingFocusTranscript(player, session);
+            }
         }
         if (runCompletion && session.completionAction() != null) {
             session.completionAction().run();
@@ -16444,9 +16450,87 @@ public final class Testproject extends JavaPlugin {
         return Math.max(1200L, millis);
     }
 
+    private long getOnboardingNpcFocusTypewriterCharMillis() {
+        long millis = coreSettingsConfig != null ? coreSettingsConfig.getLong("onboarding.npc-focus.typewriter-char-millis", 35L) : 35L;
+        return Math.max(15L, millis);
+    }
+
+    private boolean isOnboardingNpcFocusTranscriptEnabled() {
+        return coreSettingsConfig == null || coreSettingsConfig.getBoolean("onboarding.npc-focus.transcript-to-chat", true);
+    }
+
+    private int getOnboardingNpcFocusZoomSlownessAmplifier() {
+        int amplifier = coreSettingsConfig != null ? coreSettingsConfig.getInt("onboarding.npc-focus.zoom-slowness-amplifier", 1) : 1;
+        return Math.max(0, Math.min(4, amplifier));
+    }
+
     private int getOnboardingNpcFocusChatClearLines() {
         int lines = coreSettingsConfig != null ? coreSettingsConfig.getInt("onboarding.npc-focus.chat-clear-lines", 80) : 80;
         return Math.max(10, lines);
+    }
+
+    private void tickOnboardingFocusTypewriter(Player player, OnboardingFocusSession session, long now) {
+        if (player == null || session == null || session.lineIndex() < 0 || session.lineIndex() >= session.dialogueLines().size()) {
+            return;
+        }
+        String line = session.dialogueLines().get(session.lineIndex());
+        String visibleLine = ChatColor.stripColor(colorize(line));
+        if (visibleLine == null) {
+            visibleLine = line;
+        }
+        int typedCharacters = session.typedCharacters();
+        long nextTypeAtMillis = session.nextTypeAtMillis();
+        long charMillis = getOnboardingNpcFocusTypewriterCharMillis();
+        if (typedCharacters < visibleLine.length() && now >= nextTypeAtMillis) {
+            long elapsed = Math.max(0L, now - nextTypeAtMillis);
+            int additionalCharacters = 1 + (int) (elapsed / charMillis);
+            typedCharacters = Math.min(visibleLine.length(), typedCharacters + additionalCharacters);
+            nextTypeAtMillis = now + charMillis;
+            OnboardingFocusSession updatedSession = session.withLineState(session.lineIndex(), typedCharacters, nextTypeAtMillis, session.nextAdvanceAtMillis());
+            onboardingFocusSessions.put(player.getUniqueId(), updatedSession);
+            session = updatedSession;
+        }
+        String partialLine = visibleLine.substring(0, Math.min(visibleLine.length(), session.typedCharacters()));
+        String suffix = session.typedCharacters() < visibleLine.length() ? "&7|" : "";
+        player.sendActionBar(legacyComponent("&6" + session.speakerName() + "&8: &f" + partialLine + suffix));
+    }
+
+    private void sendOnboardingFocusTranscript(Player player, OnboardingFocusSession session) {
+        if (player == null || session == null || !isOnboardingNpcFocusTranscriptEnabled()) {
+            return;
+        }
+        player.sendMessage("");
+        player.sendMessage(colorize("&8[&6" + session.speakerName() + "&8] &7Conversation log"));
+        for (String line : session.dialogueLines()) {
+            if (line == null || line.isBlank()) {
+                continue;
+            }
+            player.sendMessage(colorize("&6" + session.speakerName() + "&8: &f" + line));
+        }
+    }
+
+    private void applyOnboardingFocusZoomEffect(Player player) {
+        if (player == null) {
+            return;
+        }
+        player.addPotionEffect(new PotionEffect(
+                PotionEffectType.SLOWNESS,
+                20 * 60,
+                getOnboardingNpcFocusZoomSlownessAmplifier(),
+                false,
+                false,
+                false
+        ));
+    }
+
+    private void restoreOnboardingFocusZoomEffect(Player player, PotionEffect originalSlownessEffect) {
+        if (player == null) {
+            return;
+        }
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
+        if (originalSlownessEffect != null) {
+            player.addPotionEffect(originalSlownessEffect);
+        }
     }
 
     private void clearPlayerChatWindow(Player player) {
@@ -21025,12 +21109,15 @@ public final class Testproject extends JavaPlugin {
             String speakerName,
             List<String> dialogueLines,
             int lineIndex,
+            int typedCharacters,
+            long nextTypeAtMillis,
             long nextAdvanceAtMillis,
             float originalWalkSpeed,
             float originalFlySpeed,
+            PotionEffect originalSlownessEffect,
             Runnable completionAction
     ) {
-        private OnboardingFocusSession withLineState(int updatedLineIndex, long updatedAdvanceAtMillis) {
+        private OnboardingFocusSession withLineState(int updatedLineIndex, int updatedTypedCharacters, long updatedNextTypeAtMillis, long updatedAdvanceAtMillis) {
             return new OnboardingFocusSession(
                     playerId,
                     entityId,
@@ -21039,9 +21126,12 @@ public final class Testproject extends JavaPlugin {
                     speakerName,
                     dialogueLines,
                     updatedLineIndex,
+                    updatedTypedCharacters,
+                    updatedNextTypeAtMillis,
                     updatedAdvanceAtMillis,
                     originalWalkSpeed,
                     originalFlySpeed,
+                    originalSlownessEffect,
                     completionAction
             );
         }

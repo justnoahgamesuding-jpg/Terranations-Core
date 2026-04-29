@@ -70,7 +70,10 @@ onboarding:
   npc-focus:
     enabled: true
     line-millis: 2400
+    typewriter-char-millis: 35
     chat-clear-lines: 80
+    transcript-to-chat: true
+    zoom-slowness-amplifier: 1
   npc-dialogue:
     default:
       - "&7Take a second to look around and read what the world is asking of you."
