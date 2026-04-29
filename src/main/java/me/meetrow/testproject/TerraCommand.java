@@ -781,6 +781,20 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
+        if (args.length >= 4 && args[1].equalsIgnoreCase("renamenpc")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            String npcId = args[2];
+            String displayName = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+            if (plugin.renameOnboardingCustomNpc(npcId, displayName)) {
+                player.sendMessage(plugin.colorize("&aRenamed onboarding NPC &f" + npcId + "&a to &f" + displayName + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not rename that onboarding NPC."));
+            }
+            return true;
+        }
         if (args.length == 2 && args[1].equalsIgnoreCase("clearnpc")) {
             if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
                 player.sendMessage(plugin.getMessage("general.no-permission"));
@@ -865,6 +879,20 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage(plugin.colorize("&aUpdated FancyNpcs skin for &f" + fancyNpcId + "&a to &f" + skinName + "&a."));
             } else {
                 player.sendMessage(plugin.colorize("&cCould not update that FancyNpcs skin. Check that the NPC exists, FancyNpcs is loaded, and the skin identifier is valid."));
+            }
+            return true;
+        }
+        if (args.length >= 4 && args[1].equalsIgnoreCase("renamefancynpc")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            String fancyNpcId = args[2];
+            String displayName = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+            if (plugin.renameOnboardingFancyNpc(fancyNpcId, displayName)) {
+                player.sendMessage(plugin.colorize("&aRenamed FancyNpcs NPC &f" + fancyNpcId + "&a to &f" + displayName + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not rename that FancyNpcs NPC."));
             }
             return true;
         }
@@ -3991,9 +4019,11 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                     "spawnnpc",
                     "registernpc",
                     "removenpc",
+                    "renamenpc",
                     "npcs",
                     "spawnfancynpc",
                     "skinfancynpc",
+                    "renamefancynpc",
                     "bindfancynpc",
                     "unbindfancynpc",
                     "fancynpcs"
@@ -4016,10 +4046,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             if (action.equals("marknpc")) {
                 return partialMatches(args[2], getSuggestedTutorialQuestKeys());
             }
-            if (action.equals("removenpc") || action.equals("spawnnpc") || action.equals("registernpc")) {
+            if (action.equals("removenpc") || action.equals("spawnnpc") || action.equals("registernpc") || action.equals("renamenpc")) {
                 return partialMatches(args[2], getSuggestedTutorialNpcIds());
             }
-            if (action.equals("bindfancynpc") || action.equals("unbindfancynpc") || action.equals("spawnfancynpc") || action.equals("skinfancynpc")) {
+            if (action.equals("bindfancynpc") || action.equals("unbindfancynpc") || action.equals("spawnfancynpc") || action.equals("skinfancynpc") || action.equals("renamefancynpc")) {
                 return partialMatches(args[2], getSuggestedFancyNpcIds());
             }
         }
@@ -4092,6 +4122,16 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                     "Trader Guide",
                     "Merchant Guide",
                     "Country Recruiter"
+            ));
+        }
+        if (args.length >= 4 && (action.equals("renamenpc") || action.equals("renamefancynpc"))) {
+            return partialMatches(args[args.length - 1], List.of(
+                    "Starter Guide",
+                    "Embassy Guide",
+                    "Trader Guide",
+                    "Merchant Guide",
+                    "Country Recruiter",
+                    "Freeport Guide"
             ));
         }
         return Collections.emptyList();

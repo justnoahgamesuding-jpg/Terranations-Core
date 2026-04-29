@@ -15996,6 +15996,66 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
+    public boolean renameOnboardingCustomNpc(String npcId, String displayName) {
+        String normalizedNpcId = normalizeQuestKey(npcId);
+        if (normalizedNpcId == null || displayName == null || displayName.isBlank()) {
+            return false;
+        }
+        OnboardingCustomNpc existing = onboardingCustomNpcs.get(normalizedNpcId);
+        if (existing == null) {
+            return false;
+        }
+        OnboardingCustomNpc updated = existing.withDisplayName(displayName.trim());
+        onboardingCustomNpcs.put(normalizedNpcId, updated);
+        if (updated.entityId() != null) {
+            Entity entity = getServer().getEntity(updated.entityId());
+            if (entity != null) {
+                applyOnboardingCustomNpcState(entity, updated);
+            }
+        }
+        saveOnboardingCustomNpcs();
+        return true;
+    }
+
+    public boolean renameOnboardingFancyNpc(String fancyNpcId, String displayName) {
+        String resolvedFancyNpcId = resolveAvailableFancyNpcId(fancyNpcId);
+        if (resolvedFancyNpcId == null || displayName == null || displayName.isBlank()) {
+            return false;
+        }
+        String key = resolvedFancyNpcId.toLowerCase(Locale.ROOT);
+        OnboardingFancyNpcBinding existingBinding = onboardingFancyNpcBindings.get(key);
+        if (existingBinding != null) {
+            onboardingFancyNpcBindings.put(key, new OnboardingFancyNpcBinding(
+                    existingBinding.fancyNpcId(),
+                    existingBinding.questKey(),
+                    existingBinding.dialogueKey(),
+                    displayName.trim()
+            ));
+            saveOnboardingFancyNpcBindings();
+        }
+        if (getServer().getPluginManager().getPlugin("FancyNpcs") == null) {
+            return existingBinding != null;
+        }
+        try {
+            de.oliver.fancynpcs.api.NpcManager npcManager = de.oliver.fancynpcs.api.FancyNpcsPlugin.get().getNpcManager();
+            if (npcManager == null || !npcManager.isLoaded()) {
+                return existingBinding != null;
+            }
+            de.oliver.fancynpcs.api.Npc npc = npcManager.getNpcById(resolvedFancyNpcId);
+            if (npc == null || npc.getData() == null) {
+                return existingBinding != null;
+            }
+            npc.getData().setDisplayName(displayName.trim());
+            npc.getData().setDirty(true);
+            npc.updateForAll();
+            npcManager.saveNpcs(false);
+            return true;
+        } catch (Throwable throwable) {
+            getLogger().warning("Failed to rename FancyNpcs NPC '" + fancyNpcId + "': " + throwable.getMessage());
+            return existingBinding != null;
+        }
+    }
+
     public boolean unbindOnboardingFancyNpc(String fancyNpcId) {
         String key = fancyNpcId == null ? null : fancyNpcId.toLowerCase(Locale.ROOT);
         if (key == null || !onboardingFancyNpcBindings.containsKey(key)) {
@@ -21090,6 +21150,10 @@ public final class Testproject extends JavaPlugin {
 
         private OnboardingCustomNpc withEntityId(UUID updatedEntityId) {
             return new OnboardingCustomNpc(id, questKey, dialogueKey, itemsAdderEntityId, displayName, worldName, x, y, z, yaw, pitch, updatedEntityId);
+        }
+
+        private OnboardingCustomNpc withDisplayName(String updatedDisplayName) {
+            return new OnboardingCustomNpc(id, questKey, dialogueKey, itemsAdderEntityId, updatedDisplayName, worldName, x, y, z, yaw, pitch, entityId);
         }
     }
 
