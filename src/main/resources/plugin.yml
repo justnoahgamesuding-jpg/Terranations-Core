@@ -2,7 +2,7 @@ name: testproject
 version: '1.0-SNAPSHOT'
 main: me.meetrow.testproject.Testproject
 api-version: '1.21'
-softdepend: [Vault, PlaceholderAPI, ItemsAdder, LuckPerms, WorldEdit, WorldGuard, dynmap, CoreProtect]
+softdepend: [Vault, PlaceholderAPI, ItemsAdder, FancyNpcs, LuckPerms, WorldEdit, WorldGuard, dynmap, CoreProtect]
 commands:
   terra:
     description: Terra plugin commands

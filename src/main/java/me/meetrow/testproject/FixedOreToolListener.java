@@ -22,7 +22,7 @@ public class FixedOreToolListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK && event.getAction() != Action.LEFT_CLICK_BLOCK) {
             return;
         }
 
@@ -38,6 +38,16 @@ public class FixedOreToolListener implements Listener {
         }
 
         event.setCancelled(true);
+        if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
+            if (!plugin.isFixedOreMaterial(block.getType())) {
+                player.sendMessage(plugin.colorize("&cThat block cannot be made into a fixed ore node."));
+                return;
+            }
+            plugin.createFixedOre(block, block.getType());
+            player.sendMessage(plugin.colorize("&aMarked &f" + plugin.formatMaterialName(block.getType()) + "&a as a fixed ore node."));
+            return;
+        }
+
         if (!plugin.deleteFixedOre(block)) {
             player.sendMessage(plugin.getMessage("terra.fixedore.tool-not-found"));
             return;

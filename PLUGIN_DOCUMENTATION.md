@@ -6,14 +6,16 @@ This file is the current admin and systems reference for the plugin snapshot in 
 
 Terra combines these major systems:
 
+- a first-hour onboarding and tutorial framework with delayed profession lock-in
 - profession progression with enforced specialization
-- country management with roles, treasury, upgrades, boosts, and territory
+- country management with roles, treasury, upgrades, boosts, territory, and hidden system-country support
 - climate-aware farming and sapling growth
 - structural stability and support logic
 - a standalone Terra workbench crafting playtest layer with placeable specialist benches and placeholder custom content
 - trader routes and merchant waves
 - Terra-owned balance storage
 - a locked player guide item in hotbar slot 9 for future gameplay navigation
+- onboarding NPC integrations for ItemsAdder and FancyNpcs
 - staff, maintenance, lag-reduction, and rollback utilities
 
 ## Command Surface
@@ -65,7 +67,9 @@ Primary admin root. Most subcommands require `terra.admin`.
 - `orevision`
   Toggles admin ore-vision overlays.
 - `fixedore` and `fixedoretool`
-  Manages fixed ore nodes and the remover wand.
+  Manages fixed ore nodes and the fixed-ore tool.
+- `tutorial`
+  Manages onboarding quest markers, tutorial NPC bindings, and starter-flow setup helpers.
 - `reload`
   Reloads Terra configs, cached state, integrations, and item metadata refresh passes.
 - `hardrestart`
@@ -162,6 +166,7 @@ Notes:
 - `/country` with no arguments opens the main country GUI.
 - Country homes and trader spawns must be placed inside the country’s linked territory.
 - Farmland limits depend on linked territory and current member count.
+- Hidden system countries are excluded from normal player-facing lookup, browser, HUD, and info flows.
 
 ### `/climate`
 
@@ -281,6 +286,25 @@ Key behavior:
 - It cannot be moved, dropped, hotbar-swapped, offhand-swapped, or placed into containers.
 - Right-clicking it opens the main player hub.
 - The current guide includes player stats, jobs access, personal skills, contracts, country access, and ore-sense toggles.
+
+### Tutorial And Onboarding
+
+The first-hour onboarding flow is now a separate system from profession ownership.
+
+Key behavior:
+
+- New players can remain profession-unlocked while onboarding is active.
+- The tutorial can require trial completion and playtime before the first real job choice unlocks.
+- Tutorial progress is quest-driven and supports guide opens, location visits, block actions, NPC interactions, profession trials, country steps, and delayed profession lock-in.
+- New players can be routed to a starter hub spawn before they choose a primary profession.
+- The starter hub can be bound to a real country entry while still being treated as a hidden admin/system country.
+- Tutorial NPCs can be generic marked entities or persistent custom NPCs spawned through ItemsAdder.
+- Tutorial NPCs can also be existing FancyNpcs NPCs, with Terra only binding tutorial logic to them.
+- When an onboarding player interacts with a tutorial NPC, Terra can temporarily clear chat, lock movement and hotbar actions, suppress inventory and chat use, and keep the player camera focused on that NPC while dialogue lines display.
+
+Important limitation:
+
+- The NPC focus system uses real camera-facing control, but Paper does not provide a general server-side FOV zoom for normal players. The effect is a strong cinematic focus lock, not a true optical zoom.
 
 ### Personal Skills And Work Orders
 
@@ -402,6 +426,8 @@ Optional integrations used by Terra:
 - WorldGuard
 - Dynmap
 - CoreProtect
+- ItemsAdder
+- FancyNpcs
 
 ## Recommended Setup Flow
 
@@ -413,6 +439,393 @@ Optional integrations used by Terra:
 6. Link each region with `/country territory setregion ...` and run `/country territory sync ...`.
 7. Set country homes and trader spawns from inside the linked territory.
 8. Verify optional integrations you expect to use.
+
+## Tutorial Setup
+
+This is the recommended setup order if you want a clean first-join experience.
+
+The intended architecture is:
+
+- onboarding state is separate from profession ownership
+- players can walk, explore, and try systems before choosing a locked profession
+- the starter hub can be either a standalone spawn or a hidden system-country entry
+- tutorial quests drive progression
+- NPCs are presentation surfaces, while Terra owns the actual tutorial progress logic
+
+If you place quests or NPC bindings before the physical onboarding space is stable, you will usually end up with mismatched keys, bad routing, and a confusing first-hour flow.
+
+### 1. Enable and tune onboarding
+
+Review `settings/core.yml`:
+
+- `onboarding.enabled`
+- `onboarding.required-trials`
+- `onboarding.required-playtime-minutes`
+- `onboarding.starter-hub.*`
+- `onboarding.trial-thresholds.*`
+- `onboarding.npc-focus.*`
+- `onboarding.npc-dialogue.*`
+
+Recommended starting values for a first pass:
+
+- `required-trials: 3`
+- `required-playtime-minutes: 20`
+- keep `starter-hub.enabled: true`
+- set `starter-hub.country-key` if the hub should use a hidden admin country home
+- use `starter-hub.use-global-spawn: true` only when you are not binding the hub to a country
+
+If you want a separate onboarding-only spawn without using a country, disable `use-global-spawn` and set:
+
+- `starter-hub.world`
+- `starter-hub.x`
+- `starter-hub.y`
+- `starter-hub.z`
+- `starter-hub.yaw`
+- `starter-hub.pitch`
+
+#### Starter hub as a hidden admin country
+
+If you want the starter island to exist inside the country/territory system:
+
+1. Create the country normally as an admin.
+   Recommended: create it without assigning a normal player owner.
+2. Set its territory and its home location.
+3. Set `onboarding.starter-hub.country-key` in `settings/core.yml` to that country name.
+
+When that key is set, Terra treats that country as:
+
+- the onboarding spawn source, using the country home first and trader spawn as fallback
+- a hidden country for normal player-facing lookup, browser, HUD, and location display
+- a system/admin country that is excluded from random trader and merchant hosting
+
+Players cannot join it through normal country commands, cannot browse it in the country list, and cannot inspect it with normal `/country info` lookups. Admin tooling still resolves it directly.
+
+Recommended use:
+
+- use the country system for territory, home, trader spawn, and region ownership
+- do not treat the hub like a player-managed nation
+- use it as a neutral recruitment and onboarding space
+- keep normal leadership and long-term progression in real player countries
+
+### 2. Build the starter area first
+
+Before wiring quests, build the actual spaces the tutorial refers to:
+
+- arrival point
+- central guide plaza
+- profession trial spaces
+- trader stop
+- merchant stop
+- embassy or country recruitment area
+- any guided route between those spaces
+
+Do not configure quest locations until the physical layout is stable.
+
+### 3. Configure the starter quest flow
+
+Review `settings/quests.yml` under `quests.starter.list`.
+
+Each tutorial quest supports:
+
+- `type`
+- `key`
+- `target`
+- `title`
+- `objective`
+- `hint`
+- `requires-completed`
+
+Current onboarding-specific quest types:
+
+- `open_guide`
+- `visit_location`
+- `break_block`
+- `place_block`
+- `interact_block`
+- `interact_npc`
+- `complete_trial`
+- `playtime`
+- `select_profession`
+- `join_country`
+- `contribute_country`
+
+Examples:
+
+- `visit_location` uses a marker key such as `starter_hub`
+- `interact_npc` uses a quest key such as `trader_npc`
+- `complete_trial` can use `key: any` to count any completed profession trial
+- `playtime` uses `target` in minutes
+
+Recommended first-hour sequence:
+
+1. open the guide
+2. visit the starter hub landmark
+3. talk to a guide or trader NPC
+4. complete at least three profession trials
+5. spend the required playtime in-world
+6. complete any country-facing onboarding step you want to teach
+7. unlock and select the first real profession
+
+### 4. Save named tutorial locations in-world
+
+Use these commands while standing at the correct spot:
+
+- `/terra tutorial setlocation <key> [radius] [display name]`
+- `/terra tutorial clearlocation <key>`
+- `/terra tutorial locations`
+
+Examples:
+
+- `/terra tutorial setlocation starter_hub 12 Starter Hub`
+- `/terra tutorial setlocation embassy_board 8 Embassy Board`
+- `/terra tutorial setlocation forge_yard 10 Forge Yard`
+
+Location keys should match the `key` values used by any `visit_location` tutorial quest.
+
+### 5. Add tutorial NPCs
+
+There are three supported setup paths. Pick the one that matches who should own the NPC.
+
+Use this rule:
+
+- use a marked entity for quick tests or lightweight integrations
+- use ItemsAdder when Terra should spawn, save, and respawn the NPC itself
+- use FancyNpcs when you want better visual customization and you already manage the NPC through FancyNpcs
+
+#### Option A: mark an existing entity
+
+Use this if you already placed an NPC through another plugin or vanilla means.
+
+- look at the entity
+- run `/terra tutorial marknpc <quest-key>`
+
+Example:
+
+- `/terra tutorial marknpc trader_npc`
+
+This is enough for simple onboarding interaction tracking.
+
+#### Option B: create a persistent ItemsAdder tutorial NPC
+
+Use this if you want Terra to own and respawn the onboarding NPC.
+
+Command:
+
+- `/terra tutorial spawnnpc <npc-id> <quest-key> <itemsadder-entity> <dialogue-key|-> [display name]`
+
+Example:
+
+- `/terra tutorial spawnnpc embassy_guide embassy_guide terra:embassy_guide embassy_guide Embassy Guide`
+
+This stores:
+
+- a stable Terra NPC id
+- the quest key used by tutorial quests
+- the ItemsAdder custom entity id
+- an optional dialogue key
+- the spawn location and facing
+
+If the entity already exists and you want Terra to register it instead of spawning a new one:
+
+- look at the entity
+- run `/terra tutorial registernpc <npc-id> <quest-key> <itemsadder-entity> <dialogue-key|-> [display name]`
+
+Management commands:
+
+- `/terra tutorial npcs`
+- `/terra tutorial removenpc <npc-id>`
+- `/terra tutorial clearnpc`
+
+Notes:
+
+- Terra uses ItemsAdder as a soft dependency for this system.
+- The custom NPC entity id must match the ItemsAdder entity you created in your content pack.
+- Terra will try to respawn saved onboarding NPCs on reload and after ItemsAdder finishes loading its data.
+
+#### Option C: bind an existing FancyNpcs NPC
+
+Use this if you want FancyNpcs to handle the NPC visuals, skins, equipment, pose, visibility, and other presentation choices while Terra handles tutorial logic.
+
+Commands:
+
+- `/terra tutorial bindfancynpc <fancynpc-id> <quest-key> <dialogue-key|-> [display name]`
+- `/terra tutorial unbindfancynpc <fancynpc-id>`
+- `/terra tutorial fancynpcs`
+
+Example:
+
+- `/terra tutorial bindfancynpc embassy_guide embassy_guide embassy_guide Embassy Guide`
+
+Behavior:
+
+- Terra listens for FancyNpcs interaction events on bound NPC ids.
+- The onboarding focus/camera-lock sequence still runs through Terra.
+- Terra preserves the tutorial flow even when the NPC is only a packet-based FancyNpcs NPC.
+- FancyNpcs keeps ownership of the NPC itself, so Terra does not respawn or delete it.
+
+Recommended FancyNpcs workflow:
+
+1. create and visually configure the NPC in FancyNpcs first
+2. decide the Terra tutorial `quest-key` that should be completed by talking to it
+3. decide whether it needs a dedicated `dialogue-key` in `core.yml`
+4. bind the FancyNpcs id with `/terra tutorial bindfancynpc ...`
+5. test the full interaction with a fresh onboarding player
+
+Use FancyNpcs for:
+
+- embassy recruiters
+- arrival greeters
+- profession trainers
+- lore-heavy dialogue NPCs
+- country representatives that need better visual identity
+
+Use ItemsAdder instead when:
+
+- Terra should recreate the NPC automatically
+- you want the NPC location and facing fully controlled by Terra data
+- you are already using an ItemsAdder custom entity as the tutorial asset
+
+### 6. Match NPC keys to quest keys cleanly
+
+This is where most setup mistakes happen.
+
+Keep these identifiers straight:
+
+- `npc-id`
+  Terra-owned identifier for an ItemsAdder-spawned onboarding NPC
+- `fancynpc-id`
+  FancyNpcs-owned identifier for an existing FancyNpcs NPC
+- `quest-key`
+  The key used by tutorial quests such as `interact_npc`
+- `dialogue-key`
+  The key used to load dialogue lines from `core.yml`
+
+Practical example:
+
+- `quest-key: embassy_guide`
+- `dialogue-key: embassy_guide`
+- FancyNpcs id: `starter_embassy_guide`
+
+That means:
+
+- the quest listens for `embassy_guide`
+- dialogue loads from `onboarding.npc-dialogue.embassy_guide`
+- Terra binds the FancyNpcs NPC named `starter_embassy_guide` to that quest key
+
+### 7. Add NPC dialogue
+
+Dialogue lives in `settings/core.yml` under `onboarding.npc-dialogue`.
+
+Each entry is a list of lines. The lookup order is:
+
+1. custom NPC `dialogue-key`
+2. custom NPC id
+3. quest key
+4. `default`
+
+Example:
+
+```yml
+onboarding:
+  npc-dialogue:
+    embassy_guide:
+      - "&fCountries are the long-term social loop."
+      - "&fMeet people here before you commit to a path."
+```
+
+If onboarding focus is enabled, these lines drive the temporary cinematic interaction.
+
+### 8. Understand the focus interaction mode
+
+When an onboarding player interacts with a tutorial NPC and dialogue exists:
+
+- the player inventory closes
+- chat is visually pushed away by clearing lines
+- chat messages and commands are blocked
+- hotbar scrolling and swaps are blocked
+- item drop and most interaction input is blocked
+- movement is locked in place
+- the camera is repeatedly aimed at the NPC
+- dialogue lines display in sequence
+
+This only applies during the onboarding focus session and is intended for new-player tutorial moments, not general late-game NPC usage.
+
+FancyNpcs note:
+
+- Terra can still focus the player camera on a FancyNpcs NPC even though the NPC is packet-based, because the focus session can lock onto a saved location when a live Bukkit entity is not available.
+
+### 9. Test the full first-join flow
+
+Use a fresh test account or clear a player’s Terra data before testing.
+
+Verify:
+
+- the player spawns at the intended onboarding location
+- if `starter-hub.country-key` is set, the player spawns at that country home
+- the intro finishes correctly
+- the guide opens and the first quest advances
+- named location markers complete
+- tutorial NPC interactions complete
+- FancyNpcs-bound NPCs complete the same way as Terra-owned NPCs
+- profession trials count correctly
+- the profession choice stays locked until trial and playtime requirements are met
+- `/jobs` becomes available only when onboarding is ready
+
+### 10. Use tab completion
+
+The `/terra tutorial` command now suggests:
+
+- subcommands
+- saved location marker keys
+- saved custom NPC ids
+- available FancyNpcs ids
+- configured tutorial quest keys
+- configured onboarding dialogue keys
+- common radius values
+- ItemsAdder-style NPC id examples
+
+That is intended to reduce setup mistakes when wiring the tutorial in-world.
+
+## FancyNpcs Quick Setup
+
+If you are using FancyNpcs for tutorial or onboarding NPCs, this is the shortest reliable setup:
+
+1. Install and start FancyNpcs normally.
+2. Create the NPC in FancyNpcs and place it where the onboarding route expects it.
+3. Decide the Terra `quest-key` and optional `dialogue-key`.
+4. Bind it with `/terra tutorial bindfancynpc <fancynpc-id> <quest-key> <dialogue-key|-> [display name]`.
+5. Confirm it appears in `/terra tutorial fancynpcs`.
+6. Test the click flow with a fresh player.
+
+If the interaction should advance a tutorial step, the `quest-key` must match the `key` used by the `interact_npc` quest entry in `settings/quests.yml`.
+
+## Fixed Ores
+
+Fixed ores now persist more than just the block material.
+
+Saved fixed-ore data includes:
+
+- world and coordinates
+- ore material
+- full block-data string when available
+
+That means directional or stateful valid fixed-ore blocks such as logs keep their block state more reliably across:
+
+- creation
+- placeholder swaps after breaking
+- server reloads
+
+Admin usage:
+
+- `/terra fixedore create <material>`
+- `/terra fixedore fill <material>`
+- `/terra fixedore delete`
+- `/terra fixedoretool`
+
+The fixed-ore tool behavior is:
+
+- left-click a valid block to mark it as a fixed ore
+- right-click a fixed ore to remove it
 
 ## Related Docs
 

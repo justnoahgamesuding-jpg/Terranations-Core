@@ -388,12 +388,21 @@ public final class QuestAdminGuiListener implements Listener {
             case SELECT_PROFESSION -> Material.COMPASS;
             case EARN_PROFESSION_XP -> Material.EXPERIENCE_BOTTLE;
             case REACH_PROFESSION_LEVEL -> Material.EMERALD;
+            case OPEN_GUIDE -> Material.BOOK;
+            case VISIT_LOCATION -> Material.LODESTONE;
+            case BREAK_BLOCK -> Material.IRON_PICKAXE;
+            case PLACE_BLOCK -> Material.BRICKS;
+            case INTERACT_BLOCK -> Material.LEVER;
+            case INTERACT_NPC -> Material.VILLAGER_SPAWN_EGG;
+            case COMPLETE_TRIAL -> Material.TARGET;
+            case PLAYTIME -> Material.CLOCK;
             case JOIN_COUNTRY -> Material.BLUE_BANNER;
             case CONTRIBUTE_COUNTRY -> Material.GOLD_INGOT;
         };
         return createItem(icon, (quest.isEnabled() ? "&a" : "&7") + quest.getId(), List.of(
                 "&7Type: &f" + formatType(quest.getType()),
                 "&7Profession: &f" + formatProfession(quest.getProfession()),
+                "&7Key: &f" + (quest.getKey() != null ? quest.getKey() : "None"),
                 "&7Target: &f" + quest.getTarget(),
                 "&7Title: &f" + stripColors(quest.getTitle()),
                 "&eClick to edit"
@@ -455,6 +464,14 @@ public final class QuestAdminGuiListener implements Listener {
             case SELECT_PROFESSION -> "Select Profession";
             case EARN_PROFESSION_XP -> "Earn Profession XP";
             case REACH_PROFESSION_LEVEL -> "Reach Profession Level";
+            case OPEN_GUIDE -> "Open Guide";
+            case VISIT_LOCATION -> "Visit Location";
+            case BREAK_BLOCK -> "Break Block";
+            case PLACE_BLOCK -> "Place Block";
+            case INTERACT_BLOCK -> "Interact Block";
+            case INTERACT_NPC -> "Interact NPC";
+            case COMPLETE_TRIAL -> "Complete Trial";
+            case PLAYTIME -> "Playtime";
             case JOIN_COUNTRY -> "Join Country";
             case CONTRIBUTE_COUNTRY -> "Contribute Country";
         };

@@ -130,7 +130,7 @@ public class CountryGuiListener implements Listener {
 
         fillEmptySlots(inventory);
         Country playerCountry = plugin.getPlayerCountry(player.getUniqueId());
-        Country locationCountry = plugin.getCountryAt(player.getLocation());
+        Country locationCountry = plugin.getVisibleCountryAt(player.getLocation());
         boolean ownerView = canSeeOwnerControls(player, playerCountry);
 
         inventory.setItem(INFO_SLOT, createDashboardInfoItem(player, playerCountry, locationCountry));
@@ -1292,7 +1292,7 @@ public class CountryGuiListener implements Listener {
     }
 
     private List<Country> getFilteredCountries(CountryListFilter filter, CountryListSort sort) {
-        List<Country> countries = new ArrayList<>(plugin.getCountries());
+        List<Country> countries = new ArrayList<>(plugin.getVisibleCountries());
         countries.removeIf(country -> !filter.matches(country));
         countries.sort(sort.comparator(plugin));
         return countries;

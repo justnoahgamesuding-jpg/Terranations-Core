@@ -91,7 +91,12 @@ public class TraderQuestListener implements Listener {
         }
 
         event.setCancelled(true);
-        openTraderMenu(event.getPlayer(), plugin.getTraderState(clicked));
+        plugin.beginOnboardingNpcInteraction(
+                event.getPlayer(),
+                clicked,
+                "trader_npc",
+                () -> openTraderMenu(event.getPlayer(), plugin.getTraderState(clicked))
+        );
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

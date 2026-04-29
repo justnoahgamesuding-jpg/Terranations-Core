@@ -2,6 +2,7 @@ package me.meetrow.testproject;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import me.meetrow.testproject.scoreboard.CustomScoreboard;
+import io.papermc.paper.entity.LookAnchor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -83,6 +84,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.Duration;
@@ -176,6 +178,7 @@ public final class Testproject extends JavaPlugin {
     private final Map<UUID, BypassEntry> bypassEntries = new LinkedHashMap<>();
     private final Map<PlacedBlockKey, UUID> placedBlocks = new ConcurrentHashMap<>();
     private final Map<PlacedBlockKey, Material> fixedOreBlocks = new ConcurrentHashMap<>();
+    private final Map<PlacedBlockKey, String> fixedOreBlockData = new ConcurrentHashMap<>();
     private final Map<FurnaceKey, FurnaceSession> furnaceSessions = new ConcurrentHashMap<>();
     private final Map<String, Country> countriesByKey = new LinkedHashMap<>();
     private final Map<UUID, String> playerCountries = new ConcurrentHashMap<>();
@@ -209,6 +212,14 @@ public final class Testproject extends JavaPlugin {
     private final Map<UUID, Integer> tutorialStarterXpProgress = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> completedTutorialQuestIds = new ConcurrentHashMap<>();
     private final Map<UUID, Map<String, Integer>> tutorialQuestProgress = new ConcurrentHashMap<>();
+    private final Map<UUID, OnboardingPhase> onboardingPhases = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> onboardingStartedAtMillis = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<String>> completedOnboardingTrialKeys = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<String, Integer>> onboardingObjectiveProgress = new ConcurrentHashMap<>();
+    private final Map<String, OnboardingLocationMarker> onboardingLocationMarkers = new ConcurrentHashMap<>();
+    private final Map<String, OnboardingCustomNpc> onboardingCustomNpcs = new ConcurrentHashMap<>();
+    private final Map<String, OnboardingFancyNpcBinding> onboardingFancyNpcBindings = new ConcurrentHashMap<>();
+    private final Map<UUID, OnboardingFocusSession> onboardingFocusSessions = new ConcurrentHashMap<>();
     private final List<PlayerQuestDefinition> tutorialQuestDefinitions = new ArrayList<>();
     private final Map<UUID, String> tutorialQuestHudIdCache = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> tutorialQuestHudPercentCache = new ConcurrentHashMap<>();
@@ -251,6 +262,8 @@ public final class Testproject extends JavaPlugin {
     private BukkitTask playtestTickTask;
     private BukkitTask traderRuntimeTask;
     private BukkitTask tutorialActionBarTask;
+    private BukkitTask onboardingMarkerTask;
+    private BukkitTask onboardingFocusTask;
     private BukkitTask persistentActionBarTask;
     private BukkitTask climateBossBarTask;
     private BukkitTask climateFreezeTask;
@@ -342,6 +355,13 @@ public final class Testproject extends JavaPlugin {
         CONTRIBUTE_TO_COUNTRY
     }
 
+    private enum OnboardingPhase {
+        INTRO,
+        ACTIVE,
+        READY_TO_CHOOSE,
+        COMPLETE
+    }
+
     private enum BlockActionType {
         BREAK,
         PLACE
@@ -380,6 +400,8 @@ public final class Testproject extends JavaPlugin {
     private NamespacedKey traderNpcKey;
     private NamespacedKey merchantNpcKey;
     private NamespacedKey fixedOreToolKey;
+    private NamespacedKey onboardingNpcKey;
+    private NamespacedKey onboardingNpcIdKey;
     private NamespacedKey climateCropLoreKey;
     private NamespacedKey soulboundItemKey;
     private NamespacedKey guidanceItemKey;
@@ -400,6 +422,8 @@ public final class Testproject extends JavaPlugin {
         traderNpcKey = new NamespacedKey(this, "dynamic_trader_npc");
         merchantNpcKey = new NamespacedKey(this, "wandering_merchant_npc");
         fixedOreToolKey = new NamespacedKey(this, "fixed_ore_tool");
+        onboardingNpcKey = new NamespacedKey(this, "onboarding_npc_key");
+        onboardingNpcIdKey = new NamespacedKey(this, "onboarding_npc_id");
         climateCropLoreKey = new NamespacedKey(this, "climate_crop_lore");
         soulboundItemKey = new NamespacedKey(this, "soulbound_item");
         guidanceItemKey = new NamespacedKey(this, "guidance_item");
@@ -443,6 +467,12 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new CooldownDebugListener(this), this);
         getServer().getPluginManager().registerEvents(new ChatSoundListener(this), this);
         getServer().getPluginManager().registerEvents(new TutorialIntroListener(this), this);
+        getServer().getPluginManager().registerEvents(new OnboardingFocusListener(this), this);
+        getServer().getPluginManager().registerEvents(new OnboardingNpcInteractionListener(this), this);
+        getServer().getPluginManager().registerEvents(new OnboardingProgressListener(this), this);
+        if (getServer().getPluginManager().getPlugin("FancyNpcs") != null) {
+            getServer().getPluginManager().registerEvents(new OnboardingFancyNpcListener(this), this);
+        }
         getServer().getPluginManager().registerEvents(new ClimateListener(this), this);
         getServer().getPluginManager().registerEvents(new ClimateWeatherListener(this), this);
         getServer().getPluginManager().registerEvents(new ClimateGuiListener(this), this);
@@ -616,10 +646,14 @@ public final class Testproject extends JavaPlugin {
         restartTerraTipsRuntime();
         restartStabilityDebugRuntime();
         restartLagReductionRuntime();
+        restartOnboardingMarkerRuntime();
+        restartOnboardingFocusRuntime();
         restartItemsAdderTopStatusHud();
         restartCustomScoreboard();
         ensurePersistentActionBarTask();
         restartClimateRuntime();
+        restoreOnboardingCustomNpcs();
+        registerItemsAdderLoadHook();
         processPendingHardRestartPhase();
 
         for (Player player : getServer().getOnlinePlayers()) {
@@ -659,6 +693,8 @@ public final class Testproject extends JavaPlugin {
         stopCountryBorderParticlesRuntime();
         stopStabilityDebugRuntime();
         stopLagReductionRuntime();
+        stopOnboardingMarkerRuntime();
+        stopOnboardingFocusRuntime();
         if (terraCraftingManager != null) {
             terraCraftingManager.shutdown();
             terraCraftingManager = null;
@@ -673,6 +709,7 @@ public final class Testproject extends JavaPlugin {
         bypassEntries.clear();
         placedBlocks.clear();
         fixedOreBlocks.clear();
+        fixedOreBlockData.clear();
         furnaceSessions.clear();
         countriesByKey.clear();
         playerCountries.clear();
@@ -728,6 +765,10 @@ public final class Testproject extends JavaPlugin {
         tutorialStoredScoreboards.clear();
         tutorialChecklistStoredScoreboards.clear();
         tutorialStarterXpProgress.clear();
+        onboardingPhases.clear();
+        onboardingStartedAtMillis.clear();
+        completedOnboardingTrialKeys.clear();
+        onboardingObjectiveProgress.clear();
         tutorialQuestHudIdCache.clear();
         tutorialQuestHudPercentCache.clear();
         tutorialQuestHudStepCache.clear();
@@ -1390,13 +1431,94 @@ public final class Testproject extends JavaPlugin {
     }
 
     public boolean requiresProfessionSelection(Player player) {
-        return !hasProfession(player.getUniqueId());
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (hasProfession(playerId)) {
+            return false;
+        }
+        if (!isOnboardingEnabled()) {
+            return true;
+        }
+        return isPrimaryProfessionChoiceUnlocked(playerId);
+    }
+
+    public boolean isOnboardingActive(UUID playerId) {
+        if (playerId == null || !isOnboardingEnabled()) {
+            return false;
+        }
+        if (getPrimaryProfession(playerId) != null) {
+            return false;
+        }
+        OnboardingPhase phase = onboardingPhases.get(playerId);
+        return phase == null || phase != OnboardingPhase.COMPLETE;
+    }
+
+    public boolean isPrimaryProfessionChoiceUnlocked(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        if (getPrimaryProfession(playerId) != null || !isOnboardingEnabled()) {
+            return true;
+        }
+        return getCompletedOnboardingTrialCount(playerId) >= getRequiredOnboardingTrialCount()
+                && getOnboardingElapsedMinutes(playerId) >= getRequiredOnboardingPlaytimeMinutes();
+    }
+
+    public boolean isOnboardingEnabled() {
+        return getCoreSettings().getBoolean("onboarding.enabled", true);
+    }
+
+    public int getRequiredOnboardingTrialCount() {
+        return Math.max(1, getCoreSettings().getInt("onboarding.required-trials", 3));
+    }
+
+    public int getRequiredOnboardingPlaytimeMinutes() {
+        return Math.max(1, getCoreSettings().getInt("onboarding.required-playtime-minutes", 30));
+    }
+
+    public int getCompletedOnboardingTrialCount(UUID playerId) {
+        if (playerId == null) {
+            return 0;
+        }
+        Set<String> completed = completedOnboardingTrialKeys.get(playerId);
+        return completed == null ? 0 : completed.size();
+    }
+
+    public long getOnboardingElapsedMinutes(UUID playerId) {
+        if (playerId == null) {
+            return 0L;
+        }
+        long startedAt = onboardingStartedAtMillis.getOrDefault(playerId, 0L);
+        if (startedAt <= 0L) {
+            return 0L;
+        }
+        return Math.max(0L, (System.currentTimeMillis() - startedAt) / 60_000L);
+    }
+
+    public String getOnboardingUnlockRequirementText(UUID playerId) {
+        int completedTrials = getCompletedOnboardingTrialCount(playerId);
+        int requiredTrials = getRequiredOnboardingTrialCount();
+        long completedMinutes = getOnboardingElapsedMinutes(playerId);
+        int requiredMinutes = getRequiredOnboardingPlaytimeMinutes();
+        return "Complete onboarding: "
+                + Math.min(completedTrials, requiredTrials) + "/" + requiredTrials + " trials, "
+                + Math.min(completedMinutes, requiredMinutes) + "/" + requiredMinutes + " minutes";
+    }
+
+    private FileConfiguration getCoreSettings() {
+        return coreSettingsConfig != null ? coreSettingsConfig : getConfig();
     }
 
     public ProfessionSelectionResult selectProfession(UUID playerId, Profession profession) {
         Profession primary = getPrimaryProfession(playerId);
         Profession secondary = getSecondaryProfession(playerId);
         Profession active = getProfession(playerId);
+
+        if (primary == null && !isPrimaryProfessionChoiceUnlocked(playerId)) {
+            return ProfessionSelectionResult.PROFESSION_LOCKED;
+        }
 
         if (!canUnlockProfession(playerId, profession)) {
             return ProfessionSelectionResult.PROFESSION_LOCKED;
@@ -1524,6 +1646,9 @@ public final class Testproject extends JavaPlugin {
         if (profession == null) {
             return false;
         }
+        if (getPrimaryProfession(playerId) == null && isOnboardingEnabled() && !isPrimaryProfessionChoiceUnlocked(playerId)) {
+            return false;
+        }
         if (profession != Profession.SOLDIER) {
             return true;
         }
@@ -1533,6 +1658,9 @@ public final class Testproject extends JavaPlugin {
     public String getProfessionUnlockRequirementText(UUID playerId, Profession profession) {
         if (profession == null || canUnlockProfession(playerId, profession)) {
             return "";
+        }
+        if (getPrimaryProfession(playerId) == null && isOnboardingEnabled() && !isPrimaryProfessionChoiceUnlocked(playerId)) {
+            return getOnboardingUnlockRequirementText(playerId);
         }
         if (profession == Profession.SOLDIER) {
             int requiredLevel = Math.max(1, jobsConfig.getInt("progression.soldier-unlock-level", 10));
@@ -8886,6 +9014,7 @@ public final class Testproject extends JavaPlugin {
         stopNpcHeadTrackingRuntime();
         stopCountryBorderParticlesRuntime();
         stopLagReductionRuntime();
+        stopOnboardingFocusRuntime();
         reloadConfig();
         reloadCustomConfigs();
         reloadPluginSettings();
@@ -8902,9 +9031,11 @@ public final class Testproject extends JavaPlugin {
         restartNpcHeadTrackingRuntime();
         restartCountryBorderParticlesRuntime();
         restartLagReductionRuntime();
+        restartOnboardingFocusRuntime();
         restartItemsAdderTopStatusHud();
         restartCustomScoreboard();
         restartClimateRuntime();
+        restoreOnboardingCustomNpcs();
 
         for (Player player : getServer().getOnlinePlayers()) {
             handleTutorialJoin(player);
@@ -9087,8 +9218,15 @@ public final class Testproject extends JavaPlugin {
             }
 
             clearPlacedBlockOwner(block);
-            fixedOreBlocks.put(PlacedBlockKey.from(block), oreType);
-            block.setType(oreType, false);
+            PlacedBlockKey blockKey = PlacedBlockKey.from(block);
+            String blockDataString = buildFixedOreBlockDataString(block.getBlockData(), oreType);
+            fixedOreBlocks.put(blockKey, oreType);
+            if (blockDataString != null && !blockDataString.isBlank()) {
+                fixedOreBlockData.put(blockKey, blockDataString);
+            } else {
+                fixedOreBlockData.remove(blockKey);
+            }
+            applyFixedOreBlockState(block, oreType, blockDataString);
             createdCount++;
         }
 
@@ -9105,13 +9243,20 @@ public final class Testproject extends JavaPlugin {
 
         PlacedBlockKey key = PlacedBlockKey.from(block);
         Material removed = fixedOreBlocks.remove(key);
+        String removedBlockData = fixedOreBlockData.remove(key);
         if (removed == null) {
             return false;
         }
 
         Material placeholder = getFixedOrePlaceholder(removed);
         if (block.getType() == removed || block.getType() == placeholder) {
-            block.setType(Material.AIR, false);
+            String placeholderBlockData = buildFixedOreBlockDataString(removedBlockData, placeholder);
+            if (placeholder == Material.AIR) {
+                block.setType(Material.AIR, false);
+            } else {
+                applyFixedOreBlockState(block, placeholder, placeholderBlockData);
+                block.setType(Material.AIR, false);
+            }
         }
         saveFixedOreBlocks();
         return true;
@@ -9148,10 +9293,14 @@ public final class Testproject extends JavaPlugin {
             }
 
             Block currentBlock = world.getBlockAt(x, y, z);
-            if (!fixedOreBlocks.containsKey(PlacedBlockKey.from(currentBlock))) {
+            PlacedBlockKey blockKey = PlacedBlockKey.from(currentBlock);
+            Material configuredOre = fixedOreBlocks.get(blockKey);
+            if (configuredOre == null) {
                 return;
             }
-            currentBlock.setType(placeholder, false);
+            String configuredBlockData = fixedOreBlockData.get(blockKey);
+            String placeholderBlockData = buildFixedOreBlockDataString(configuredBlockData, placeholder);
+            applyFixedOreBlockState(currentBlock, placeholder, placeholderBlockData);
         });
 
         getServer().getScheduler().runTaskLater(this, () -> {
@@ -9161,12 +9310,13 @@ public final class Testproject extends JavaPlugin {
             }
 
             Block currentBlock = world.getBlockAt(x, y, z);
-            Material configuredOre = fixedOreBlocks.get(PlacedBlockKey.from(currentBlock));
+            PlacedBlockKey blockKey = PlacedBlockKey.from(currentBlock);
+            Material configuredOre = fixedOreBlocks.get(blockKey);
             if (configuredOre == null) {
                 return;
             }
 
-            currentBlock.setType(configuredOre, false);
+            applyFixedOreBlockState(currentBlock, configuredOre, fixedOreBlockData.get(blockKey));
         }, 200L);
     }
 
@@ -9186,6 +9336,51 @@ public final class Testproject extends JavaPlugin {
         }
 
         return Material.BEDROCK;
+    }
+
+    private void applyFixedOreBlockState(Block block, Material material, String blockDataString) {
+        if (block == null || material == null) {
+            return;
+        }
+        if (blockDataString != null && !blockDataString.isBlank()) {
+            try {
+                BlockData blockData = Bukkit.createBlockData(blockDataString);
+                if (blockData.getMaterial() == material) {
+                    block.setBlockData(blockData, false);
+                    return;
+                }
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        block.setType(material, false);
+    }
+
+    private String buildFixedOreBlockDataString(BlockData sourceBlockData, Material targetMaterial) {
+        if (targetMaterial == null) {
+            return null;
+        }
+        if (sourceBlockData == null) {
+            return Bukkit.createBlockData(targetMaterial).getAsString();
+        }
+        return buildFixedOreBlockDataString(sourceBlockData.getAsString(), targetMaterial);
+    }
+
+    private String buildFixedOreBlockDataString(String sourceBlockDataString, Material targetMaterial) {
+        if (targetMaterial == null) {
+            return null;
+        }
+        BlockData defaultBlockData = Bukkit.createBlockData(targetMaterial);
+        if (sourceBlockDataString == null || sourceBlockDataString.isBlank()) {
+            return defaultBlockData.getAsString();
+        }
+        int propertyIndex = sourceBlockDataString.indexOf('[');
+        String propertySuffix = propertyIndex >= 0 ? sourceBlockDataString.substring(propertyIndex) : "";
+        String candidate = targetMaterial.getKey() + propertySuffix;
+        try {
+            return Bukkit.createBlockData(candidate).getAsString();
+        } catch (IllegalArgumentException ignored) {
+            return defaultBlockData.getAsString();
+        }
     }
 
     public boolean canUseAdminCommands(Player player) {
@@ -9839,10 +10034,60 @@ public final class Testproject extends JavaPlugin {
         return new ArrayList<>(countriesByKey.values());
     }
 
+    public List<Country> getVisibleCountries() {
+        List<Country> visibleCountries = new ArrayList<>();
+        for (Country country : countriesByKey.values()) {
+            if (isPlayerVisibleCountry(country)) {
+                visibleCountries.add(country);
+            }
+        }
+        return visibleCountries;
+    }
+
+    public Country getVisibleCountry(String countryName) {
+        Country country = getCountry(countryName);
+        return isPlayerVisibleCountry(country) ? country : null;
+    }
+
+    public Country getVisibleCountryAt(Location location) {
+        Country country = getCountryAt(location);
+        return isPlayerVisibleCountry(country) ? country : null;
+    }
+
+    public boolean isSystemCountry(Country country) {
+        return country != null && (country.isSystemCountry() || isConfiguredStarterHubCountry(country));
+    }
+
+    public boolean isHiddenCountry(Country country) {
+        return country != null && (country.isHiddenFromPlayers() || isSystemCountry(country));
+    }
+
+    public boolean isPlayerVisibleCountry(Country country) {
+        return country != null && !isHiddenCountry(country);
+    }
+
+    public String getStarterHubCountryKey() {
+        String key = getCoreSettings().getString("onboarding.starter-hub.country-key", "");
+        return key == null || key.isBlank() ? "" : normalizeCountryName(key);
+    }
+
+    public Country getStarterHubCountry() {
+        String key = getStarterHubCountryKey();
+        return key.isBlank() ? null : getCountryByKey(key);
+    }
+
+    public boolean isConfiguredStarterHubCountry(Country country) {
+        if (country == null) {
+            return false;
+        }
+        String starterHubKey = getStarterHubCountryKey();
+        return !starterHubKey.isBlank() && starterHubKey.equals(normalizeCountryName(country.getName()));
+    }
+
     public void createCountry(String countryName, OfflinePlayer owner) {
         UUID ownerId = owner != null ? owner.getUniqueId() : null;
         Set<UUID> members = ownerId != null ? Set.of(ownerId) : Set.of();
-        Country country = new Country(countryName, ownerId, true, null, null, null, null, 0.0D, 0.0D, 0.0D, 0.0F, 0.0F,
+        Country country = new Country(countryName, ownerId, true, false, false, null, null, null, null, 0.0D, 0.0D, 0.0D, 0.0F, 0.0F,
                 members, Set.of(), Set.of(), Set.of(), null, 0.0D, 0.0D, 0.0D, 0.0F, 0.0F, Set.of(), null, null, 0L,
                 1, 0.0D, 0, null, 0L, Set.of());
         countriesByKey.put(normalizeCountryName(countryName), country);
@@ -10042,6 +10287,16 @@ public final class Testproject extends JavaPlugin {
     }
 
     public Location getPrimarySpawnLocation(Player player) {
+        if (player != null && isOnboardingActive(player.getUniqueId())) {
+            Location onboardingSpawn = getOnboardingSpawnLocation(player);
+            if (onboardingSpawn != null) {
+                return onboardingSpawn;
+            }
+        }
+        return getBasePrimarySpawnLocation(player);
+    }
+
+    private Location getBasePrimarySpawnLocation(Player player) {
         Location configuredSpawn = getWorldSpawnLocation();
         if (configuredSpawn != null) {
             return configuredSpawn;
@@ -10051,6 +10306,9 @@ public final class Testproject extends JavaPlugin {
             if (defaultWorld != null) {
                 return defaultWorld.getSpawnLocation();
             }
+        }
+        if (player == null) {
+            return null;
         }
         return player.getWorld().getSpawnLocation();
     }
@@ -10726,10 +10984,16 @@ public final class Testproject extends JavaPlugin {
     }
 
     public boolean canManageCountry(Country country, UUID playerId) {
+        if (isSystemCountry(country)) {
+            return false;
+        }
         return isCountryOwner(country, playerId) || isCountryCoOwner(country, playerId);
     }
 
     public boolean canInviteToCountry(Country country, UUID playerId) {
+        if (isSystemCountry(country)) {
+            return false;
+        }
         return canManageCountry(country, playerId) || isCountrySteward(country, playerId);
     }
 
@@ -12921,7 +13185,13 @@ public final class Testproject extends JavaPlugin {
         }
         for (String key : ownerCountry.getAllowedTradeCountries()) {
             Country country = getCountryByKey(key);
-            names.add(country != null ? country.getName() : key);
+            if (country == null) {
+                names.add(key);
+                continue;
+            }
+            if (isPlayerVisibleCountry(country)) {
+                names.add(country.getName());
+            }
         }
         names.sort(String::compareToIgnoreCase);
         return names;
@@ -13475,6 +13745,22 @@ public final class Testproject extends JavaPlugin {
     }
 
     public List<String> getCountryNames() {
+        return getVisibleCountryNames();
+    }
+
+    public List<String> getVisibleCountryNames() {
+        List<String> countryNames = new ArrayList<>();
+        for (Country country : countriesByKey.values()) {
+            if (!isPlayerVisibleCountry(country)) {
+                continue;
+            }
+            countryNames.add(country.getName());
+        }
+        countryNames.sort(String.CASE_INSENSITIVE_ORDER);
+        return countryNames;
+    }
+
+    public List<String> getAllCountryNames() {
         List<String> countryNames = new ArrayList<>();
         for (Country country : countriesByKey.values()) {
             countryNames.add(country.getName());
@@ -13963,6 +14249,9 @@ public final class Testproject extends JavaPlugin {
         reloadPendingStarterKitGrants();
         reloadTutorialQuestDefinitions();
         reloadTutorialStages();
+        reloadOnboardingLocationMarkers();
+        reloadOnboardingCustomNpcs();
+        reloadOnboardingFancyNpcBindings();
         reloadAssignedQuestStates();
         reloadJobContracts();
         reloadFixedOreBlocks();
@@ -14238,6 +14527,8 @@ public final class Testproject extends JavaPlugin {
             }
 
             boolean open = countryDataConfig.getBoolean(path + ".open", true);
+            boolean systemCountry = countryDataConfig.getBoolean(path + ".system-country", false);
+            boolean hiddenFromPlayers = countryDataConfig.getBoolean(path + ".hidden-from-players", false);
             String tag = countryDataConfig.getString(path + ".tag");
             String territoryWorld = countryDataConfig.getString(path + ".territory.world");
             String territoryRegionId = countryDataConfig.getString(path + ".territory.region");
@@ -14275,7 +14566,7 @@ public final class Testproject extends JavaPlugin {
                 CountryUpgrade upgrade = CountryUpgrade.fromKey(upgradeKey);
                 unlockedUpgradeKeys.add(upgrade != null ? upgrade.getKey() : upgradeKey);
             }
-            Country country = new Country(name, ownerId, open, tag, territoryWorld, territoryRegionId, homeWorld, homeX, homeY, homeZ, homeYaw, homePitch,
+            Country country = new Country(name, ownerId, open, systemCountry, hiddenFromPlayers, tag, territoryWorld, territoryRegionId, homeWorld, homeX, homeY, homeZ, homeYaw, homePitch,
                     members, coOwners, stewards, invitedPlayers, traderSpawnWorld, traderSpawnX, traderSpawnY, traderSpawnZ, traderSpawnYaw, traderSpawnPitch,
                     allowedTradeCountries, lastTraderName, lastTraderSpecialty, lastTraderSeenAtMillis, countryLevel, treasuryBalance, resourceStockpile,
                     activeBoostKey, activeBoostUntilMillis, unlockedUpgradeKeys);
@@ -14587,6 +14878,7 @@ public final class Testproject extends JavaPlugin {
                     questSection.getString("objective", "Complete this quest"),
                     questSection.getString("hint", ""),
                     Math.max(1, questSection.getInt("target", 1)),
+                    normalizeQuestKey(questSection.getString("key")),
                     Profession.fromKey(questSection.getString("profession")),
                     type,
                     requiresCompleted
@@ -14604,6 +14896,10 @@ public final class Testproject extends JavaPlugin {
         tutorialStarterXpProgress.clear();
         completedTutorialQuestIds.clear();
         tutorialQuestProgress.clear();
+        onboardingPhases.clear();
+        onboardingStartedAtMillis.clear();
+        completedOnboardingTrialKeys.clear();
+        onboardingObjectiveProgress.clear();
 
         ConfigurationSection section = dataConfig.getConfigurationSection("tutorial");
         if (section == null) {
@@ -14624,6 +14920,41 @@ public final class Testproject extends JavaPlugin {
                 int starterProgress = Math.max(0, section.getInt(playerKey + ".starter-xp-progress", 0));
                 if (starterProgress > 0) {
                     tutorialStarterXpProgress.put(playerId, starterProgress);
+                }
+                String onboardingPhaseName = section.getString(playerKey + ".onboarding-phase");
+                if (onboardingPhaseName != null && !onboardingPhaseName.isBlank()) {
+                    try {
+                        onboardingPhases.put(playerId, OnboardingPhase.valueOf(onboardingPhaseName.toUpperCase(Locale.ROOT)));
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+                long onboardingStartedAt = Math.max(0L, section.getLong(playerKey + ".onboarding-started-at", 0L));
+                if (onboardingStartedAt > 0L) {
+                    onboardingStartedAtMillis.put(playerId, onboardingStartedAt);
+                }
+                Set<String> completedTrials = new LinkedHashSet<>();
+                for (String trialKey : section.getStringList(playerKey + ".completed-trials")) {
+                    String normalizedTrialKey = normalizeQuestKey(trialKey);
+                    if (normalizedTrialKey != null) {
+                        completedTrials.add(normalizedTrialKey);
+                    }
+                }
+                if (!completedTrials.isEmpty()) {
+                    completedOnboardingTrialKeys.put(playerId, completedTrials);
+                }
+                ConfigurationSection onboardingProgressSection = section.getConfigurationSection(playerKey + ".onboarding-progress");
+                if (onboardingProgressSection != null) {
+                    Map<String, Integer> progressByKey = new LinkedHashMap<>();
+                    for (String progressKey : onboardingProgressSection.getKeys(false)) {
+                        int progress = Math.max(0, onboardingProgressSection.getInt(progressKey, 0));
+                        String normalizedKey = normalizeQuestKey(progressKey);
+                        if (progress > 0 && normalizedKey != null) {
+                            progressByKey.put(normalizedKey, progress);
+                        }
+                    }
+                    if (!progressByKey.isEmpty()) {
+                        onboardingObjectiveProgress.put(playerId, progressByKey);
+                    }
                 }
 
                 Set<String> completed = new LinkedHashSet<>();
@@ -14720,6 +15051,33 @@ public final class Testproject extends JavaPlugin {
         } else {
             dataConfig.set("tutorial." + playerId + ".starter-xp-progress", starterProgress);
         }
+        OnboardingPhase onboardingPhase = onboardingPhases.get(playerId);
+        if (onboardingPhase == null) {
+            dataConfig.set("tutorial." + playerId + ".onboarding-phase", null);
+        } else {
+            dataConfig.set("tutorial." + playerId + ".onboarding-phase", onboardingPhase.name().toLowerCase(Locale.ROOT));
+        }
+        long onboardingStartedAt = Math.max(0L, onboardingStartedAtMillis.getOrDefault(playerId, 0L));
+        if (onboardingStartedAt <= 0L) {
+            dataConfig.set("tutorial." + playerId + ".onboarding-started-at", null);
+        } else {
+            dataConfig.set("tutorial." + playerId + ".onboarding-started-at", onboardingStartedAt);
+        }
+        Set<String> completedTrials = completedOnboardingTrialKeys.get(playerId);
+        if (completedTrials == null || completedTrials.isEmpty()) {
+            dataConfig.set("tutorial." + playerId + ".completed-trials", null);
+        } else {
+            dataConfig.set("tutorial." + playerId + ".completed-trials", new ArrayList<>(completedTrials));
+        }
+        Map<String, Integer> onboardingProgress = onboardingObjectiveProgress.get(playerId);
+        dataConfig.set("tutorial." + playerId + ".onboarding-progress", null);
+        if (onboardingProgress != null && !onboardingProgress.isEmpty()) {
+            for (Map.Entry<String, Integer> entry : onboardingProgress.entrySet()) {
+                if (entry.getValue() != null && entry.getValue() > 0) {
+                    dataConfig.set("tutorial." + playerId + ".onboarding-progress." + entry.getKey(), entry.getValue());
+                }
+            }
+        }
 
         Set<String> completed = completedTutorialQuestIds.get(playerId);
         if (completed == null || completed.isEmpty()) {
@@ -14741,6 +15099,10 @@ public final class Testproject extends JavaPlugin {
         if (tutorialStages.get(playerId) == null
                 && introIndex == null
                 && starterProgress <= 0
+                && onboardingPhase == null
+                && onboardingStartedAt <= 0L
+                && (completedTrials == null || completedTrials.isEmpty())
+                && (onboardingProgress == null || onboardingProgress.isEmpty())
                 && (completed == null || completed.isEmpty())
                 && (progressByQuest == null || progressByQuest.isEmpty())) {
             dataConfig.set("tutorial." + playerId, null);
@@ -14888,7 +15250,8 @@ public final class Testproject extends JavaPlugin {
         }
 
         UUID playerId = player.getUniqueId();
-        if (requiresProfessionSelection(player)) {
+        if (isOnboardingActive(playerId)) {
+            ensureOnboardingProfile(player);
             if (!tutorialIntroIndices.containsKey(playerId)) {
                 startTutorialIntro(player, 0, true);
             } else {
@@ -14913,6 +15276,10 @@ public final class Testproject extends JavaPlugin {
         tutorialStarterXpProgress.remove(playerId);
         completedTutorialQuestIds.remove(playerId);
         tutorialQuestProgress.remove(playerId);
+        onboardingPhases.remove(playerId);
+        onboardingStartedAtMillis.remove(playerId);
+        completedOnboardingTrialKeys.remove(playerId);
+        onboardingObjectiveProgress.remove(playerId);
         saveTutorialStage(playerId);
         Player player = getServer().getPlayer(playerId);
         if (player != null && player.isOnline()) {
@@ -14930,6 +15297,10 @@ public final class Testproject extends JavaPlugin {
         tutorialStarterXpProgress.remove(playerId);
         completedTutorialQuestIds.remove(playerId);
         tutorialQuestProgress.remove(playerId);
+        onboardingPhases.remove(playerId);
+        onboardingStartedAtMillis.remove(playerId);
+        completedOnboardingTrialKeys.remove(playerId);
+        onboardingObjectiveProgress.remove(playerId);
         tutorialQuestHudIdCache.remove(playerId);
         tutorialQuestHudPercentCache.remove(playerId);
         tutorialQuestHudStepCache.remove(playerId);
@@ -14938,6 +15309,1198 @@ public final class Testproject extends JavaPlugin {
         if (player != null && player.isOnline()) {
             clearTutorialChecklist(player);
             syncTutorialQuestHud(player, true);
+        }
+    }
+
+    private void ensureOnboardingProfile(Player player) {
+        if (player == null || !player.isOnline() || !isOnboardingActive(player.getUniqueId())) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        boolean newProfile = !onboardingStartedAtMillis.containsKey(playerId);
+        onboardingStartedAtMillis.putIfAbsent(playerId, System.currentTimeMillis());
+        if (newProfile) {
+            Location onboardingSpawn = getOnboardingSpawnLocation(player);
+            if (onboardingSpawn != null) {
+                player.teleport(onboardingSpawn);
+            }
+        }
+        refreshOnboardingPhase(playerId, true);
+    }
+
+    private void refreshOnboardingPhase(UUID playerId, boolean save) {
+        if (playerId == null) {
+            return;
+        }
+        OnboardingPhase phase;
+        if (getPrimaryProfession(playerId) != null) {
+            phase = OnboardingPhase.COMPLETE;
+        } else if (isTutorialIntroActive(playerId)) {
+            phase = OnboardingPhase.INTRO;
+        } else if (isPrimaryProfessionChoiceUnlocked(playerId)) {
+            phase = OnboardingPhase.READY_TO_CHOOSE;
+        } else {
+            phase = OnboardingPhase.ACTIVE;
+        }
+        onboardingPhases.put(playerId, phase);
+        if (save) {
+            saveTutorialStage(playerId);
+        }
+    }
+
+    private OnboardingPhase getOnboardingPhase(UUID playerId) {
+        if (playerId == null) {
+            return OnboardingPhase.COMPLETE;
+        }
+        refreshOnboardingPhase(playerId, false);
+        return onboardingPhases.getOrDefault(playerId, OnboardingPhase.ACTIVE);
+    }
+
+    public Location getOnboardingSpawnLocation(Player player) {
+        if (player == null) {
+            return getDefaultSpawnLocation();
+        }
+        if (!isOnboardingEnabled() || !getCoreSettings().getBoolean("onboarding.starter-hub.enabled", false)) {
+            return getBasePrimarySpawnLocation(player);
+        }
+        Country starterHubCountry = getStarterHubCountry();
+        if (starterHubCountry != null) {
+            Location countryHome = getCountryHome(starterHubCountry);
+            if (countryHome != null) {
+                return countryHome;
+            }
+            if (starterHubCountry.hasTraderSpawn()) {
+                World traderWorld = getServer().getWorld(starterHubCountry.getTraderSpawnWorld());
+                if (traderWorld != null) {
+                    return new Location(
+                            traderWorld,
+                            starterHubCountry.getTraderSpawnX(),
+                            starterHubCountry.getTraderSpawnY(),
+                            starterHubCountry.getTraderSpawnZ(),
+                            starterHubCountry.getTraderSpawnYaw(),
+                            starterHubCountry.getTraderSpawnPitch()
+                    );
+                }
+            }
+        }
+        if (getCoreSettings().getBoolean("onboarding.starter-hub.use-global-spawn", true)) {
+            return getBasePrimarySpawnLocation(player);
+        }
+        String worldName = getCoreSettings().getString("onboarding.starter-hub.world", "");
+        World world = worldName == null || worldName.isBlank() ? player.getWorld() : getServer().getWorld(worldName);
+        if (world == null) {
+            return getBasePrimarySpawnLocation(player);
+        }
+        return new Location(
+                world,
+                getCoreSettings().getDouble("onboarding.starter-hub.x", world.getSpawnLocation().getX()),
+                getCoreSettings().getDouble("onboarding.starter-hub.y", world.getSpawnLocation().getY()),
+                getCoreSettings().getDouble("onboarding.starter-hub.z", world.getSpawnLocation().getZ()),
+                (float) getCoreSettings().getDouble("onboarding.starter-hub.yaw", 0.0D),
+                (float) getCoreSettings().getDouble("onboarding.starter-hub.pitch", 0.0D)
+        );
+    }
+
+    public List<Profession> getOnboardingTrialProfessions() {
+        return List.of(
+                Profession.MINER,
+                Profession.LUMBERJACK,
+                Profession.FARMER,
+                Profession.BUILDER,
+                Profession.BLACKSMITH,
+                Profession.TRADER
+        );
+    }
+
+    public int getOnboardingTrialTarget(Profession profession) {
+        if (profession == null) {
+            return 1;
+        }
+        return switch (profession) {
+            case MINER -> Math.max(1, getCoreSettings().getInt("onboarding.trial-thresholds.miner", 8));
+            case LUMBERJACK -> Math.max(1, getCoreSettings().getInt("onboarding.trial-thresholds.lumberjack", 6));
+            case FARMER -> Math.max(1, getCoreSettings().getInt("onboarding.trial-thresholds.farmer", 6));
+            case BUILDER -> Math.max(1, getCoreSettings().getInt("onboarding.trial-thresholds.builder", 12));
+            case BLACKSMITH -> Math.max(1, getCoreSettings().getInt("onboarding.trial-thresholds.blacksmith", 3));
+            case TRADER -> Math.max(1, getCoreSettings().getInt("onboarding.trial-thresholds.trader", 3));
+            case SOLDIER -> Integer.MAX_VALUE;
+        };
+    }
+
+    public int getOnboardingTrialProgress(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null) {
+            return 0;
+        }
+        return getOnboardingObjectiveProgress(playerId, "trial_" + profession.getKey());
+    }
+
+    public boolean hasCompletedOnboardingTrial(UUID playerId, Profession profession) {
+        if (playerId == null || profession == null) {
+            return false;
+        }
+        Set<String> completed = completedOnboardingTrialKeys.get(playerId);
+        return completed != null && completed.contains(profession.getKey());
+    }
+
+    public String getOnboardingTrialHint(Profession profession) {
+        if (profession == null) {
+            return "";
+        }
+        return switch (profession) {
+            case MINER -> "Break stone or ore in the starter dig site.";
+            case LUMBERJACK -> "Chop logs in the starter grove.";
+            case FARMER -> "Plant, harvest, or work crop plots.";
+            case BUILDER -> "Place building blocks in the practice yard.";
+            case BLACKSMITH -> "Use the crafting or forge stations.";
+            case TRADER -> "Use trade, storage, or logistics stations in the hub.";
+            case SOLDIER -> "Soldier unlocks later.";
+        };
+    }
+
+    public void recordOnboardingGuideOpened(Player player) {
+        if (player == null || !isOnboardingActive(player.getUniqueId())) {
+            return;
+        }
+        setOnboardingObjectiveProgress(player.getUniqueId(), "guide_opened", 1, true);
+        refreshTutorialQuestFlow(player, true);
+        updateTutorialChecklist(player);
+        syncTutorialQuestHud(player, false);
+    }
+
+    public void recordOnboardingLocationVisit(Player player, String locationKey) {
+        if (player == null || !isOnboardingActive(player.getUniqueId())) {
+            return;
+        }
+        String normalizedKey = normalizeQuestKey(locationKey);
+        if (normalizedKey == null) {
+            return;
+        }
+        setOnboardingObjectiveProgress(player.getUniqueId(), normalizedKey, 1, true);
+        refreshTutorialQuestFlow(player, true);
+        updateTutorialChecklist(player);
+        syncTutorialQuestHud(player, false);
+    }
+
+    public void recordOnboardingBlockBreak(Player player, Material material) {
+        if (player == null || material == null || !isOnboardingActive(player.getUniqueId())) {
+            return;
+        }
+        addOnboardingObjectiveProgress(player.getUniqueId(), "any_block_break", 1, false);
+        boolean updated = true;
+        if (material == Material.STONE || material.name().endsWith("_ORE") || material == Material.ANCIENT_DEBRIS) {
+            updated |= incrementOnboardingTrialProgress(player, Profession.MINER);
+        }
+        if (Tag.LOGS.isTagged(material) || material.name().endsWith("_WOOD") || material.name().endsWith("_STEM") || material.name().endsWith("_HYPHAE")) {
+            updated |= incrementOnboardingTrialProgress(player, Profession.LUMBERJACK);
+        }
+        if (isFarmerCrop(material)) {
+            updated |= incrementOnboardingTrialProgress(player, Profession.FARMER);
+        }
+        if (updated) {
+            refreshTutorialQuestFlow(player, true);
+            updateTutorialChecklist(player);
+            syncTutorialQuestHud(player, false);
+        }
+    }
+
+    public void recordOnboardingBlockPlace(Player player, Material material) {
+        if (player == null || material == null || !isOnboardingActive(player.getUniqueId())) {
+            return;
+        }
+        addOnboardingObjectiveProgress(player.getUniqueId(), "any_block_place", 1, false);
+        boolean updated = true;
+        if (material.isBlock() && material.isSolid() && !isFarmerCrop(material)) {
+            updated |= incrementOnboardingTrialProgress(player, Profession.BUILDER);
+        }
+        if (isFarmerCrop(material) || material == Material.FARMLAND) {
+            updated |= incrementOnboardingTrialProgress(player, Profession.FARMER);
+        }
+        if (updated) {
+            refreshTutorialQuestFlow(player, true);
+            updateTutorialChecklist(player);
+            syncTutorialQuestHud(player, false);
+        }
+    }
+
+    public void recordOnboardingBlockInteract(Player player, Material material) {
+        if (player == null || material == null || !isOnboardingActive(player.getUniqueId())) {
+            return;
+        }
+        addOnboardingObjectiveProgress(player.getUniqueId(), "any_block_interact", 1, false);
+        boolean updated = true;
+        if (material == Material.CRAFTING_TABLE
+                || material == Material.SMITHING_TABLE
+                || material == Material.ANVIL
+                || material == Material.CHIPPED_ANVIL
+                || material == Material.DAMAGED_ANVIL
+                || material == Material.FURNACE
+                || material == Material.BLAST_FURNACE
+                || material == Material.GRINDSTONE) {
+            updated |= incrementOnboardingTrialProgress(player, Profession.BLACKSMITH);
+        }
+        if (material == Material.BARREL
+                || material == Material.CHEST
+                || material == Material.LECTERN
+                || material == Material.BELL
+                || material == Material.LODESTONE) {
+            updated |= incrementOnboardingTrialProgress(player, Profession.TRADER);
+        }
+        if (updated) {
+            refreshTutorialQuestFlow(player, true);
+            updateTutorialChecklist(player);
+            syncTutorialQuestHud(player, false);
+        }
+    }
+
+    private boolean incrementOnboardingTrialProgress(Player player, Profession profession) {
+        if (player == null || profession == null || profession == Profession.SOLDIER) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        String progressKey = "trial_" + profession.getKey();
+        int progress = addOnboardingObjectiveProgress(playerId, progressKey, 1, false);
+        if (progress < getOnboardingTrialTarget(profession)) {
+            saveTutorialStage(playerId);
+            return true;
+        }
+        return completeOnboardingTrial(player, profession);
+    }
+
+    private boolean completeOnboardingTrial(Player player, Profession profession) {
+        if (player == null || profession == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        Set<String> completed = completedOnboardingTrialKeys.computeIfAbsent(playerId, ignored -> new LinkedHashSet<>());
+        if (!completed.add(profession.getKey())) {
+            return false;
+        }
+        setOnboardingObjectiveProgress(playerId, "trial_" + profession.getKey(), getOnboardingTrialTarget(profession), false);
+        refreshOnboardingPhase(playerId, false);
+        saveTutorialStage(playerId);
+        player.sendMessage(colorize("&aTrial complete: &f" + getProfessionPlainDisplayName(profession) + "&a."));
+        playTutorialStageAdvanceEffect(player, false);
+        if (isPrimaryProfessionChoiceUnlocked(playerId)) {
+            player.sendMessage(colorize("&6Your first profession choice is now unlocked. Open &f/jobs&6 or the &fTerra Guide&6."));
+        }
+        return true;
+    }
+
+    private int getOnboardingObjectiveProgress(UUID playerId, String key) {
+        if (playerId == null) {
+            return 0;
+        }
+        Map<String, Integer> progress = onboardingObjectiveProgress.get(playerId);
+        return progress == null ? 0 : Math.max(0, progress.getOrDefault(key, 0));
+    }
+
+    private int addOnboardingObjectiveProgress(UUID playerId, String key, int amount, boolean save) {
+        String normalizedKey = normalizeQuestKey(key);
+        if (playerId == null || normalizedKey == null || amount <= 0) {
+            return 0;
+        }
+        Map<String, Integer> progress = onboardingObjectiveProgress.computeIfAbsent(playerId, ignored -> new ConcurrentHashMap<>());
+        int updated = Math.max(0, progress.getOrDefault(normalizedKey, 0) + amount);
+        progress.put(normalizedKey, updated);
+        if (save) {
+            saveTutorialStage(playerId);
+        }
+        return updated;
+    }
+
+    private void setOnboardingObjectiveProgress(UUID playerId, String key, int amount, boolean save) {
+        String normalizedKey = normalizeQuestKey(key);
+        if (playerId == null || normalizedKey == null) {
+            return;
+        }
+        if (amount <= 0) {
+            Map<String, Integer> progress = onboardingObjectiveProgress.get(playerId);
+            if (progress != null) {
+                progress.remove(normalizedKey);
+                if (progress.isEmpty()) {
+                    onboardingObjectiveProgress.remove(playerId);
+                }
+            }
+        } else {
+            onboardingObjectiveProgress.computeIfAbsent(playerId, ignored -> new ConcurrentHashMap<>()).put(normalizedKey, amount);
+        }
+        if (save) {
+            saveTutorialStage(playerId);
+        }
+    }
+
+    private String normalizeQuestKey(String input) {
+        if (input == null || input.isBlank()) {
+            return null;
+        }
+        return input.trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+    }
+
+    private void reloadOnboardingLocationMarkers() {
+        onboardingLocationMarkers.clear();
+        ConfigurationSection section = dataConfig.getConfigurationSection("tutorial-markers.locations");
+        if (section == null) {
+            return;
+        }
+        for (String rawKey : section.getKeys(false)) {
+            String key = normalizeQuestKey(rawKey);
+            if (key == null) {
+                continue;
+            }
+            String worldName = section.getString(rawKey + ".world", "");
+            World world = worldName == null || worldName.isBlank() ? null : getServer().getWorld(worldName);
+            if (world == null) {
+                continue;
+            }
+            onboardingLocationMarkers.put(key, new OnboardingLocationMarker(
+                    key,
+                    section.getString(rawKey + ".name", key),
+                    world.getName(),
+                    section.getDouble(rawKey + ".x", world.getSpawnLocation().getX()),
+                    section.getDouble(rawKey + ".y", world.getSpawnLocation().getY()),
+                    section.getDouble(rawKey + ".z", world.getSpawnLocation().getZ()),
+                    Math.max(1.0D, section.getDouble(rawKey + ".radius", 8.0D))
+            ));
+        }
+        ensureDefaultOnboardingLocationMarker();
+    }
+
+    private void ensureDefaultOnboardingLocationMarker() {
+        if (onboardingLocationMarkers.containsKey("starter_hub")) {
+            return;
+        }
+        Location fallback = getDefaultSpawnLocation();
+        if (fallback == null || fallback.getWorld() == null) {
+            return;
+        }
+        onboardingLocationMarkers.put("starter_hub", new OnboardingLocationMarker(
+                "starter_hub",
+                "Starter Hub",
+                fallback.getWorld().getName(),
+                fallback.getX(),
+                fallback.getY(),
+                fallback.getZ(),
+                12.0D
+        ));
+    }
+
+    private void saveOnboardingLocationMarkers() {
+        dataConfig.set("tutorial-markers.locations", null);
+        for (OnboardingLocationMarker marker : onboardingLocationMarkers.values()) {
+            String path = "tutorial-markers.locations." + marker.key();
+            dataConfig.set(path + ".name", marker.displayName());
+            dataConfig.set(path + ".world", marker.worldName());
+            dataConfig.set(path + ".x", marker.x());
+            dataConfig.set(path + ".y", marker.y());
+            dataConfig.set(path + ".z", marker.z());
+            dataConfig.set(path + ".radius", marker.radius());
+        }
+        saveDataConfig();
+    }
+
+    private void restartOnboardingMarkerRuntime() {
+        stopOnboardingMarkerRuntime();
+        onboardingMarkerTask = getServer().getScheduler().runTaskTimer(this, this::tickOnboardingMarkers, 20L, 20L);
+    }
+
+    private void stopOnboardingMarkerRuntime() {
+        if (onboardingMarkerTask != null) {
+            onboardingMarkerTask.cancel();
+            onboardingMarkerTask = null;
+        }
+    }
+
+    private void tickOnboardingMarkers() {
+        if (onboardingLocationMarkers.isEmpty()) {
+            return;
+        }
+        for (Player player : getServer().getOnlinePlayers()) {
+            if (!isOnboardingActive(player.getUniqueId())) {
+                continue;
+            }
+            OnboardingLocationMarker marker = getMatchingOnboardingLocationMarker(player.getLocation());
+            if (marker != null) {
+                recordOnboardingLocationVisit(player, marker.key());
+            }
+        }
+    }
+
+    private OnboardingLocationMarker getMatchingOnboardingLocationMarker(Location location) {
+        if (location == null || location.getWorld() == null) {
+            return null;
+        }
+        for (OnboardingLocationMarker marker : onboardingLocationMarkers.values()) {
+            if (!location.getWorld().getName().equalsIgnoreCase(marker.worldName())) {
+                continue;
+            }
+            Location markerLocation = marker.toLocation(getServer());
+            if (markerLocation != null && location.distanceSquared(markerLocation) <= (marker.radius() * marker.radius())) {
+                return marker;
+            }
+        }
+        return null;
+    }
+
+    public boolean setOnboardingLocationMarker(String key, Location location, double radius, String displayName) {
+        String normalizedKey = normalizeQuestKey(key);
+        if (normalizedKey == null || location == null || location.getWorld() == null) {
+            return false;
+        }
+        onboardingLocationMarkers.put(normalizedKey, new OnboardingLocationMarker(
+                normalizedKey,
+                displayName == null || displayName.isBlank() ? normalizedKey : displayName,
+                location.getWorld().getName(),
+                location.getX(),
+                location.getY(),
+                location.getZ(),
+                Math.max(1.0D, radius)
+        ));
+        saveOnboardingLocationMarkers();
+        return true;
+    }
+
+    public boolean removeOnboardingLocationMarker(String key) {
+        String normalizedKey = normalizeQuestKey(key);
+        if (normalizedKey == null) {
+            return false;
+        }
+        boolean removed = onboardingLocationMarkers.remove(normalizedKey) != null;
+        if (removed) {
+            saveOnboardingLocationMarkers();
+        }
+        return removed;
+    }
+
+    public List<String> getOnboardingLocationMarkerKeys() {
+        List<String> keys = new ArrayList<>(onboardingLocationMarkers.keySet());
+        keys.sort(String.CASE_INSENSITIVE_ORDER);
+        return keys;
+    }
+
+    private void reloadOnboardingCustomNpcs() {
+        onboardingCustomNpcs.clear();
+        ConfigurationSection section = dataConfig.getConfigurationSection("tutorial-markers.custom-npcs");
+        if (section == null) {
+            return;
+        }
+        for (String npcId : section.getKeys(false)) {
+            String normalizedNpcId = normalizeQuestKey(npcId);
+            String itemsAdderEntity = section.getString(npcId + ".itemsadder-entity");
+            String questKey = normalizeQuestKey(section.getString(npcId + ".quest-key"));
+            String worldName = section.getString(npcId + ".world");
+            if (normalizedNpcId == null || itemsAdderEntity == null || itemsAdderEntity.isBlank() || questKey == null || worldName == null || worldName.isBlank()) {
+                continue;
+            }
+            onboardingCustomNpcs.put(normalizedNpcId, new OnboardingCustomNpc(
+                    normalizedNpcId,
+                    questKey,
+                    normalizeQuestKey(section.getString(npcId + ".dialogue-key")),
+                    itemsAdderEntity.trim(),
+                    section.getString(npcId + ".display-name", normalizedNpcId),
+                    worldName,
+                    section.getDouble(npcId + ".x"),
+                    section.getDouble(npcId + ".y"),
+                    section.getDouble(npcId + ".z"),
+                    (float) section.getDouble(npcId + ".yaw", 0.0D),
+                    (float) section.getDouble(npcId + ".pitch", 0.0D),
+                    parseUuid(section.getString(npcId + ".entity-id"))
+            ));
+        }
+    }
+
+    private void saveOnboardingCustomNpcs() {
+        dataConfig.set("tutorial-markers.custom-npcs", null);
+        for (OnboardingCustomNpc npc : onboardingCustomNpcs.values()) {
+            String path = "tutorial-markers.custom-npcs." + npc.id();
+            dataConfig.set(path + ".quest-key", npc.questKey());
+            dataConfig.set(path + ".dialogue-key", npc.dialogueKey());
+            dataConfig.set(path + ".itemsadder-entity", npc.itemsAdderEntityId());
+            dataConfig.set(path + ".display-name", npc.displayName());
+            dataConfig.set(path + ".world", npc.worldName());
+            dataConfig.set(path + ".x", npc.x());
+            dataConfig.set(path + ".y", npc.y());
+            dataConfig.set(path + ".z", npc.z());
+            dataConfig.set(path + ".yaw", npc.yaw());
+            dataConfig.set(path + ".pitch", npc.pitch());
+            dataConfig.set(path + ".entity-id", npc.entityId() != null ? npc.entityId().toString() : null);
+        }
+        saveDataConfig();
+    }
+
+    private void reloadOnboardingFancyNpcBindings() {
+        onboardingFancyNpcBindings.clear();
+        ConfigurationSection section = dataConfig.getConfigurationSection("tutorial-markers.fancy-npcs");
+        if (section == null) {
+            return;
+        }
+        for (String rawId : section.getKeys(false)) {
+            String fancyNpcId = section.getString(rawId + ".fancy-npc-id", rawId);
+            String questKey = normalizeQuestKey(section.getString(rawId + ".quest-key"));
+            if (fancyNpcId == null || fancyNpcId.isBlank() || questKey == null) {
+                continue;
+            }
+            onboardingFancyNpcBindings.put(
+                    rawId.toLowerCase(Locale.ROOT),
+                    new OnboardingFancyNpcBinding(
+                            fancyNpcId.trim(),
+                            questKey,
+                            normalizeQuestKey(section.getString(rawId + ".dialogue-key")),
+                            section.getString(rawId + ".display-name", fancyNpcId.trim())
+                    )
+            );
+        }
+    }
+
+    private void saveOnboardingFancyNpcBindings() {
+        dataConfig.set("tutorial-markers.fancy-npcs", null);
+        for (OnboardingFancyNpcBinding binding : onboardingFancyNpcBindings.values()) {
+            String path = "tutorial-markers.fancy-npcs." + binding.fancyNpcId();
+            dataConfig.set(path + ".fancy-npc-id", binding.fancyNpcId());
+            dataConfig.set(path + ".quest-key", binding.questKey());
+            dataConfig.set(path + ".dialogue-key", binding.dialogueKey());
+            dataConfig.set(path + ".display-name", binding.displayName());
+        }
+        saveDataConfig();
+    }
+
+    public List<String> getOnboardingCustomNpcIds() {
+        List<String> ids = new ArrayList<>(onboardingCustomNpcs.keySet());
+        ids.sort(String.CASE_INSENSITIVE_ORDER);
+        return ids;
+    }
+
+    public List<String> getAvailableFancyNpcIds() {
+        List<String> ids = new ArrayList<>();
+        if (getServer().getPluginManager().getPlugin("FancyNpcs") == null) {
+            return ids;
+        }
+        try {
+            for (de.oliver.fancynpcs.api.Npc npc : de.oliver.fancynpcs.api.FancyNpcsPlugin.get().getNpcManager().getAllNpcs()) {
+                if (npc != null && npc.getData() != null && npc.getData().getId() != null && !npc.getData().getId().isBlank()) {
+                    ids.add(npc.getData().getId());
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        ids.sort(String.CASE_INSENSITIVE_ORDER);
+        return ids;
+    }
+
+    public List<String> getBoundFancyNpcIds() {
+        List<String> ids = onboardingFancyNpcBindings.values().stream()
+                .map(OnboardingFancyNpcBinding::fancyNpcId)
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+        return new ArrayList<>(ids);
+    }
+
+    public boolean bindOnboardingFancyNpc(String fancyNpcId, String questKey, String dialogueKey, String displayName) {
+        String resolvedFancyNpcId = resolveAvailableFancyNpcId(fancyNpcId);
+        String normalizedQuestKey = normalizeQuestKey(questKey);
+        String normalizedDialogueKey = normalizeQuestKey(dialogueKey);
+        if (resolvedFancyNpcId == null || normalizedQuestKey == null) {
+            return false;
+        }
+        String key = resolvedFancyNpcId.toLowerCase(Locale.ROOT);
+        onboardingFancyNpcBindings.put(key, new OnboardingFancyNpcBinding(
+                resolvedFancyNpcId,
+                normalizedQuestKey,
+                normalizedDialogueKey,
+                displayName == null || displayName.isBlank() ? resolvedFancyNpcId : displayName
+        ));
+        saveOnboardingFancyNpcBindings();
+        return true;
+    }
+
+    public boolean unbindOnboardingFancyNpc(String fancyNpcId) {
+        String key = fancyNpcId == null ? null : fancyNpcId.toLowerCase(Locale.ROOT);
+        if (key == null || !onboardingFancyNpcBindings.containsKey(key)) {
+            String resolvedFancyNpcId = resolveAvailableFancyNpcId(fancyNpcId);
+            key = resolvedFancyNpcId == null ? key : resolvedFancyNpcId.toLowerCase(Locale.ROOT);
+        }
+        if (key == null) {
+            return false;
+        }
+        OnboardingFancyNpcBinding removed = onboardingFancyNpcBindings.remove(key);
+        if (removed == null) {
+            return false;
+        }
+        saveOnboardingFancyNpcBindings();
+        return true;
+    }
+
+    public OnboardingFancyNpcBinding getOnboardingFancyNpcBinding(String fancyNpcId) {
+        if (fancyNpcId == null || fancyNpcId.isBlank()) {
+            return null;
+        }
+        OnboardingFancyNpcBinding direct = onboardingFancyNpcBindings.get(fancyNpcId.toLowerCase(Locale.ROOT));
+        if (direct != null) {
+            return direct;
+        }
+        String resolvedFancyNpcId = resolveAvailableFancyNpcId(fancyNpcId);
+        return resolvedFancyNpcId == null ? null : onboardingFancyNpcBindings.get(resolvedFancyNpcId.toLowerCase(Locale.ROOT));
+    }
+
+    public boolean beginOnboardingFancyNpcInteraction(Player player, String fancyNpcId, String npcKey, String dialogueKey, String displayName, Location focusLocation, Runnable completionAction) {
+        if (player == null || focusLocation == null || focusLocation.getWorld() == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        String normalizedKey = normalizeQuestKey(npcKey);
+        if (normalizedKey == null) {
+            return false;
+        }
+        Runnable finalAction = () -> {
+            if (isOnboardingActive(playerId)) {
+                recordOnboardingNpcInteraction(player, normalizedKey);
+            }
+            if (completionAction != null && player.isOnline()) {
+                completionAction.run();
+            }
+        };
+        if (!isOnboardingActive(playerId) || !isOnboardingNpcFocusEnabled()) {
+            finalAction.run();
+            return false;
+        }
+        List<String> dialogueLines = getOnboardingFancyNpcDialogueLines(fancyNpcId, normalizedKey, dialogueKey);
+        if (dialogueLines.isEmpty()) {
+            finalAction.run();
+            return false;
+        }
+        startOnboardingFocus(player, null, focusLocation, normalizedKey, resolveOnboardingFancyNpcSpeaker(fancyNpcId, displayName), dialogueLines, finalAction);
+        return true;
+    }
+
+    private String resolveAvailableFancyNpcId(String fancyNpcId) {
+        if (fancyNpcId == null || fancyNpcId.isBlank()) {
+            return null;
+        }
+        for (String availableId : getAvailableFancyNpcIds()) {
+            if (availableId.equalsIgnoreCase(fancyNpcId)) {
+                return availableId;
+            }
+        }
+        return null;
+    }
+
+    public boolean spawnOnboardingCustomNpc(String npcId, String questKey, String dialogueKey, String itemsAdderEntityId, Location location, String displayName) {
+        String normalizedNpcId = normalizeQuestKey(npcId);
+        String normalizedQuestKey = normalizeQuestKey(questKey);
+        String normalizedDialogueKey = normalizeQuestKey(dialogueKey);
+        if (normalizedNpcId == null || normalizedQuestKey == null || itemsAdderEntityId == null || itemsAdderEntityId.isBlank() || location == null || location.getWorld() == null) {
+            return false;
+        }
+        removeExistingOnboardingCustomNpcEntity(normalizedNpcId, null);
+        Entity entity = spawnItemsAdderCustomEntity(itemsAdderEntityId.trim(), location);
+        if (entity == null) {
+            return false;
+        }
+        OnboardingCustomNpc npc = new OnboardingCustomNpc(
+                normalizedNpcId,
+                normalizedQuestKey,
+                normalizedDialogueKey,
+                itemsAdderEntityId.trim(),
+                displayName == null || displayName.isBlank() ? normalizedNpcId : displayName,
+                location.getWorld().getName(),
+                location.getX(),
+                location.getY(),
+                location.getZ(),
+                location.getYaw(),
+                location.getPitch(),
+                entity.getUniqueId()
+        );
+        onboardingCustomNpcs.put(normalizedNpcId, npc);
+        applyOnboardingCustomNpcState(entity, npc);
+        saveOnboardingCustomNpcs();
+        return true;
+    }
+
+    public boolean registerExistingOnboardingCustomNpc(Entity entity, String npcId, String questKey, String dialogueKey, String itemsAdderEntityId, String displayName) {
+        String normalizedNpcId = normalizeQuestKey(npcId);
+        String normalizedQuestKey = normalizeQuestKey(questKey);
+        String normalizedDialogueKey = normalizeQuestKey(dialogueKey);
+        if (entity == null || normalizedNpcId == null || normalizedQuestKey == null || itemsAdderEntityId == null || itemsAdderEntityId.isBlank() || entity.getWorld() == null) {
+            return false;
+        }
+        removeExistingOnboardingCustomNpcEntity(normalizedNpcId, entity.getUniqueId());
+        Location location = entity.getLocation();
+        OnboardingCustomNpc npc = new OnboardingCustomNpc(
+                normalizedNpcId,
+                normalizedQuestKey,
+                normalizedDialogueKey,
+                itemsAdderEntityId.trim(),
+                displayName == null || displayName.isBlank() ? normalizedNpcId : displayName,
+                entity.getWorld().getName(),
+                location.getX(),
+                location.getY(),
+                location.getZ(),
+                location.getYaw(),
+                location.getPitch(),
+                entity.getUniqueId()
+        );
+        onboardingCustomNpcs.put(normalizedNpcId, npc);
+        applyOnboardingCustomNpcState(entity, npc);
+        saveOnboardingCustomNpcs();
+        return true;
+    }
+
+    private void removeExistingOnboardingCustomNpcEntity(String npcId, UUID ignoredEntityId) {
+        OnboardingCustomNpc existing = onboardingCustomNpcs.get(npcId);
+        if (existing == null || existing.entityId() == null) {
+            return;
+        }
+        if (ignoredEntityId != null && ignoredEntityId.equals(existing.entityId())) {
+            return;
+        }
+        Entity entity = getServer().getEntity(existing.entityId());
+        if (entity != null) {
+            entity.remove();
+        }
+    }
+
+    public boolean removeOnboardingCustomNpc(String npcId) {
+        String normalizedNpcId = normalizeQuestKey(npcId);
+        if (normalizedNpcId == null) {
+            return false;
+        }
+        OnboardingCustomNpc removed = onboardingCustomNpcs.remove(normalizedNpcId);
+        if (removed == null) {
+            return false;
+        }
+        Entity entity = removed.entityId() != null ? getServer().getEntity(removed.entityId()) : null;
+        if (entity != null) {
+            entity.remove();
+        }
+        saveOnboardingCustomNpcs();
+        return true;
+    }
+
+    public void restoreOnboardingCustomNpcs() {
+        if (onboardingCustomNpcs.isEmpty()) {
+            return;
+        }
+        boolean changed = false;
+        for (Map.Entry<String, OnboardingCustomNpc> entry : new ArrayList<>(onboardingCustomNpcs.entrySet())) {
+            OnboardingCustomNpc npc = entry.getValue();
+            if (npc == null) {
+                continue;
+            }
+            Entity entity = npc.entityId() != null ? getServer().getEntity(npc.entityId()) : null;
+            if (entity != null && entity.isValid()) {
+                applyOnboardingCustomNpcState(entity, npc);
+                continue;
+            }
+            Location location = npc.toLocation(getServer());
+            if (location == null) {
+                continue;
+            }
+            Entity spawned = spawnItemsAdderCustomEntity(npc.itemsAdderEntityId(), location);
+            if (spawned == null) {
+                continue;
+            }
+            OnboardingCustomNpc updated = npc.withEntityId(spawned.getUniqueId());
+            onboardingCustomNpcs.put(entry.getKey(), updated);
+            applyOnboardingCustomNpcState(spawned, updated);
+            changed = true;
+        }
+        if (changed) {
+            saveOnboardingCustomNpcs();
+        }
+    }
+
+    private void applyOnboardingCustomNpcState(Entity entity, OnboardingCustomNpc npc) {
+        if (entity == null || npc == null) {
+            return;
+        }
+        markOnboardingNpc(entity, npc.questKey());
+        if (onboardingNpcIdKey != null) {
+            entity.getPersistentDataContainer().set(onboardingNpcIdKey, PersistentDataType.STRING, npc.id());
+        }
+        if (entity instanceof LivingEntity livingEntity) {
+            livingEntity.setAI(false);
+            livingEntity.setInvulnerable(true);
+            livingEntity.setPersistent(true);
+            livingEntity.setRemoveWhenFarAway(false);
+            livingEntity.setCanPickupItems(false);
+            if (npc.displayName() != null && !npc.displayName().isBlank()) {
+                livingEntity.customName(legacyComponent("&6" + npc.displayName()));
+                livingEntity.setCustomNameVisible(true);
+            }
+        }
+    }
+
+    public OnboardingCustomNpc getOnboardingCustomNpc(Entity entity) {
+        String npcId = getOnboardingNpcId(entity);
+        return npcId != null ? onboardingCustomNpcs.get(npcId) : null;
+    }
+
+    public String getOnboardingNpcId(Entity entity) {
+        if (entity == null || onboardingNpcIdKey == null) {
+            return null;
+        }
+        return normalizeQuestKey(entity.getPersistentDataContainer().get(onboardingNpcIdKey, PersistentDataType.STRING));
+    }
+
+    public boolean markOnboardingNpc(Entity entity, String key) {
+        String normalizedKey = normalizeQuestKey(key);
+        if (entity == null || normalizedKey == null || onboardingNpcKey == null) {
+            return false;
+        }
+        entity.getPersistentDataContainer().set(onboardingNpcKey, PersistentDataType.STRING, normalizedKey);
+        return true;
+    }
+
+    public boolean clearOnboardingNpc(Entity entity) {
+        if (entity == null || onboardingNpcKey == null) {
+            return false;
+        }
+        if (!entity.getPersistentDataContainer().has(onboardingNpcKey, PersistentDataType.STRING)) {
+            return false;
+        }
+        entity.getPersistentDataContainer().remove(onboardingNpcKey);
+        if (onboardingNpcIdKey != null) {
+            entity.getPersistentDataContainer().remove(onboardingNpcIdKey);
+        }
+        return true;
+    }
+
+    public String getOnboardingNpcKey(Entity entity) {
+        if (entity == null || onboardingNpcKey == null) {
+            return null;
+        }
+        return normalizeQuestKey(entity.getPersistentDataContainer().get(onboardingNpcKey, PersistentDataType.STRING));
+    }
+
+    public void recordOnboardingNpcInteraction(Player player, String npcKey) {
+        if (player == null || !isOnboardingActive(player.getUniqueId())) {
+            return;
+        }
+        String normalizedKey = normalizeQuestKey(npcKey);
+        if (normalizedKey == null) {
+            return;
+        }
+        setOnboardingObjectiveProgress(player.getUniqueId(), normalizedKey, 1, true);
+        refreshTutorialQuestFlow(player, true);
+        updateTutorialChecklist(player);
+        syncTutorialQuestHud(player, false);
+    }
+
+    public boolean handleOnboardingNpcInteraction(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        String npcKey = getOnboardingNpcKey(entity);
+        if (npcKey == null) {
+            return false;
+        }
+        beginOnboardingNpcInteraction(player, entity, npcKey, null);
+        return true;
+    }
+
+    public boolean beginOnboardingNpcInteraction(Player player, Entity entity, String npcKey, Runnable completionAction) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        String normalizedKey = normalizeQuestKey(npcKey);
+        if (normalizedKey == null) {
+            return false;
+        }
+        Runnable finalAction = () -> {
+            if (isOnboardingActive(playerId)) {
+                recordOnboardingNpcInteraction(player, normalizedKey);
+            }
+            if (completionAction != null && player.isOnline()) {
+                completionAction.run();
+            }
+        };
+        if (!isOnboardingActive(playerId) || !isOnboardingNpcFocusEnabled()) {
+            finalAction.run();
+            return false;
+        }
+        List<String> dialogueLines = getOnboardingNpcDialogueLines(entity, normalizedKey);
+        if (dialogueLines.isEmpty()) {
+            finalAction.run();
+            return false;
+        }
+        startOnboardingFocus(player, entity.getUniqueId(), entity.getLocation(), normalizedKey, resolveOnboardingNpcSpeaker(entity), dialogueLines, finalAction);
+        return true;
+    }
+
+    public boolean isPlayerInOnboardingFocus(UUID playerId) {
+        return playerId != null && onboardingFocusSessions.containsKey(playerId);
+    }
+
+    public void cancelOnboardingFocus(UUID playerId) {
+        endOnboardingFocus(playerId, false);
+    }
+
+    private void restartOnboardingFocusRuntime() {
+        stopOnboardingFocusRuntime();
+        onboardingFocusTask = getServer().getScheduler().runTaskTimer(this, this::tickOnboardingFocusSessions, 1L, 1L);
+    }
+
+    private void stopOnboardingFocusRuntime() {
+        if (onboardingFocusTask != null) {
+            onboardingFocusTask.cancel();
+            onboardingFocusTask = null;
+        }
+        for (UUID playerId : new ArrayList<>(onboardingFocusSessions.keySet())) {
+            endOnboardingFocus(playerId, false);
+        }
+        onboardingFocusSessions.clear();
+    }
+
+    private void startOnboardingFocus(Player player, UUID entityId, Location focusLocation, String npcKey, String speakerName, List<String> dialogueLines, Runnable completionAction) {
+        endOnboardingFocus(player.getUniqueId(), false);
+        player.closeInventory();
+        clearPlayerChatWindow(player);
+        float originalWalkSpeed = player.getWalkSpeed();
+        float originalFlySpeed = player.getFlySpeed();
+        player.setWalkSpeed(0.0F);
+        player.setFlySpeed(0.0F);
+        OnboardingFocusSession session = new OnboardingFocusSession(
+                player.getUniqueId(),
+                entityId,
+                focusLocation == null ? null : focusLocation.clone(),
+                npcKey,
+                speakerName,
+                new ArrayList<>(dialogueLines),
+                -1,
+                0L,
+                originalWalkSpeed,
+                originalFlySpeed,
+                completionAction
+        );
+        onboardingFocusSessions.put(player.getUniqueId(), session);
+        advanceOnboardingFocusLine(player, session);
+    }
+
+    private void tickOnboardingFocusSessions() {
+        long now = System.currentTimeMillis();
+        for (UUID playerId : new ArrayList<>(onboardingFocusSessions.keySet())) {
+            OnboardingFocusSession session = onboardingFocusSessions.get(playerId);
+            Player player = getServer().getPlayer(playerId);
+            if (session == null || player == null || !player.isOnline()) {
+                endOnboardingFocus(playerId, false);
+                continue;
+            }
+            Location focusLocation = resolveOnboardingFocusLocation(session);
+            if (focusLocation == null || focusLocation.getWorld() == null || focusLocation.getWorld() != player.getWorld()) {
+                endOnboardingFocus(playerId, true);
+                continue;
+            }
+            player.lookAt(focusLocation.getX(), focusLocation.getY(), focusLocation.getZ(), LookAnchor.EYES);
+            if (session.nextAdvanceAtMillis() > 0L && now >= session.nextAdvanceAtMillis()) {
+                advanceOnboardingFocusLine(player, session);
+            }
+        }
+    }
+
+    private Location resolveOnboardingFocusLocation(OnboardingFocusSession session) {
+        if (session == null) {
+            return null;
+        }
+        if (session.entityId() != null) {
+            Entity entity = getServer().getEntity(session.entityId());
+            if (entity == null || !entity.isValid()) {
+                return null;
+            }
+            return entity.getLocation().clone().add(0.0D, Math.max(1.2D, entity.getHeight() * 0.75D), 0.0D);
+        }
+        return session.focusLocation() != null ? session.focusLocation().clone().add(0.0D, 1.6D, 0.0D) : null;
+    }
+
+    private void advanceOnboardingFocusLine(Player player, OnboardingFocusSession session) {
+        if (player == null || session == null) {
+            return;
+        }
+        int nextLineIndex = session.lineIndex() + 1;
+        if (nextLineIndex >= session.dialogueLines().size()) {
+            endOnboardingFocus(player.getUniqueId(), true);
+            return;
+        }
+        String line = session.dialogueLines().get(nextLineIndex);
+        player.showTitle(Title.title(
+                legacyComponent("&6" + session.speakerName()),
+                legacyComponent("&f" + line),
+                Title.Times.times(Duration.ofMillis(150L), Duration.ofMillis(Math.max(900L, getOnboardingNpcFocusLineMillis() - 300L)), Duration.ofMillis(250L))
+        ));
+        player.sendActionBar(legacyComponent("&7Focus on the conversation..."));
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.45F, 1.6F);
+        onboardingFocusSessions.put(player.getUniqueId(), session.withLineState(
+                nextLineIndex,
+                System.currentTimeMillis() + getOnboardingNpcFocusLineMillis()
+        ));
+    }
+
+    private void endOnboardingFocus(UUID playerId, boolean runCompletion) {
+        OnboardingFocusSession session = onboardingFocusSessions.remove(playerId);
+        if (session == null) {
+            return;
+        }
+        Player player = getServer().getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            player.setWalkSpeed(session.originalWalkSpeed());
+            player.setFlySpeed(session.originalFlySpeed());
+            player.clearTitle();
+            player.sendActionBar(Component.empty());
+        }
+        if (runCompletion && session.completionAction() != null) {
+            session.completionAction().run();
+        }
+    }
+
+    private boolean isOnboardingNpcFocusEnabled() {
+        return coreSettingsConfig == null || coreSettingsConfig.getBoolean("onboarding.npc-focus.enabled", true);
+    }
+
+    private long getOnboardingNpcFocusLineMillis() {
+        long millis = coreSettingsConfig != null ? coreSettingsConfig.getLong("onboarding.npc-focus.line-millis", 2400L) : 2400L;
+        return Math.max(1200L, millis);
+    }
+
+    private int getOnboardingNpcFocusChatClearLines() {
+        int lines = coreSettingsConfig != null ? coreSettingsConfig.getInt("onboarding.npc-focus.chat-clear-lines", 80) : 80;
+        return Math.max(10, lines);
+    }
+
+    private void clearPlayerChatWindow(Player player) {
+        if (player == null) {
+            return;
+        }
+        for (int index = 0; index < getOnboardingNpcFocusChatClearLines(); index++) {
+            player.sendMessage(" ");
+        }
+    }
+
+    private List<String> getOnboardingNpcDialogueLines(Entity entity, String npcKey) {
+        if (coreSettingsConfig == null) {
+            return List.of();
+        }
+        OnboardingCustomNpc customNpc = getOnboardingCustomNpc(entity);
+        List<String> lines = List.of();
+        if (customNpc != null && customNpc.dialogueKey() != null) {
+            lines = coreSettingsConfig.getStringList("onboarding.npc-dialogue." + customNpc.dialogueKey());
+        }
+        if (lines.isEmpty() && customNpc != null) {
+            lines = coreSettingsConfig.getStringList("onboarding.npc-dialogue." + customNpc.id());
+        }
+        if (lines.isEmpty()) {
+            lines = coreSettingsConfig.getStringList("onboarding.npc-dialogue." + npcKey);
+        }
+        if (lines.isEmpty()) {
+            lines = coreSettingsConfig.getStringList("onboarding.npc-dialogue.default");
+        }
+        return lines.stream()
+                .filter(line -> line != null && !line.isBlank())
+                .collect(Collectors.toList());
+    }
+
+    private List<String> getOnboardingFancyNpcDialogueLines(String fancyNpcId, String npcKey, String dialogueKey) {
+        if (coreSettingsConfig == null) {
+            return List.of();
+        }
+        List<String> lines = List.of();
+        if (dialogueKey != null && !dialogueKey.isBlank()) {
+            lines = coreSettingsConfig.getStringList("onboarding.npc-dialogue." + dialogueKey);
+        }
+        if (lines.isEmpty() && fancyNpcId != null && !fancyNpcId.isBlank()) {
+            lines = coreSettingsConfig.getStringList("onboarding.npc-dialogue." + fancyNpcId);
+        }
+        if (lines.isEmpty()) {
+            lines = coreSettingsConfig.getStringList("onboarding.npc-dialogue." + npcKey);
+        }
+        if (lines.isEmpty()) {
+            lines = coreSettingsConfig.getStringList("onboarding.npc-dialogue.default");
+        }
+        return lines.stream()
+                .filter(line -> line != null && !line.isBlank())
+                .collect(Collectors.toList());
+    }
+
+    private String resolveOnboardingNpcSpeaker(Entity entity) {
+        OnboardingCustomNpc customNpc = getOnboardingCustomNpc(entity);
+        if (customNpc != null && customNpc.displayName() != null && !customNpc.displayName().isBlank()) {
+            return customNpc.displayName();
+        }
+        if (entity != null && entity.customName() != null) {
+            String plain = PLAIN_TEXT_SERIALIZER.serialize(entity.customName());
+            if (!plain.isBlank()) {
+                return plain;
+            }
+        }
+        return "Guide";
+    }
+
+    private String resolveOnboardingFancyNpcSpeaker(String fancyNpcId, String displayName) {
+        if (displayName != null && !displayName.isBlank()) {
+            return displayName;
+        }
+        return fancyNpcId != null && !fancyNpcId.isBlank() ? fancyNpcId : "Guide";
+    }
+
+    private void registerItemsAdderLoadHook() {
+        try {
+            Class<?> eventClass = Class.forName("dev.lone.itemsadder.api.Events.ItemsAdderLoadDataEvent");
+            getServer().getPluginManager().registerEvent(
+                    (Class<? extends org.bukkit.event.Event>) eventClass,
+                    new org.bukkit.event.Listener() { },
+                    org.bukkit.event.EventPriority.MONITOR,
+                    (listener, event) -> getServer().getScheduler().runTask(this, this::restoreOnboardingCustomNpcs),
+                    this,
+                    true
+            );
+        } catch (ClassNotFoundException ignored) {
+        }
+    }
+
+    private Entity spawnItemsAdderCustomEntity(String itemsAdderEntityId, Location location) {
+        if (itemsAdderEntityId == null || itemsAdderEntityId.isBlank() || location == null || location.getWorld() == null) {
+            return null;
+        }
+        if (getServer().getPluginManager().getPlugin("ItemsAdder") == null) {
+            return null;
+        }
+        try {
+            Class<?> customEntityClass = Class.forName("dev.lone.itemsadder.api.CustomEntity.CustomEntity");
+            Method spawnMethod = customEntityClass.getMethod("spawn", String.class, Location.class);
+            Object result = spawnMethod.invoke(null, itemsAdderEntityId, location);
+            return extractItemsAdderEntity(result);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            getLogger().warning("Failed to spawn ItemsAdder onboarding NPC '" + itemsAdderEntityId + "': " + exception.getMessage());
+            return null;
+        }
+    }
+
+    private Entity extractItemsAdderEntity(Object customEntityHandle) {
+        if (customEntityHandle instanceof Entity entity) {
+            return entity;
+        }
+        if (customEntityHandle == null) {
+            return null;
+        }
+        for (String methodName : List.of("getEntity", "getBukkitEntity", "getLivingEntity")) {
+            try {
+                Method method = customEntityHandle.getClass().getMethod(methodName);
+                Object result = method.invoke(customEntityHandle);
+                if (result instanceof Entity entity) {
+                    return entity;
+                }
+            } catch (ReflectiveOperationException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private UUID parseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException exception) {
+            return null;
         }
     }
 
@@ -15064,11 +16627,10 @@ public final class Testproject extends JavaPlugin {
         player.sendMessage(getMessage("tutorial.intro.finished"));
         player.playSound(player.getLocation(), Sound.UI_TOAST_IN, 0.75F, 1.0F);
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.55F, 1.45F);
-        getServer().getScheduler().runTaskLater(this, () -> {
-            if (player.isOnline() && requiresProfessionSelection(player)) {
-                openProfessionMenu(player);
-            }
-        }, 2L);
+        refreshAssignedQuestFlow(player, false);
+        refreshTutorialQuestFlow(player, true);
+        updateTutorialChecklist(player);
+        syncTutorialQuestHud(player, true);
     }
 
     private void applyTutorialIntroLock(Player player) {
@@ -15102,6 +16664,7 @@ public final class Testproject extends JavaPlugin {
         UUID playerId = player.getUniqueId();
         tutorialStages.remove(playerId);
         tutorialStarterXpProgress.remove(playerId);
+        onboardingPhases.put(playerId, getPrimaryProfession(playerId) == null ? OnboardingPhase.READY_TO_CHOOSE : OnboardingPhase.COMPLETE);
         Set<String> completed = getCompletedTutorialQuestIds(playerId);
         for (PlayerQuestDefinition quest : tutorialQuestDefinitions) {
             if (quest.isEnabled()) {
@@ -15123,6 +16686,7 @@ public final class Testproject extends JavaPlugin {
     public void handleTutorialPrimaryProfessionSelected(Player player) {
         if (player != null) {
             UUID playerId = player.getUniqueId();
+            onboardingPhases.put(playerId, OnboardingPhase.COMPLETE);
             tutorialStages.remove(playerId);
             tutorialStarterXpProgress.remove(playerId);
             saveTutorialStage(playerId);
@@ -15450,9 +17014,9 @@ public final class Testproject extends JavaPlugin {
             }
         }
         return switch (quest.getType()) {
-            case SELECT_PROFESSION -> quest.getProfession() == null || hasProfession(playerId, quest.getProfession()) || !hasProfession(playerId);
+            case SELECT_PROFESSION -> isPrimaryProfessionChoiceUnlocked(playerId);
             case EARN_PROFESSION_XP, REACH_PROFESSION_LEVEL -> resolveTutorialQuestProfession(playerId, quest) != null;
-            case JOIN_COUNTRY, CONTRIBUTE_COUNTRY -> true;
+            case OPEN_GUIDE, VISIT_LOCATION, BREAK_BLOCK, PLACE_BLOCK, INTERACT_BLOCK, INTERACT_NPC, COMPLETE_TRIAL, PLAYTIME, JOIN_COUNTRY, CONTRIBUTE_COUNTRY -> true;
         };
     }
 
@@ -15498,6 +17062,29 @@ public final class Testproject extends JavaPlugin {
 
     public List<PlayerQuestDefinition> getGeneralQuestDefinitions() {
         return Collections.unmodifiableList(generalQuestDefinitions);
+    }
+
+    public List<String> getTutorialQuestKeys() {
+        Set<String> keys = new LinkedHashSet<>();
+        for (PlayerQuestDefinition definition : tutorialQuestDefinitions) {
+            if (definition.getKey() != null && !definition.getKey().isBlank()) {
+                keys.add(definition.getKey());
+            }
+        }
+        return new ArrayList<>(keys);
+    }
+
+    public List<String> getOnboardingDialogueKeys() {
+        if (coreSettingsConfig == null) {
+            return List.of();
+        }
+        ConfigurationSection section = coreSettingsConfig.getConfigurationSection("onboarding.npc-dialogue");
+        if (section == null) {
+            return List.of();
+        }
+        List<String> keys = new ArrayList<>(section.getKeys(false));
+        keys.sort(String.CASE_INSENSITIVE_ORDER);
+        return keys;
     }
 
     public PlayerQuestDefinition getGeneralQuestDefinition(String questId) {
@@ -15764,6 +17351,17 @@ public final class Testproject extends JavaPlugin {
                 Profession profession = resolveTutorialQuestProfession(playerId, quest);
                 yield profession != null ? getProfessionLevel(playerId, profession) : 0;
             }
+            case OPEN_GUIDE, VISIT_LOCATION, BREAK_BLOCK, PLACE_BLOCK, INTERACT_BLOCK, INTERACT_NPC ->
+                    getOnboardingObjectiveProgress(playerId, quest.getKey());
+            case COMPLETE_TRIAL -> {
+                String key = normalizeQuestKey(quest.getKey());
+                if (key == null || key.equals("any") || key.equals("profession")) {
+                    yield getCompletedOnboardingTrialCount(playerId);
+                }
+                Profession trialProfession = Profession.fromKey(key);
+                yield trialProfession != null && hasCompletedOnboardingTrial(playerId, trialProfession) ? 1 : 0;
+            }
+            case PLAYTIME -> (int) Math.min(Integer.MAX_VALUE, getOnboardingElapsedMinutes(playerId));
             case JOIN_COUNTRY -> getPlayerCountry(playerId) != null ? 1 : 0;
             case CONTRIBUTE_COUNTRY -> assignedQuest
                     ? getAssignedQuestStoredProgress(playerId, quest.getId())
@@ -15920,6 +17518,7 @@ public final class Testproject extends JavaPlugin {
                 .replace("%player%", playerName != null ? playerName : "player")
                 .replace("%profession%", profession != null ? profession.getDisplayName() : "profession")
                 .replace("%profession_key%", profession != null ? profession.getKey() : "none")
+                .replace("%key%", quest != null && quest.getKey() != null ? quest.getKey() : "")
                 .replace("%progress%", String.valueOf(Math.min(current, target)))
                 .replace("%current%", String.valueOf(Math.min(current, target)))
                 .replace("%target%", String.valueOf(target))
@@ -16145,6 +17744,7 @@ public final class Testproject extends JavaPlugin {
 
     private void reloadFixedOreBlocks() {
         fixedOreBlocks.clear();
+        fixedOreBlockData.clear();
 
         ConfigurationSection section = dataConfig.getConfigurationSection("fixed-ores");
         if (section == null) {
@@ -16157,15 +17757,26 @@ public final class Testproject extends JavaPlugin {
                 continue;
             }
 
-            Material oreType = Material.matchMaterial(section.getString(key, ""));
+            String legacyType = section.getString(key, "");
+            String configuredType = legacyType;
+            String configuredBlockData = null;
+            if (section.isConfigurationSection(key)) {
+                configuredType = section.getString(key + ".type", "");
+                configuredBlockData = section.getString(key + ".block-data");
+            }
+
+            Material oreType = Material.matchMaterial(configuredType);
             if (!isFixedOreMaterial(oreType)) {
                 continue;
             }
 
             fixedOreBlocks.put(blockKey, oreType);
+            if (configuredBlockData != null && !configuredBlockData.isBlank()) {
+                fixedOreBlockData.put(blockKey, configuredBlockData);
+            }
             World world = getServer().getWorld(blockKey.worldId);
             if (world != null) {
-                world.getBlockAt(blockKey.x, blockKey.y, blockKey.z).setType(oreType, false);
+                applyFixedOreBlockState(world.getBlockAt(blockKey.x, blockKey.y, blockKey.z), oreType, configuredBlockData);
             }
         }
     }
@@ -16873,7 +18484,7 @@ public final class Testproject extends JavaPlugin {
     private Country selectNextTraderHostCountry() {
         List<Country> eligible = new ArrayList<>();
         for (Country country : countriesByKey.values()) {
-            if (getCountryTraderSpawnLocation(country) != null) {
+            if (!isSystemCountry(country) && getCountryTraderSpawnLocation(country) != null) {
                 eligible.add(country);
             }
         }
@@ -16887,7 +18498,7 @@ public final class Testproject extends JavaPlugin {
     private Country selectNextMerchantHostCountry() {
         List<Country> eligible = new ArrayList<>();
         for (Country country : countriesByKey.values()) {
-            if (getCountryHome(country) != null) {
+            if (!isSystemCountry(country) && getCountryHome(country) != null) {
                 eligible.add(country);
             }
         }
@@ -17040,9 +18651,10 @@ public final class Testproject extends JavaPlugin {
         ItemStack item = new ItemStack(Material.BLAZE_ROD);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(legacyComponent("&cFixed Ore Remover"));
+            meta.displayName(legacyComponent("&cFixed Ore Tool"));
             meta.lore(List.of(
-                    legacyComponent("&7Admin tool for removing fixed ore nodes."),
+                    legacyComponent("&7Admin tool for fixed ore nodes."),
+                    legacyComponent("&7Left-click a valid block to mark it."),
                     legacyComponent("&7Right-click a fixed ore block to delete it.")
             ));
             meta.getPersistentDataContainer().set(fixedOreToolKey, PersistentDataType.BYTE, (byte) 1);
@@ -17070,6 +18682,8 @@ public final class Testproject extends JavaPlugin {
         countryDataConfig.set(path + ".name", country.getName());
         countryDataConfig.set(path + ".owner", country.getOwnerId() != null ? country.getOwnerId().toString() : null);
         countryDataConfig.set(path + ".open", country.isOpen());
+        countryDataConfig.set(path + ".system-country", country.isSystemCountry());
+        countryDataConfig.set(path + ".hidden-from-players", country.isHiddenFromPlayers());
 
         List<String> memberIds = new ArrayList<>();
         for (UUID memberId : country.getMembers()) {
@@ -17503,6 +19117,7 @@ public final class Testproject extends JavaPlugin {
                 || path.startsWith("terra-tips.")
                 || path.startsWith("hunger.")
                 || path.startsWith("profession-procs.")
+                || path.startsWith("onboarding.")
                 || path.startsWith("country-home.")) {
             return coreSettingsConfig;
         }
@@ -17749,7 +19364,10 @@ public final class Testproject extends JavaPlugin {
     private void saveFixedOreBlocks() {
         dataConfig.set("fixed-ores", null);
         for (Map.Entry<PlacedBlockKey, Material> entry : fixedOreBlocks.entrySet()) {
-            dataConfig.set("fixed-ores." + entry.getKey().asPath(), entry.getValue().name());
+            String path = "fixed-ores." + entry.getKey().asPath();
+            dataConfig.set(path + ".type", entry.getValue().name());
+            String blockDataString = fixedOreBlockData.get(entry.getKey());
+            dataConfig.set(path + ".block-data", blockDataString != null && !blockDataString.isBlank() ? blockDataString : null);
         }
         saveDataConfig();
     }
@@ -19274,5 +20892,74 @@ public final class Testproject extends JavaPlugin {
     }
 
     public record StarterKitEntry(Material material, int amount) {
+    }
+
+    private record OnboardingLocationMarker(String key, String displayName, String worldName, double x, double y, double z, double radius) {
+        private Location toLocation(org.bukkit.Server server) {
+            World world = server.getWorld(worldName);
+            return world == null ? null : new Location(world, x, y, z);
+        }
+    }
+
+    public record OnboardingCustomNpc(
+            String id,
+            String questKey,
+            String dialogueKey,
+            String itemsAdderEntityId,
+            String displayName,
+            String worldName,
+            double x,
+            double y,
+            double z,
+            float yaw,
+            float pitch,
+            UUID entityId
+    ) {
+        private Location toLocation(org.bukkit.Server server) {
+            World world = server.getWorld(worldName);
+            return world == null ? null : new Location(world, x, y, z, yaw, pitch);
+        }
+
+        private OnboardingCustomNpc withEntityId(UUID updatedEntityId) {
+            return new OnboardingCustomNpc(id, questKey, dialogueKey, itemsAdderEntityId, displayName, worldName, x, y, z, yaw, pitch, updatedEntityId);
+        }
+    }
+
+    public record OnboardingFancyNpcBinding(
+            String fancyNpcId,
+            String questKey,
+            String dialogueKey,
+            String displayName
+    ) {
+    }
+
+    private record OnboardingFocusSession(
+            UUID playerId,
+            UUID entityId,
+            Location focusLocation,
+            String npcKey,
+            String speakerName,
+            List<String> dialogueLines,
+            int lineIndex,
+            long nextAdvanceAtMillis,
+            float originalWalkSpeed,
+            float originalFlySpeed,
+            Runnable completionAction
+    ) {
+        private OnboardingFocusSession withLineState(int updatedLineIndex, long updatedAdvanceAtMillis) {
+            return new OnboardingFocusSession(
+                    playerId,
+                    entityId,
+                    focusLocation,
+                    npcKey,
+                    speakerName,
+                    dialogueLines,
+                    updatedLineIndex,
+                    updatedAdvanceAtMillis,
+                    originalWalkSpeed,
+                    originalFlySpeed,
+                    completionAction
+            );
+        }
     }
 }

@@ -8,6 +8,8 @@ public class Country {
     private String name;
     private UUID ownerId;
     private boolean open;
+    private boolean systemCountry;
+    private boolean hiddenFromPlayers;
     private String tag;
     private String territoryWorld;
     private String territoryRegionId;
@@ -38,7 +40,8 @@ public class Country {
     private final Set<String> allowedTradeCountries;
     private final Set<String> unlockedUpgradeKeys;
 
-    public Country(String name, UUID ownerId, boolean open, String tag, String territoryWorld, String territoryRegionId,
+    public Country(String name, UUID ownerId, boolean open, boolean systemCountry, boolean hiddenFromPlayers,
+                   String tag, String territoryWorld, String territoryRegionId,
                    String homeWorld, double homeX, double homeY, double homeZ, float homeYaw, float homePitch,
                    Set<UUID> members, Set<UUID> coOwners, Set<UUID> stewards, Set<UUID> invitedPlayers,
                    String traderSpawnWorld, double traderSpawnX, double traderSpawnY, double traderSpawnZ,
@@ -49,6 +52,8 @@ public class Country {
         this.name = name;
         this.ownerId = ownerId;
         this.open = open;
+        this.systemCountry = systemCountry;
+        this.hiddenFromPlayers = hiddenFromPlayers;
         this.tag = tag;
         this.territoryWorld = territoryWorld;
         this.territoryRegionId = territoryRegionId;
@@ -106,6 +111,22 @@ public class Country {
 
     public void setOpen(boolean open) {
         this.open = open;
+    }
+
+    public boolean isSystemCountry() {
+        return systemCountry;
+    }
+
+    public void setSystemCountry(boolean systemCountry) {
+        this.systemCountry = systemCountry;
+    }
+
+    public boolean isHiddenFromPlayers() {
+        return hiddenFromPlayers;
+    }
+
+    public void setHiddenFromPlayers(boolean hiddenFromPlayers) {
+        this.hiddenFromPlayers = hiddenFromPlayers;
     }
 
     public String getTag() {

@@ -235,7 +235,12 @@ public final class MerchantShopListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        openMerchantMenu(event.getPlayer(), plugin.getMerchantState(clicked));
+        plugin.beginOnboardingNpcInteraction(
+                event.getPlayer(),
+                clicked,
+                "merchant_npc",
+                () -> openMerchantMenu(event.getPlayer(), plugin.getMerchantState(clicked))
+        );
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

@@ -203,7 +203,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
 
         Country country;
         if (args.length >= 2) {
-            country = plugin.getCountry(joinName(args, 1));
+            country = plugin.getVisibleCountry(joinName(args, 1));
             if (country == null) {
                 player.sendMessage(plugin.getMessage("country.not-found"));
                 return true;
@@ -211,7 +211,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
         } else {
             country = plugin.getPlayerCountry(player.getUniqueId());
             if (country == null) {
-                country = plugin.getCountryAt(player.getLocation());
+                country = plugin.getVisibleCountryAt(player.getLocation());
             }
             if (country == null) {
                 player.sendMessage(plugin.getMessage("country.not-in-country"));
@@ -479,7 +479,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        Country country = plugin.getCountry(joinName(args, 1));
+        Country country = plugin.getVisibleCountry(joinName(args, 1));
         if (country == null) {
             player.sendMessage(plugin.getMessage("country.not-found"));
             return true;
@@ -550,7 +550,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        Country country = plugin.getCountry(joinName(args, 1));
+        Country country = plugin.getVisibleCountry(joinName(args, 1));
         if (country == null) {
             player.sendMessage(plugin.getMessage("country.not-found"));
             return true;
@@ -701,7 +701,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleInfo(Player player, String[] args) {
-        Country country = args.length >= 2 ? plugin.getCountry(joinName(args, 1)) : plugin.getCountryAt(player.getLocation());
+        Country country = args.length >= 2 ? plugin.getVisibleCountry(joinName(args, 1)) : plugin.getVisibleCountryAt(player.getLocation());
         if (country == null) {
             player.sendMessage(plugin.getMessage(args.length >= 2 ? "country.not-found" : "country.info.here-none"));
             return true;
@@ -788,7 +788,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleFarmland(Player player, String[] args) {
-        Country country = args.length >= 2 ? plugin.getCountry(joinName(args, 1)) : plugin.getCountryAt(player.getLocation());
+        Country country = args.length >= 2 ? plugin.getVisibleCountry(joinName(args, 1)) : plugin.getVisibleCountryAt(player.getLocation());
         if (country == null) {
             player.sendMessage(plugin.getMessage(args.length >= 2 ? "country.not-found" : "country.info.here-none"));
             return true;
@@ -1196,7 +1196,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        Country targetCountry = plugin.getCountry(joinName(args, 2));
+        Country targetCountry = plugin.getVisibleCountry(joinName(args, 2));
         if (targetCountry == null) {
             player.sendMessage(plugin.getMessage("country.not-found"));
             return true;
@@ -1386,8 +1386,12 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
             return partialMatches(args[0], options);
         }
 
-        if ((args[0].equalsIgnoreCase("join") || args[0].equalsIgnoreCase("acceptinvite") || args[0].equalsIgnoreCase("disband") || args[0].equalsIgnoreCase("info") || args[0].equalsIgnoreCase("farmland")) && args.length >= 2) {
-            return partialMatches(args[args.length - 1], plugin.getCountryNames());
+        if ((args[0].equalsIgnoreCase("join") || args[0].equalsIgnoreCase("acceptinvite") || args[0].equalsIgnoreCase("info") || args[0].equalsIgnoreCase("farmland")) && args.length >= 2) {
+            return partialMatches(args[args.length - 1], plugin.getVisibleCountryNames());
+        }
+
+        if (args[0].equalsIgnoreCase("disband") && args.length >= 2) {
+            return partialMatches(args[args.length - 1], plugin.getAllCountryNames());
         }
 
         if (args[0].equalsIgnoreCase("invite") && args.length == 2) {
@@ -1400,7 +1404,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
 
         if (args[0].equalsIgnoreCase("setowner") && args.length >= 2) {
             if (args.length == 2) {
-                return partialMatches(args[1], plugin.getCountryNames());
+                return partialMatches(args[1], plugin.getAllCountryNames());
             }
             List<String> names = new ArrayList<>();
             for (Player online : Bukkit.getOnlinePlayers()) {
@@ -1458,7 +1462,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args[0].equalsIgnoreCase("addtagtocountry") && args.length >= 2) {
-            return partialMatches(args[args.length - 1], plugin.getCountryNames());
+            return partialMatches(args[args.length - 1], isAdminBypass(player) ? plugin.getAllCountryNames() : plugin.getVisibleCountryNames());
         }
 
         if (args[0].equalsIgnoreCase("role")) {
@@ -1503,7 +1507,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
         if (args[0].equalsIgnoreCase("borders")) {
             if (args.length >= 2) {
                 List<String> suggestions = new ArrayList<>(List.of("on", "off"));
-                suggestions.addAll(plugin.getCountryNames());
+                suggestions.addAll(plugin.getVisibleCountryNames());
                 return partialMatches(args[args.length - 1], suggestions);
             }
             return Collections.emptyList();
@@ -1521,11 +1525,11 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
                     return partialMatches(args[3], plugin.getTerritoryRegionIds(args[2]));
                 }
                 if (args.length >= 5) {
-                    return partialMatches(args[args.length - 1], plugin.getCountryNames());
+                    return partialMatches(args[args.length - 1], plugin.getAllCountryNames());
                 }
             }
             if ((args[1].equalsIgnoreCase("clear") || args[1].equalsIgnoreCase("sync") || args[1].equalsIgnoreCase("info") || args[1].equalsIgnoreCase("debug")) && args.length >= 3) {
-                return partialMatches(args[args.length - 1], plugin.getCountryNames());
+                return partialMatches(args[args.length - 1], plugin.getAllCountryNames());
             }
         }
 
@@ -1536,12 +1540,12 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args[0].equalsIgnoreCase("admin") && args.length >= 2) {
-            return partialMatches(args[args.length - 1], plugin.getCountryNames());
+            return partialMatches(args[args.length - 1], plugin.getAllCountryNames());
         }
 
         if (args[0].equalsIgnoreCase("settraderreputation")) {
             if (args.length == 2) {
-                return partialMatches(args[1], plugin.getCountryNames());
+                return partialMatches(args[1], plugin.getAllCountryNames());
             }
             if (args.length >= 3) {
                 return partialMatches(args[args.length - 1], List.of("0", "5", "10", "25", "50"));
@@ -1557,7 +1561,7 @@ public class CountryCommand implements CommandExecutor, TabCompleter {
                 return partialMatches(args[1], List.of("allow", "remove", "list"));
             }
             if ((args[1].equalsIgnoreCase("allow") || args[1].equalsIgnoreCase("remove")) && args.length >= 3) {
-                return partialMatches(args[args.length - 1], plugin.getCountryNames());
+                return partialMatches(args[args.length - 1], plugin.getVisibleCountryNames());
             }
         }
 

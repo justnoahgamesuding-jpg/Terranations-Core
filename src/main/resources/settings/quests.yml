@@ -8,80 +8,70 @@ quests:
     hint: ""
   starter:
     list:
-      choose_profession:
+      open_guide:
         order: 10
         enabled: true
-        type: select_profession
-        title: "&6Choose Your Path"
-        objective: "Choose your first profession"
-        hint: "Use /jobs"
-      first_profession_xp:
+        type: open_guide
+        key: guide_opened
+        title: "&6Open Your Guide"
+        objective: "Open the Terra Guide for the first time"
+        hint: "Use the locked guide item in slot 9"
+      complete_trials:
         order: 20
         enabled: true
-        type: earn_profession_xp
+        type: complete_trial
+        key: any
+        target: 3
+        title: "&6Try A Few Roles"
+        objective: "Complete %target% profession trials"
+        hint: "Use the starter hub to try gathering, building, crafting, and trade loops"
+      visit_hub:
+        order: 30
+        enabled: true
+        type: visit_location
+        key: starter_hub
         target: 1
-        title: "&6Get Started"
-        objective: "Earn your first %profession% XP"
-        hint: "Work in your chosen job"
-      miner_momentum:
-        order: 30
-        enabled: true
-        profession: miner
-        type: earn_profession_xp
-        target: 120
-        title: "&6Find Your Rhythm"
-        objective: "Reach %target% Miner XP"
-        hint: "Mine stone and ores to build momentum"
-      lumberjack_momentum:
-        order: 30
-        enabled: true
-        profession: lumberjack
-        type: earn_profession_xp
-        target: 120
-        title: "&6Find Your Rhythm"
-        objective: "Reach %target% Lumberjack XP"
-        hint: "Chop trees and keep replanting"
-      farmer_momentum:
-        order: 30
-        enabled: true
-        profession: farmer
-        type: earn_profession_xp
-        target: 120
-        title: "&6Find Your Rhythm"
-        objective: "Reach %target% Farmer XP"
-        hint: "Farm, till, plant, and harvest crops"
-      builder_momentum:
-        order: 30
-        enabled: true
-        profession: builder
-        type: earn_profession_xp
-        target: 90
-        title: "&6Find Your Rhythm"
-        objective: "Reach %target% Builder XP"
-        hint: "Place and shape builder blocks"
-      blacksmith_momentum:
-        order: 30
-        enabled: true
-        profession: blacksmith
-        type: earn_profession_xp
-        target: 90
-        title: "&6Find Your Rhythm"
-        objective: "Reach %target% Blacksmith XP"
-        hint: "Smelt, forge, and work at anvils"
-      join_country:
+        title: "&6Learn The Hub"
+        objective: "Visit the starter hub square"
+        hint: "Walk through the main onboarding plaza"
+      meet_trader:
         order: 40
+        enabled: true
+        type: interact_npc
+        key: trader_npc
+        target: 1
+        title: "&6Meet The Route Trader"
+        objective: "Speak to a trader or marked onboarding NPC"
+        hint: "Visit the trader stop or click a marked guide NPC"
+      explore_time:
+        order: 50
+        enabled: true
+        type: playtime
+        target: 20
+        title: "&6Take Your Time"
+        objective: "Spend %target% minutes in the world"
+        hint: "Explore the starter hub and get comfortable before locking in a job"
+      join_country:
+        order: 60
         enabled: true
         type: join_country
         title: "&6Find Allies"
-        objective: "Join a country"
-        hint: "Use /country list"
+        objective: "Join a country or meet one through the hub"
+        hint: "Use /country list or meet recruiters in the starter area"
       contribute_country:
-        order: 50
+        order: 70
         enabled: true
         type: contribute_country
         target: 1
         title: "&6Pull Your Weight"
         objective: "Contribute to your country"
         hint: "Use /country deposit or /country contribute"
+      choose_profession:
+        order: 80
+        enabled: true
+        type: select_profession
+        title: "&6Choose Your Path"
+        objective: "Choose your first profession"
+        hint: "Open /jobs or use the guide when your onboarding is ready"
   general:
     list: {}

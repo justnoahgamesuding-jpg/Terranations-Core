@@ -46,6 +46,45 @@ profession-procs:
 country-home:
   cooldown-seconds: 3600
 
+onboarding:
+  enabled: true
+  required-trials: 3
+  required-playtime-minutes: 20
+  starter-hub:
+    enabled: true
+    country-key: ""
+    use-global-spawn: true
+    world: ""
+    x: 0.0
+    y: 64.0
+    z: 0.0
+    yaw: 0.0
+    pitch: 0.0
+  trial-thresholds:
+    miner: 8
+    lumberjack: 6
+    farmer: 6
+    builder: 12
+    blacksmith: 3
+    trader: 3
+  npc-focus:
+    enabled: true
+    line-millis: 2400
+    chat-clear-lines: 80
+  npc-dialogue:
+    default:
+      - "&7Take a second to look around and read what the world is asking of you."
+      - "&7Your guide will keep updating as you learn new systems."
+    trader_npc:
+      - "&fRoutes connect countries together through supply, demand, and timing."
+      - "&fEven if you do not lock Trader first, learn where money and goods move."
+    merchant_npc:
+      - "&fMerchants are a simple market loop: buy what you need, sell what you have."
+      - "&fUse them to understand value before you choose your first profession."
+    embassy_guide:
+      - "&fCountries are the long-term social loop."
+      - "&fThe starter island is where you meet them before committing to your path."
+
 items:
   ender-pearls-enabled: true
   shulker-boxes-enabled: true

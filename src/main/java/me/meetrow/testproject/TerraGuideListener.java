@@ -27,6 +27,7 @@ public final class TerraGuideListener implements Listener {
     private static final int CLOSE_SLOT = 49;
     private static final int BACK_SLOT = 45;
     private static final int SKILL_SELECTOR_INFO_SLOT = 4;
+    private static final int ONBOARDING_INFO_SLOT = 4;
     private static final int CONTRACT_ACTIVE_SLOT = 13;
     private static final int CONTRACT_REROLL_INFO_SLOT = 40;
     private static final int CONTRACT_ABANDON_SLOT = 41;
@@ -76,6 +77,7 @@ public final class TerraGuideListener implements Listener {
             case MAIN -> handleMainClick(player, event.getSlot());
             case STATS -> handleBackClose(player, event.getSlot());
             case SKILL_SELECTOR -> handleSkillSelectorClick(player, event.getSlot());
+            case ONBOARDING -> handleOnboardingClick(player, event.getSlot());
             case CONTRACTS -> handleContractsClick(player, event);
         }
     }
@@ -88,6 +90,7 @@ public final class TerraGuideListener implements Listener {
     }
 
     public void openMainMenu(Player player) {
+        plugin.recordOnboardingGuideOpened(player);
         Inventory inventory = Bukkit.createInventory(new TerraGuideHolder(GuidePage.MAIN), GUI_SIZE, plugin.legacyComponent("&8Terra Guide"));
         fillEmpty(inventory);
 
@@ -113,6 +116,14 @@ public final class TerraGuideListener implements Listener {
                 "&7Track your active quest and",
                 "&7future personal work systems."
         )));
+        if (plugin.isOnboardingActive(player.getUniqueId())) {
+            inventory.setItem(22, createItem(Material.COMPASS, "&eFirst Hour Guide", List.of(
+                    "&7See your onboarding progress,",
+                    "&7profession trials, and next step.",
+                    "",
+                    "&eClick to open."
+            )));
+        }
         inventory.setItem(28, createItem(Material.BLUE_BANNER, country != null ? "&9Country Dashboard" : "&9Country Browser", List.of(
                 country != null ? "&7Open your player country dashboard." : "&7Browse and join server countries."
         )));
@@ -266,6 +277,11 @@ public final class TerraGuideListener implements Listener {
             case 12 -> plugin.openProfessionMenu(player);
             case 14 -> openSkillSelectorMenu(player);
             case 16 -> openContractsMenu(player);
+            case 22 -> {
+                if (plugin.isOnboardingActive(player.getUniqueId())) {
+                    openOnboardingMenu(player);
+                }
+            }
             case 28 -> {
                 if (country != null) {
                     plugin.openCountryMenu(player);
@@ -282,6 +298,57 @@ public final class TerraGuideListener implements Listener {
             default -> {
             }
         }
+    }
+
+    private void openOnboardingMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(new TerraGuideHolder(GuidePage.ONBOARDING), GUI_SIZE, plugin.legacyComponent("&8First Hour Guide"));
+        fillEmpty(inventory);
+
+        UUID playerId = player.getUniqueId();
+        int requiredTrials = plugin.getRequiredOnboardingTrialCount();
+        int completedTrials = plugin.getCompletedOnboardingTrialCount(playerId);
+        int requiredMinutes = plugin.getRequiredOnboardingPlaytimeMinutes();
+        long elapsedMinutes = plugin.getOnboardingElapsedMinutes(playerId);
+        boolean ready = plugin.isPrimaryProfessionChoiceUnlocked(playerId);
+
+        inventory.setItem(ONBOARDING_INFO_SLOT, createItem(Material.COMPASS, "&6Onboarding Progress", List.of(
+                "&7Trials: &f" + Math.min(completedTrials, requiredTrials) + "&7/&f" + requiredTrials,
+                "&7Playtime: &f" + Math.min(elapsedMinutes, requiredMinutes) + "&7/&f" + requiredMinutes + " min",
+                ready ? "&aYour first profession choice is unlocked." : "&7Keep exploring the starter flow first."
+        )));
+
+        int[] trialSlots = {19, 20, 21, 22, 23, 24};
+        List<Profession> trialProfessions = plugin.getOnboardingTrialProfessions();
+        for (int i = 0; i < trialProfessions.size() && i < trialSlots.length; i++) {
+            Profession profession = trialProfessions.get(i);
+            boolean complete = plugin.hasCompletedOnboardingTrial(playerId, profession);
+            int progress = plugin.getOnboardingTrialProgress(playerId, profession);
+            int target = plugin.getOnboardingTrialTarget(profession);
+            inventory.setItem(trialSlots[i], createItem(
+                    profession.getIcon(),
+                    (complete ? "&a" : "&e") + plugin.getProfessionPlainDisplayName(profession) + " Trial",
+                    List.of(
+                            "&7Progress: &f" + Math.min(progress, target) + "&7/&f" + target,
+                            complete ? "&aCompleted." : "&7" + plugin.getOnboardingTrialHint(profession)
+                    )));
+        }
+
+        inventory.setItem(31, createItem(Material.BLUE_BANNER, "&9Countries", List.of(
+                "&7Browse countries and meet recruiters",
+                "&7before you lock in your first job."
+        )));
+        inventory.setItem(32, createItem(Material.ANVIL, "&6Starter Hub", List.of(
+                "&7Use the hub to try workstations,",
+                "&7storage, crops, and resource loops."
+        )));
+        inventory.setItem(33, createItem(ready ? Material.EMERALD : Material.GRAY_DYE, ready ? "&aChoose First Profession" : "&7Profession Locked", List.of(
+                ready ? "&7You are ready to choose your first job." : "&7Requirement:",
+                ready ? "&eClick to open the jobs menu." : "&f" + plugin.getOnboardingUnlockRequirementText(playerId)
+        )));
+
+        inventory.setItem(BACK_SLOT, createItem(Material.ARROW, "&eBack", List.of("&7Return to the main guide menu.")));
+        inventory.setItem(CLOSE_SLOT, createItem(Material.BARRIER, "&cClose", List.of("&7Close the Terra Guide.")));
+        player.openInventory(inventory);
     }
 
     private void handleSkillSelectorClick(Player player, int slot) {
@@ -356,6 +423,24 @@ public final class TerraGuideListener implements Listener {
         }
     }
 
+    private void handleOnboardingClick(Player player, int slot) {
+        if (handleBackClose(player, slot)) {
+            return;
+        }
+        switch (slot) {
+            case 31 -> plugin.openCountryListMenu(player);
+            case 33 -> {
+                if (plugin.isPrimaryProfessionChoiceUnlocked(player.getUniqueId())) {
+                    plugin.openProfessionMenu(player);
+                } else {
+                    player.sendMessage(plugin.colorize("&cYour first profession is still locked. &7" + plugin.getOnboardingUnlockRequirementText(player.getUniqueId())));
+                }
+            }
+            default -> {
+            }
+        }
+    }
+
     private boolean handleBackClose(Player player, int slot) {
         if (slot == BACK_SLOT) {
             openMainMenu(player);
@@ -391,6 +476,7 @@ public final class TerraGuideListener implements Listener {
         MAIN,
         STATS,
         SKILL_SELECTOR,
+        ONBOARDING,
         CONTRACTS
     }
 

@@ -12,6 +12,7 @@ public final class PlayerQuestDefinition {
     private final String objective;
     private final String hint;
     private final int target;
+    private final String key;
     private final Profession profession;
     private final PlayerQuestType type;
     private final Set<String> requiresCompleted;
@@ -24,6 +25,7 @@ public final class PlayerQuestDefinition {
             String objective,
             String hint,
             int target,
+            String key,
             Profession profession,
             PlayerQuestType type,
             Set<String> requiresCompleted
@@ -35,6 +37,7 @@ public final class PlayerQuestDefinition {
         this.objective = objective;
         this.hint = hint;
         this.target = target;
+        this.key = key;
         this.profession = profession;
         this.type = type;
         this.requiresCompleted = Collections.unmodifiableSet(new LinkedHashSet<>(requiresCompleted));
@@ -66,6 +69,10 @@ public final class PlayerQuestDefinition {
 
     public int getTarget() {
         return target;
+    }
+
+    public String getKey() {
+        return key;
     }
 
     public Profession getProfession() {
