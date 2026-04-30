@@ -58,10 +58,6 @@ public final class GuildCommand implements CommandExecutor, TabCompleter {
             case "stockpile" -> handleStockpile(player, args);
             case "logs", "log" -> handleLogs(player, args);
             case "list" -> handleList(player);
-            case "menu" -> {
-                plugin.openGuildMenu(player);
-                yield true;
-            }
             default -> {
                 sendOverview(player);
                 yield true;
@@ -248,7 +244,7 @@ public final class GuildCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(plugin.colorize("&cCountry not found."));
             return true;
         }
-        String failure = plugin.claimCountryForGuild(guild, country, player.getUniqueId());
+        String failure = plugin.claimCountryForGuild(guild, country, player);
         if (failure != null) {
             player.sendMessage(plugin.colorize("&c" + failure));
             return true;
@@ -559,7 +555,6 @@ public final class GuildCommand implements CommandExecutor, TabCompleter {
         if (guild != null) {
             player.sendMessage(plugin.colorize("&7Current: &f" + guild.getName() + " &8[" + guild.getTag() + "]"));
         }
-        player.sendMessage(plugin.colorize("&e/guild menu"));
         player.sendMessage(plugin.colorize("&e/guild create <name> <tag>"));
         player.sendMessage(plugin.colorize("&e/guild info [guild]"));
         player.sendMessage(plugin.colorize("&e/guild invite <player>"));
@@ -582,7 +577,6 @@ public final class GuildCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> options = new ArrayList<>();
         if (args.length == 1) {
-            options.add("menu");
             options.add("create");
             options.add("info");
             options.add("invite");

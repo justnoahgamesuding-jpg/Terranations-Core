@@ -496,33 +496,122 @@ The plugin includes:
 
 Terra exposes PlaceholderAPI placeholders for scoreboards, menus, and chat integrations.
 
-Common placeholders include:
+Economy and server:
 
 - `%terra_balance%`
+- `%terra_xp%`
+- `%terra_server_time%`
+- `%terra_local_time%`
+- `%terra_server_date%`
+- `%terra_local_date%`
+- `%terra_server_datetime%`
+- `%terra_local_datetime%`
+
+Climate:
+
+- `%terra_climate_name%`
+- `%terra_climate_type%`
+- `%terra_climate_temp%`
+- `%terra_climate_temperature%`
+- `%terra_climate_season%`
+- `%terra_climate_raining%`
+- `%terra_climate_freezing%`
+
+Country:
+
+- `%terra_player_country%`
+- `%terra_player_country_level%`
+- `%terra_player_countrytag%`
+- `%terra_player_country_tag%`
+- `%terra_current_country%`
+- `%terra_current_country_tag%`
+- `%terra_current_country_level%`
+- `%terra_current_country_owner%`
+- `%terra_current_country_owner_tag%`
+
+Guild:
+
 - `%terra_player_guild%`
 - `%terra_player_guild_tag%`
 - `%terra_player_guild_level%`
 - `%terra_player_guild_balance%`
 - `%terra_player_guild_role%`
-- `%terra_player_country%`
-- `%terra_player_country_level%`
-- `%terra_current_country_owner%`
-- `%terra_current_country_owner_tag%`
+- `%terra_player_guild_members%`
+- `%terra_player_guild_member_count%`
+- `%terra_player_guild_claims%`
+- `%terra_player_guild_country_count%`
+- `%terra_player_guild_capital%`
+- `%terra_player_guild_capital_country%`
+- `%terra_player_guild_recruiting%`
+- `%terra_player_guild_recruitment%`
+- `%terra_player_guild_score%`
+- `%terra_player_guild_xp%`
+
+Profession:
+
+- `%terra_profession%`
+- `%terra_current_job%`
 - `%terra_profession_display%`
+- `%terra_current_job_display%`
+- `%terra_has_profession%`
+- `%terra_profession_locked%`
 - `%terra_current_job_level%`
 - `%terra_current_job_xp%`
 - `%terra_current_job_xp_required%`
-- `%terra_server_time%`
-- `%terra_server_date%`
-- `%terra_server_datetime%`
-- `%terra_climate_name%`
-- `%terra_climate_temperature%`
-- `%terra_climate_season%`
+
+Tutorial and onboarding:
+
+- `%terra_quest_active%`
+- `%terra_quest_has_active%`
+- `%terra_quest_id%`
+- `%terra_quest_active_id%`
+- `%terra_quest_title%`
+- `%terra_quest_active_title%`
+- `%terra_quest_title_plain%`
+- `%terra_quest_active_title_plain%`
+- `%terra_quest_objective%`
+- `%terra_quest_active_objective%`
+- `%terra_quest_objective_plain%`
+- `%terra_quest_active_objective_plain%`
+- `%terra_quest_hint%`
+- `%terra_quest_active_hint%`
+- `%terra_quest_hint_plain%`
+- `%terra_quest_active_hint_plain%`
+- `%terra_quest_progress%`
+- `%terra_quest_active_progress%`
+- `%terra_quest_status%`
+- `%terra_quest_active_status%`
+- `%terra_quest_progress_bar%`
+- `%terra_quest_active_progress_bar%`
+- `%terra_quest_accent%`
+- `%terra_quest_active_accent%`
+- `%terra_quest_current%`
+- `%terra_quest_active_current%`
+- `%terra_quest_target%`
+- `%terra_quest_active_target%`
+- `%terra_quest_percent%`
+- `%terra_quest_active_percent%`
+- `%terra_quest_steps%`
+- `%terra_quest_active_steps%`
+- `%terra_quest_max_steps%`
+- `%terra_quest_profession%`
+- `%terra_quest_active_profession%`
+
+Playtest:
+
+- `%terra_playtest_active%`
+- `%terra_playtest_remaining%`
+- `%terra_playtest_remaining_short%`
 
 Notes:
 
 - `%terra_current_job_xp%` is remaining XP to the next level, not current earned XP for the level.
 - `%terra_server_time%`, `%terra_server_date%`, and `%terra_server_datetime%` follow the same timezone as the real-time world clock configured in `realtime-clock.timezone`.
+- `%terra_player_countrytag%` and `%terra_player_country_tag%` are aliases.
+- `%terra_player_guild_members%` and `%terra_player_guild_member_count%` are aliases.
+- `%terra_player_guild_claims%` and `%terra_player_guild_country_count%` are aliases.
+- `%terra_player_guild_capital%` and `%terra_player_guild_capital_country%` are aliases.
+- `%terra_player_guild_recruiting%` and `%terra_player_guild_recruitment%` are aliases.
 
 ## Integrations
 

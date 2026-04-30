@@ -59,13 +59,20 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
             case "climate_freezing" -> getClimateFreezingPlaceholder(player);
             case "player_country" -> getPlayerCountryPlaceholder(player);
             case "player_country_level" -> getPlayerCountryLevelPlaceholder(player);
-            case "player_countrytag" -> getPlayerCountryTagPlaceholder(player);
+            case "player_countrytag", "player_country_tag" -> getPlayerCountryTagPlaceholder(player);
             case "player_guild" -> getPlayerGuildPlaceholder(player);
             case "player_guild_tag" -> getPlayerGuildTagPlaceholder(player);
             case "player_guild_level" -> getPlayerGuildLevelPlaceholder(player);
             case "player_guild_balance" -> getPlayerGuildBalancePlaceholder(player);
             case "player_guild_role" -> getPlayerGuildRolePlaceholder(player);
+            case "player_guild_members", "player_guild_member_count" -> getPlayerGuildMembersPlaceholder(player);
+            case "player_guild_claims", "player_guild_country_count" -> getPlayerGuildClaimsPlaceholder(player);
+            case "player_guild_capital", "player_guild_capital_country" -> getPlayerGuildCapitalPlaceholder(player);
+            case "player_guild_recruiting", "player_guild_recruitment" -> getPlayerGuildRecruitingPlaceholder(player);
+            case "player_guild_score" -> getPlayerGuildScorePlaceholder(player);
+            case "player_guild_xp" -> getPlayerGuildXpPlaceholder(player);
             case "current_country" -> getCurrentCountryPlaceholder(player);
+            case "current_country_tag" -> getCurrentCountryTagPlaceholder(player);
             case "current_country_level" -> getCurrentCountryLevelPlaceholder(player);
             case "current_country_owner" -> getCurrentCountryOwnerPlaceholder(player);
             case "current_country_owner_tag" -> getCurrentCountryOwnerTagPlaceholder(player);
@@ -209,6 +216,19 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
         return String.valueOf(country.getLevel());
     }
 
+    private String getCurrentCountryTagPlaceholder(OfflinePlayer player) {
+        if (player.getPlayer() == null) {
+            return "none";
+        }
+
+        Country country = plugin.getCountryAt(player.getPlayer().getLocation());
+        if (country == null || !country.hasTag()) {
+            return "none";
+        }
+
+        return country.getTag();
+    }
+
     private String getPlayerCountryTagPlaceholder(OfflinePlayer player) {
         Country country = plugin.getPlayerCountry(player.getUniqueId());
         if (country == null || !country.hasTag()) {
@@ -241,6 +261,40 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
     private String getPlayerGuildRolePlaceholder(OfflinePlayer player) {
         GuildRole role = plugin.getGuildRole(player.getUniqueId());
         return role != null ? role.name().toLowerCase(Locale.ROOT) : "none";
+    }
+
+    private String getPlayerGuildMembersPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return String.valueOf(guild != null ? guild.getMembers().size() : 0);
+    }
+
+    private String getPlayerGuildClaimsPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return String.valueOf(guild != null ? guild.getClaimedCountryKeys().size() : 0);
+    }
+
+    private String getPlayerGuildCapitalPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        if (guild == null || guild.getCapitalCountryKey() == null || guild.getCapitalCountryKey().isBlank()) {
+            return "none";
+        }
+        Country capital = plugin.getCountryByKey(guild.getCapitalCountryKey());
+        return capital != null ? capital.getName() : "none";
+    }
+
+    private String getPlayerGuildRecruitingPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return String.valueOf(guild != null && guild.isRecruitingOpen());
+    }
+
+    private String getPlayerGuildScorePlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return String.valueOf(guild != null ? plugin.getGuildScore(guild) : 0);
+    }
+
+    private String getPlayerGuildXpPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return String.valueOf(guild != null ? guild.getGuildXp() : 0);
     }
 
     private String getCurrentCountryOwnerPlaceholder(OfflinePlayer player) {

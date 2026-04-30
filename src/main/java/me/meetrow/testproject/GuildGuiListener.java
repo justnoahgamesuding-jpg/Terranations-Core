@@ -60,6 +60,13 @@ public final class GuildGuiListener implements Listener {
     private static final int DEPOSIT_ALL_SLOT = 24;
     private static final int DEPOSIT_CONFIRM_SLOT = 31;
     private static final int BACK_SLOT = 45;
+    private static final int PREVIOUS_PAGE_SLOT = 48;
+    private static final int NEXT_PAGE_SLOT = 50;
+    private static final int ROLE_OFFICER_SLOT = 20;
+    private static final int ROLE_ADMIRAL_SLOT = 22;
+    private static final int ROLE_MEMBER_SLOT = 24;
+    private static final int PLAYER_PERMISSIONS_SLOT = 31;
+    private static final int[] PERMISSION_SLOTS = COUNTRY_SLOTS;
 
     private final Testproject plugin;
     private final Map<UUID, Double> selectedDepositAmounts = new ConcurrentHashMap<>();
@@ -134,6 +141,22 @@ public final class GuildGuiListener implements Listener {
             handleCountriesClick(player, countriesHolder, event.getSlot());
             return;
         }
+        if (holder instanceof GuildPermissionsHubHolder) {
+            handlePermissionsHubClick(player, event.getSlot());
+            return;
+        }
+        if (holder instanceof GuildRolePermissionsHolder rolePermissionsHolder) {
+            handleRolePermissionsClick(player, rolePermissionsHolder, event.getSlot(), event.getClick());
+            return;
+        }
+        if (holder instanceof GuildPlayerPermissionsBrowserHolder playerPermissionsBrowserHolder) {
+            handlePlayerPermissionsBrowserClick(player, playerPermissionsBrowserHolder, event.getSlot());
+            return;
+        }
+        if (holder instanceof GuildPlayerPermissionsHolder playerPermissionsHolder) {
+            handlePlayerPermissionsClick(player, playerPermissionsHolder, event.getSlot(), event.getClick());
+            return;
+        }
         if (holder instanceof GuildInvitesHolder invitesHolder) {
             handleInvitesClick(player, invitesHolder, event.getSlot(), event.getClick());
             return;
@@ -167,6 +190,7 @@ public final class GuildGuiListener implements Listener {
                         + plugin.formatMoney(plugin.getGuildWithdrawLimit(guild, player.getUniqueId())) + "&7."));
             }
             case CLAIM_SLOT -> handleClaimCurrentCountry(player, guild);
+            case PERMISSIONS_SLOT -> openPermissionsHub(player, guild);
             case STOCKPILE_SLOT -> {
                 player.closeInventory();
                 player.sendMessage(plugin.colorize("&7Use &f/guild stockpile deposit <amount> &7while holding a material."));
@@ -319,6 +343,138 @@ public final class GuildGuiListener implements Listener {
         openInvitesMenu(player, guild);
     }
 
+    private void handlePermissionsHubClick(Player player, int slot) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        if (guild == null) {
+            openGuildBrowserMenu(player, 0);
+            return;
+        }
+        if (slot == BACK_SLOT) {
+            openGuildMenu(player);
+            return;
+        }
+        if (slot == CLOSE_SLOT) {
+            player.closeInventory();
+            return;
+        }
+        switch (slot) {
+            case ROLE_OFFICER_SLOT -> openRolePermissionsMenu(player, guild, GuildRole.OFFICER, 0);
+            case ROLE_ADMIRAL_SLOT -> openRolePermissionsMenu(player, guild, GuildRole.ADMIRAL, 0);
+            case ROLE_MEMBER_SLOT -> openRolePermissionsMenu(player, guild, GuildRole.MEMBER, 0);
+            case PLAYER_PERMISSIONS_SLOT -> openPlayerPermissionsBrowser(player, guild, 0);
+            default -> {
+            }
+        }
+    }
+
+    private void handleRolePermissionsClick(Player player, GuildRolePermissionsHolder holder, int slot, ClickType clickType) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        if (guild == null) {
+            openGuildBrowserMenu(player, 0);
+            return;
+        }
+        if (slot == BACK_SLOT) {
+            openPermissionsHub(player, guild);
+            return;
+        }
+        if (slot == CLOSE_SLOT) {
+            player.closeInventory();
+            return;
+        }
+        if (slot == PREVIOUS_PAGE_SLOT) {
+            openRolePermissionsMenu(player, guild, holder.role(), holder.page() - 1);
+            return;
+        }
+        if (slot == NEXT_PAGE_SLOT) {
+            openRolePermissionsMenu(player, guild, holder.role(), holder.page() + 1);
+            return;
+        }
+        if (!plugin.playerHasGuildPermission(guild, player.getUniqueId(), GuildPermission.MANAGE_ROLE_PERMISSIONS)) {
+            player.sendMessage(plugin.colorize("&cYou do not have permission to manage role permissions."));
+            openPermissionsHub(player, guild);
+            return;
+        }
+        int index = slotToIndex(slot, PERMISSION_SLOTS);
+        GuildPermission[] permissions = GuildPermission.values();
+        int permissionIndex = holder.page() * PERMISSION_SLOTS.length + index;
+        if (index < 0 || permissionIndex < 0 || permissionIndex >= permissions.length) {
+            return;
+        }
+        GuildPermission permission = permissions[permissionIndex];
+        GuildPermissionState current = plugin.getGuildRolePermissionOverride(guild, holder.role(), permission);
+        plugin.setGuildRolePermission(guild, holder.role(), permission, nextPermissionState(current, clickType));
+        openRolePermissionsMenu(player, guild, holder.role(), holder.page());
+    }
+
+    private void handlePlayerPermissionsBrowserClick(Player player, GuildPlayerPermissionsBrowserHolder holder, int slot) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        if (guild == null) {
+            openGuildBrowserMenu(player, 0);
+            return;
+        }
+        if (slot == BACK_SLOT) {
+            openPermissionsHub(player, guild);
+            return;
+        }
+        if (slot == CLOSE_SLOT) {
+            player.closeInventory();
+            return;
+        }
+        if (slot == PREVIOUS_PAGE_SLOT) {
+            openPlayerPermissionsBrowser(player, guild, holder.page() - 1);
+            return;
+        }
+        if (slot == NEXT_PAGE_SLOT) {
+            openPlayerPermissionsBrowser(player, guild, holder.page() + 1);
+            return;
+        }
+        int index = slotToIndex(slot, MEMBER_SLOTS);
+        int memberIndex = holder.page() * MEMBER_SLOTS.length + index;
+        if (index < 0 || memberIndex < 0 || memberIndex >= holder.memberIds().size()) {
+            return;
+        }
+        openPlayerPermissionsMenu(player, guild, holder.memberIds().get(memberIndex), 0, holder.page());
+    }
+
+    private void handlePlayerPermissionsClick(Player player, GuildPlayerPermissionsHolder holder, int slot, ClickType clickType) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        if (guild == null) {
+            openGuildBrowserMenu(player, 0);
+            return;
+        }
+        if (slot == BACK_SLOT) {
+            openPlayerPermissionsBrowser(player, guild, holder.browserPage());
+            return;
+        }
+        if (slot == CLOSE_SLOT) {
+            player.closeInventory();
+            return;
+        }
+        if (slot == PREVIOUS_PAGE_SLOT) {
+            openPlayerPermissionsMenu(player, guild, holder.targetId(), holder.page() - 1, holder.browserPage());
+            return;
+        }
+        if (slot == NEXT_PAGE_SLOT) {
+            openPlayerPermissionsMenu(player, guild, holder.targetId(), holder.page() + 1, holder.browserPage());
+            return;
+        }
+        if (!plugin.playerHasGuildPermission(guild, player.getUniqueId(), GuildPermission.MANAGE_PLAYER_PERMISSIONS)) {
+            player.sendMessage(plugin.colorize("&cYou do not have permission to manage player permissions."));
+            openPermissionsHub(player, guild);
+            return;
+        }
+        int index = slotToIndex(slot, PERMISSION_SLOTS);
+        GuildPermission[] permissions = GuildPermission.values();
+        int permissionIndex = holder.page() * PERMISSION_SLOTS.length + index;
+        if (index < 0 || permissionIndex < 0 || permissionIndex >= permissions.length) {
+            return;
+        }
+        GuildPermission permission = permissions[permissionIndex];
+        GuildPermissionState current = plugin.getGuildPlayerPermissionOverride(guild, holder.targetId(), permission);
+        plugin.setGuildPlayerPermission(guild, holder.targetId(), permission, nextPermissionState(current, clickType));
+        openPlayerPermissionsMenu(player, guild, holder.targetId(), holder.page(), holder.browserPage());
+    }
+
     private void openDepositMenu(Player player, Guild guild) {
         Inventory inventory = Bukkit.createInventory(
                 new GuildDepositHolder(player.getUniqueId()),
@@ -419,6 +575,128 @@ public final class GuildGuiListener implements Listener {
         player.openInventory(inventory);
     }
 
+    private void openPermissionsHub(Player player, Guild guild) {
+        boolean canManageRoles = plugin.playerHasGuildPermission(guild, player.getUniqueId(), GuildPermission.MANAGE_ROLE_PERMISSIONS);
+        boolean canManagePlayers = plugin.playerHasGuildPermission(guild, player.getUniqueId(), GuildPermission.MANAGE_PLAYER_PERMISSIONS);
+        Inventory inventory = Bukkit.createInventory(
+                new GuildPermissionsHubHolder(player.getUniqueId()),
+                GUI_SIZE,
+                plugin.legacyComponent("&8Guild Permissions")
+        );
+        fillEmpty(inventory);
+        inventory.setItem(INFO_SLOT, createSimpleItem(Material.COMPARATOR, "&6Guild Permissions", List.of(
+                "&7Guild: &f" + guild.getName(),
+                "&7Role editor: " + (canManageRoles ? "&aenabled" : "&cno access"),
+                "&7Player editor: " + (canManagePlayers ? "&aenabled" : "&cno access")
+        )));
+        inventory.setItem(ROLE_OFFICER_SLOT, createRoleSummaryItem(guild, GuildRole.OFFICER, canManageRoles));
+        inventory.setItem(ROLE_ADMIRAL_SLOT, createRoleSummaryItem(guild, GuildRole.ADMIRAL, canManageRoles));
+        inventory.setItem(ROLE_MEMBER_SLOT, createRoleSummaryItem(guild, GuildRole.MEMBER, canManageRoles));
+        inventory.setItem(PLAYER_PERMISSIONS_SLOT, createPlayerPermissionsBrowserItem(guild, canManagePlayers));
+        inventory.setItem(BACK_SLOT, createSimpleItem(Material.ARROW, "&eBack", List.of("&7Return to the guild dashboard.")));
+        inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
+        player.openInventory(inventory);
+    }
+
+    private void openRolePermissionsMenu(Player player, Guild guild, GuildRole role, int page) {
+        GuildPermission[] permissions = GuildPermission.values();
+        int totalPages = Math.max(1, (int) Math.ceil(permissions.length / (double) PERMISSION_SLOTS.length));
+        int safePage = Math.max(0, Math.min(page, totalPages - 1));
+        Inventory inventory = Bukkit.createInventory(
+                new GuildRolePermissionsHolder(player.getUniqueId(), role, safePage),
+                GUI_SIZE,
+                plugin.legacyComponent("&8" + role.getDisplayName() + " Permissions")
+        );
+        fillEmpty(inventory);
+        inventory.setItem(INFO_SLOT, createSimpleItem(Material.COMPARATOR, "&6" + role.getDisplayName() + " Permissions", List.of(
+                "&7Page: &f" + (safePage + 1) + "&7/&f" + totalPages,
+                "&7Left-click: &fcycle override",
+                "&7Right-click: &freset to default"
+        )));
+        int start = safePage * PERMISSION_SLOTS.length;
+        for (int i = 0; i < PERMISSION_SLOTS.length && start + i < permissions.length; i++) {
+            inventory.setItem(PERMISSION_SLOTS[i], createRolePermissionItem(guild, role, permissions[start + i]));
+        }
+        if (safePage > 0) {
+            inventory.setItem(PREVIOUS_PAGE_SLOT, createSimpleItem(Material.ARROW, "&ePrevious Page", List.of("&7View earlier permissions.")));
+        }
+        if (safePage + 1 < totalPages) {
+            inventory.setItem(NEXT_PAGE_SLOT, createSimpleItem(Material.ARROW, "&eNext Page", List.of("&7View more permissions.")));
+        }
+        inventory.setItem(BACK_SLOT, createSimpleItem(Material.ARROW, "&eBack", List.of("&7Return to permission groups.")));
+        inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
+        player.openInventory(inventory);
+    }
+
+    private void openPlayerPermissionsBrowser(Player player, Guild guild, int page) {
+        List<UUID> members = new ArrayList<>();
+        for (UUID memberId : guild.getMembersSortedByRole()) {
+            if (guild.getLeaderId() != null && guild.getLeaderId().equals(memberId)) {
+                continue;
+            }
+            members.add(memberId);
+        }
+        int totalPages = Math.max(1, (int) Math.ceil(members.size() / (double) MEMBER_SLOTS.length));
+        int safePage = Math.max(0, Math.min(page, totalPages - 1));
+        Inventory inventory = Bukkit.createInventory(
+                new GuildPlayerPermissionsBrowserHolder(player.getUniqueId(), safePage, List.copyOf(members)),
+                GUI_SIZE,
+                plugin.legacyComponent("&8Player Permissions")
+        );
+        fillEmpty(inventory);
+        inventory.setItem(INFO_SLOT, createSimpleItem(Material.PLAYER_HEAD, "&6Player Overrides", List.of(
+                "&7Page: &f" + (safePage + 1) + "&7/&f" + totalPages,
+                "&7Select a member to edit their",
+                "&7per-player permission overrides."
+        )));
+        int start = safePage * MEMBER_SLOTS.length;
+        for (int i = 0; i < MEMBER_SLOTS.length && start + i < members.size(); i++) {
+            UUID memberId = members.get(start + i);
+            inventory.setItem(MEMBER_SLOTS[i], createPermissionTargetMemberItem(guild, Bukkit.getOfflinePlayer(memberId)));
+        }
+        if (safePage > 0) {
+            inventory.setItem(PREVIOUS_PAGE_SLOT, createSimpleItem(Material.ARROW, "&ePrevious Page", List.of("&7View earlier members.")));
+        }
+        if (safePage + 1 < totalPages) {
+            inventory.setItem(NEXT_PAGE_SLOT, createSimpleItem(Material.ARROW, "&eNext Page", List.of("&7View more members.")));
+        }
+        inventory.setItem(BACK_SLOT, createSimpleItem(Material.ARROW, "&eBack", List.of("&7Return to permission groups.")));
+        inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
+        player.openInventory(inventory);
+    }
+
+    private void openPlayerPermissionsMenu(Player player, Guild guild, UUID targetId, int page, int browserPage) {
+        GuildPermission[] permissions = GuildPermission.values();
+        int totalPages = Math.max(1, (int) Math.ceil(permissions.length / (double) PERMISSION_SLOTS.length));
+        int safePage = Math.max(0, Math.min(page, totalPages - 1));
+        OfflinePlayer target = Bukkit.getOfflinePlayer(targetId);
+        Inventory inventory = Bukkit.createInventory(
+                new GuildPlayerPermissionsHolder(player.getUniqueId(), targetId, safePage, browserPage),
+                GUI_SIZE,
+                plugin.legacyComponent("&8" + plugin.safeOfflineName(target) + " Permissions")
+        );
+        fillEmpty(inventory);
+        inventory.setItem(INFO_SLOT, createSimpleItem(Material.COMPARATOR, "&6" + plugin.safeOfflineName(target), List.of(
+                "&7Role: &f" + (guild.getRole(targetId) != null ? guild.getRole(targetId).getDisplayName() : "None"),
+                "&7Page: &f" + (safePage + 1) + "&7/&f" + totalPages,
+                "&7Left-click: &fcycle override",
+                "&7Right-click: &freset to role default"
+        )));
+        int start = safePage * PERMISSION_SLOTS.length;
+        for (int i = 0; i < PERMISSION_SLOTS.length && start + i < permissions.length; i++) {
+            inventory.setItem(PERMISSION_SLOTS[i], createPlayerPermissionItem(guild, targetId, permissions[start + i]));
+        }
+        if (safePage > 0) {
+            inventory.setItem(PREVIOUS_PAGE_SLOT, createSimpleItem(Material.ARROW, "&ePrevious Page", List.of("&7View earlier permissions.")));
+        }
+        if (safePage + 1 < totalPages) {
+            inventory.setItem(NEXT_PAGE_SLOT, createSimpleItem(Material.ARROW, "&eNext Page", List.of("&7View more permissions.")));
+        }
+        inventory.setItem(BACK_SLOT, createSimpleItem(Material.ARROW, "&eBack", List.of("&7Return to the member list.")));
+        inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
+        player.openInventory(inventory);
+    }
+
     private void openGuildBrowserMenu(Player player, int page) {
         List<Guild> guilds = getSortedGuilds();
         int totalPages = Math.max(1, (int) Math.ceil(guilds.size() / (double) COUNTRY_SLOTS.length));
@@ -455,7 +733,7 @@ public final class GuildGuiListener implements Listener {
             player.sendMessage(plugin.colorize("&cYou are not standing inside a claimable country."));
             return;
         }
-        String failure = plugin.claimCountryForGuild(guild, currentCountry, player.getUniqueId());
+        String failure = plugin.claimCountryForGuild(guild, currentCountry, player);
         if (failure != null) {
             player.sendMessage(plugin.colorize("&c" + failure));
         } else {
@@ -573,11 +851,20 @@ public final class GuildGuiListener implements Listener {
         GuildRole role = guild.getRole(playerId);
         List<String> lore = new ArrayList<>();
         lore.add("&7Role: &f" + (role != null ? role.getDisplayName() : "None"));
+        int shown = 0;
         for (GuildPermission permission : GuildPermission.values()) {
             lore.add((plugin.playerHasGuildPermission(guild, playerId, permission) ? "&a" : "&c")
                     + permission.getDisplayName());
+            shown++;
+            if (shown >= 4) {
+                break;
+            }
         }
-        return createSimpleItem(Material.COMPARATOR, "&6Your Permissions", lore);
+        lore.add("");
+        boolean canManageRoles = plugin.playerHasGuildPermission(guild, playerId, GuildPermission.MANAGE_ROLE_PERMISSIONS);
+        boolean canManagePlayers = plugin.playerHasGuildPermission(guild, playerId, GuildPermission.MANAGE_PLAYER_PERMISSIONS);
+        lore.add(canManageRoles || canManagePlayers ? "&eClick to open the permissions GUI." : "&7You can view your permissions here.");
+        return createSimpleItem(canManageRoles || canManagePlayers ? Material.COMPARATOR : Material.REPEATER, "&6Guild Permissions", lore);
     }
 
     private ItemStack createWithdrawItem(Guild guild, UUID playerId) {
@@ -623,6 +910,74 @@ public final class GuildGuiListener implements Listener {
         lore.add("");
         lore.add(canManage ? "&eClick to manage invites." : "&7Invite management requires invite permission.");
         return createSimpleItem(canManage ? Material.WRITABLE_BOOK : Material.BOOK, "&6Pending Invites", lore);
+    }
+
+    private ItemStack createRoleSummaryItem(Guild guild, GuildRole role, boolean canManage) {
+        int allowed = 0;
+        for (GuildPermission permission : GuildPermission.values()) {
+            if (resolveRolePermission(guild, role, permission)) {
+                allowed++;
+            }
+        }
+        return createSimpleItem(createRoleMaterial(role), "&e" + role.getDisplayName(), List.of(
+                "&7Allowed permissions: &f" + allowed + "&7/&f" + GuildPermission.values().length,
+                "&7Override entries: &f" + guild.getRolePermissionOverrides().getOrDefault(role, Map.of()).size(),
+                "",
+                canManage ? "&eClick to edit this role." : "&7Role permission editing requires permission."
+        ));
+    }
+
+    private ItemStack createPlayerPermissionsBrowserItem(Guild guild, boolean canManagePlayers) {
+        return createSimpleItem(canManagePlayers ? Material.PLAYER_HEAD : Material.SKELETON_SKULL, "&6Player Overrides", List.of(
+                "&7Members with overrides: &f" + guild.getPlayerPermissionOverrides().size(),
+                "&7Guild members: &f" + Math.max(0, guild.getMembers().size() - 1),
+                "",
+                canManagePlayers ? "&eClick to edit player-specific overrides." : "&7Player override editing requires permission."
+        ));
+    }
+
+    private ItemStack createRolePermissionItem(Guild guild, GuildRole role, GuildPermission permission) {
+        GuildPermissionState override = plugin.getGuildRolePermissionOverride(guild, role, permission);
+        boolean defaultValue = plugin.getGuildDefaultPermissionValue(role, permission);
+        boolean effectiveValue = resolveRolePermission(guild, role, permission);
+        return createSimpleItem(getPermissionMaterial(effectiveValue, override), getPermissionColor(effectiveValue) + permission.getDisplayName(), List.of(
+                "&7Role: &f" + role.getDisplayName(),
+                "&7Override: &f" + formatPermissionState(override),
+                "&7Role default: &f" + formatPermissionBoolean(defaultValue),
+                "&7Effective: &f" + formatPermissionBoolean(effectiveValue),
+                "",
+                "&eLeft-click to cycle override.",
+                "&eRight-click to reset to default."
+        ));
+    }
+
+    private ItemStack createPermissionTargetMemberItem(Guild guild, OfflinePlayer player) {
+        UUID playerId = player.getUniqueId();
+        GuildRole role = guild.getRole(playerId);
+        int overrides = guild.getPlayerPermissionOverrides().getOrDefault(playerId, Map.of()).size();
+        return createPlayerItem(player, "&e" + plugin.safeOfflineName(player), List.of(
+                "&7Role: &f" + (role != null ? role.getDisplayName() : "None"),
+                "&7Override entries: &f" + overrides,
+                "&7Last seen: &f" + getLastSeen(player),
+                "",
+                "&eClick to edit overrides."
+        ));
+    }
+
+    private ItemStack createPlayerPermissionItem(Guild guild, UUID playerId, GuildPermission permission) {
+        GuildRole role = guild.getRole(playerId);
+        GuildPermissionState override = plugin.getGuildPlayerPermissionOverride(guild, playerId, permission);
+        boolean roleDefault = role != null && resolveRolePermission(guild, role, permission);
+        boolean effective = plugin.playerHasGuildPermission(guild, playerId, permission);
+        return createSimpleItem(getPermissionMaterial(effective, override), getPermissionColor(effective) + permission.getDisplayName(), List.of(
+                "&7Role: &f" + (role != null ? role.getDisplayName() : "None"),
+                "&7Player override: &f" + formatPermissionState(override),
+                "&7Role result: &f" + formatPermissionBoolean(roleDefault),
+                "&7Effective: &f" + formatPermissionBoolean(effective),
+                "",
+                "&eLeft-click to cycle override.",
+                "&eRight-click to reset to role behavior."
+        ));
     }
 
     private ItemStack createLeaveItem(Guild guild, UUID playerId) {
@@ -771,6 +1126,66 @@ public final class GuildGuiListener implements Listener {
         return minutes + "m";
     }
 
+    private GuildPermissionState nextPermissionState(GuildPermissionState current, ClickType clickType) {
+        if (clickType != null && clickType.isRightClick()) {
+            return GuildPermissionState.DEFAULT;
+        }
+        return switch (current != null ? current : GuildPermissionState.DEFAULT) {
+            case DEFAULT -> GuildPermissionState.ALLOW;
+            case ALLOW -> GuildPermissionState.DENY;
+            case DENY -> GuildPermissionState.DEFAULT;
+        };
+    }
+
+    private boolean resolveRolePermission(Guild guild, GuildRole role, GuildPermission permission) {
+        GuildPermissionState override = plugin.getGuildRolePermissionOverride(guild, role, permission);
+        if (override == GuildPermissionState.ALLOW) {
+            return true;
+        }
+        if (override == GuildPermissionState.DENY) {
+            return false;
+        }
+        return plugin.getGuildDefaultPermissionValue(role, permission);
+    }
+
+    private String formatPermissionState(GuildPermissionState state) {
+        if (state == null) {
+            return "Default";
+        }
+        return switch (state) {
+            case ALLOW -> "Allow";
+            case DENY -> "Deny";
+            case DEFAULT -> "Default";
+        };
+    }
+
+    private String formatPermissionBoolean(boolean allowed) {
+        return allowed ? "Allowed" : "Denied";
+    }
+
+    private String getPermissionColor(boolean allowed) {
+        return allowed ? "&a" : "&c";
+    }
+
+    private Material getPermissionMaterial(boolean allowed, GuildPermissionState state) {
+        if (state == GuildPermissionState.ALLOW) {
+            return Material.LIME_DYE;
+        }
+        if (state == GuildPermissionState.DENY) {
+            return Material.RED_DYE;
+        }
+        return allowed ? Material.GREEN_STAINED_GLASS_PANE : Material.GRAY_DYE;
+    }
+
+    private Material createRoleMaterial(GuildRole role) {
+        return switch (role) {
+            case OFFICER -> Material.GOLDEN_HELMET;
+            case ADMIRAL -> Material.IRON_HELMET;
+            case MEMBER -> Material.LEATHER_HELMET;
+            case LEADER -> Material.NETHERITE_HELMET;
+        };
+    }
+
     private List<Guild> getSortedGuilds() {
         List<Guild> guilds = new ArrayList<>(plugin.getGuilds());
         guilds.sort(Comparator.comparing(Guild::getName, String.CASE_INSENSITIVE_ORDER));
@@ -823,6 +1238,34 @@ public final class GuildGuiListener implements Listener {
     }
 
     private record GuildCountriesHolder(UUID playerId) implements GuildInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record GuildPermissionsHubHolder(UUID playerId) implements GuildInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record GuildRolePermissionsHolder(UUID playerId, GuildRole role, int page) implements GuildInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record GuildPlayerPermissionsBrowserHolder(UUID playerId, int page, List<UUID> memberIds) implements GuildInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record GuildPlayerPermissionsHolder(UUID playerId, UUID targetId, int page, int browserPage) implements GuildInventoryHolder {
         @Override
         public Inventory getInventory() {
             return null;

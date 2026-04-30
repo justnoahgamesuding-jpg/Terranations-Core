@@ -11730,6 +11730,32 @@ public final class Testproject extends JavaPlugin {
         return getDefaultGuildPermission(role, permission);
     }
 
+    public GuildPermissionState getGuildRolePermissionOverride(Guild guild, GuildRole role, GuildPermission permission) {
+        if (guild == null || role == null || permission == null) {
+            return GuildPermissionState.DEFAULT;
+        }
+        Map<GuildPermission, GuildPermissionState> overrides = guild.getRolePermissionOverrides().get(role);
+        if (overrides == null) {
+            return GuildPermissionState.DEFAULT;
+        }
+        return overrides.getOrDefault(permission, GuildPermissionState.DEFAULT);
+    }
+
+    public GuildPermissionState getGuildPlayerPermissionOverride(Guild guild, UUID playerId, GuildPermission permission) {
+        if (guild == null || playerId == null || permission == null) {
+            return GuildPermissionState.DEFAULT;
+        }
+        Map<GuildPermission, GuildPermissionState> overrides = guild.getPlayerPermissionOverrides().get(playerId);
+        if (overrides == null) {
+            return GuildPermissionState.DEFAULT;
+        }
+        return overrides.getOrDefault(permission, GuildPermissionState.DEFAULT);
+    }
+
+    public boolean getGuildDefaultPermissionValue(GuildRole role, GuildPermission permission) {
+        return getDefaultGuildPermission(role, permission);
+    }
+
     private boolean getDefaultGuildPermission(GuildRole role, GuildPermission permission) {
         if (role == null || permission == null) {
             return false;
@@ -11842,9 +11868,14 @@ public final class Testproject extends JavaPlugin {
         return null;
     }
 
-    public String claimCountryForGuild(Guild guild, Country country, UUID actorId) {
+    public String claimCountryForGuild(Guild guild, Country country, Player actor) {
+        UUID actorId = actor != null ? actor.getUniqueId() : null;
         if (guild == null || country == null || actorId == null) {
             return "Invalid guild country claim.";
+        }
+        Country standingCountry = getVisibleCountryAt(actor.getLocation());
+        if (standingCountry == null || !country.getName().equalsIgnoreCase(standingCountry.getName())) {
+            return "You must be standing inside " + country.getName() + " to claim it for your guild.";
         }
         if (isSystemCountry(country)) {
             return "Starter or system countries cannot be claimed by guilds.";

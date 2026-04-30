@@ -32,7 +32,7 @@ commands:
     usage: /country <create|setowner|join|home|invite|acceptinvite|transfercountry|accepttransfer|disband|joinstatus|leave|kick|info|list|rename|addtag|addtagtocountry|territory|manage|trade|admin|settraderreputation> ...
   guild:
     description: Guild commands
-    usage: /guild <menu|create|info|invite|resendinvite|accept|deny|deposit|withdraw|claim|role|permissions|description|motd|recruiting|stockpile|logs|kick|leave|transferleader|disband|list>
+    usage: /guild <create|info|invite|resendinvite|accept|deny|deposit|withdraw|claim|role|permissions|description|motd|recruiting|stockpile|logs|kick|leave|transferleader|disband|list>
   staff:
     description: Staff tools and moderation utilities
     usage: /staff [menu|mode|vanish|freeze|heal|tp|bring]
