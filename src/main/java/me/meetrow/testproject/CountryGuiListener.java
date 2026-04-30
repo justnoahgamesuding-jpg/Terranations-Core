@@ -593,11 +593,15 @@ public class CountryGuiListener implements Listener {
         List<String> lore = new ArrayList<>();
         lore.add("&7Your country: &f" + (playerCountry != null ? playerCountry.getName() : "None"));
         lore.add("&7Territory here: &f" + (locationCountry != null ? locationCountry.getName() : "Wilderness"));
+        Guild playerGuild = plugin.getPlayerGuild(player.getUniqueId());
+        lore.add("&7Your guild: &f" + (playerGuild != null ? playerGuild.getName() + " [" + playerGuild.getTag() + "]" : "None"));
         if (playerCountry != null) {
             CountryRole role = plugin.getCountryRole(playerCountry, player.getUniqueId());
             lore.add("&7Your role: &f" + (role != null ? role.getDisplayName() : "Member"));
             lore.add("&7Country level: &f" + plugin.getCountryLevel(playerCountry));
             lore.add("&7Members: &f" + playerCountry.getMembers().size());
+            Guild owningGuild = plugin.getOwningGuild(playerCountry);
+            lore.add("&7Claiming guild: &f" + (owningGuild != null ? owningGuild.getName() : "None"));
             lore.add("&7Home cooldown: &f" + plugin.formatDurationWords(plugin.getCountryHomeCooldownRemaining(player.getUniqueId())));
             lore.add("&7Treasury: &f⛃" + plugin.formatMoney(plugin.getCountryBalance(playerCountry)));
         } else {
@@ -610,10 +614,12 @@ public class CountryGuiListener implements Listener {
 
     private ItemStack createCountryAdminOverviewItem(Country country) {
         List<String> lore = new ArrayList<>();
+        Guild owningGuild = plugin.getOwningGuild(country);
         lore.add("&7Country: &f" + country.getName());
         lore.add("&7Members: &f" + country.getMembers().size());
         lore.add("&7Level: &f" + plugin.getCountryLevel(country));
         lore.add("&7Join status: &f" + (country.isOpen() ? "Open" : "Invite only"));
+        lore.add("&7Claiming guild: &f" + (owningGuild != null ? owningGuild.getName() + " [" + owningGuild.getTag() + "]" : "None"));
         lore.add("&7Treasury: &f⛃" + plugin.formatMoney(plugin.getCountryBalance(country)));
         lore.add("&7Resources: &f" + plugin.getCountryResources(country));
         lore.add("&7Trader reputation: &f" + plugin.formatTraderReputation(plugin.getCountryTotalTraderReputation(country)));
@@ -655,8 +661,10 @@ public class CountryGuiListener implements Listener {
             return createSimpleItem(Material.GRAY_DYE, "&6Country Owner", List.of("&7You are not currently in a country."));
         }
 
+        Guild owningGuild = plugin.getOwningGuild(country);
         return createPlayerItem(Bukkit.getOfflinePlayer(country.getOwnerId()), "&6Country Owner", List.of(
-                "&7Owner: &f" + plugin.safeOfflineName(country.getOwnerId())
+                "&7Owner: &f" + plugin.safeOfflineName(country.getOwnerId()),
+                "&7Claiming guild: &f" + (owningGuild != null ? owningGuild.getName() + " [" + owningGuild.getTag() + "]" : "None")
         ));
     }
 
@@ -1326,12 +1334,14 @@ public class CountryGuiListener implements Listener {
 
     private ItemStack createCountryListEntryItem(Country country) {
         Material statusMaterial = country.isOpen() ? Material.LIME_BANNER : Material.RED_BANNER;
+        Guild owningGuild = plugin.getOwningGuild(country);
         return createSimpleItem(statusMaterial, "&e" + country.getName(), List.of(
                 "&7Status: &f" + (country.isOpen() ? "Open" : "Closed"),
                 "&7Members: &f" + country.getMembers().size(),
                 "&7Online members: &f" + plugin.getOnlineCountryMemberCount(country),
                 "&7Country level: &f" + plugin.getCountryLevel(country),
                 "&7Owner: &f" + (country.hasOwner() ? plugin.safeOfflineName(country.getOwnerId()) : "None"),
+                "&7Claiming guild: &f" + (owningGuild != null ? owningGuild.getName() : "None"),
                 "",
                 "&eClick to view /country info"
         ));

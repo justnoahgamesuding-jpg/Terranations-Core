@@ -27,4 +27,6 @@ public interface TerritoryService {
     TerritoryDebugInfo getDebugInfo(Country country);
 
     int countFarmlandBlocks(Country country);
+
+    int getTerritoryArea(Country country);
 }

@@ -266,6 +266,9 @@ terra:
   phantoms:
     enabled: "&aPhantom spawning enabled."
     disabled: "&ePhantom spawning disabled."
+  bats:
+    enabled: "&aBat spawning enabled."
+    disabled: "&eBat spawning disabled."
   blockdelay:
     enabled: "&aBlock delay enabled."
     disabled: "&aBlock delay disabled."
@@ -778,6 +781,10 @@ help:
     - "&7Phantom Commands:"
     - "&f  &a/terra phantoms enable"
     - "&f  &a/terra phantoms disable"
+  bats:
+    - "&7Bat Commands:"
+    - "&f  &a/terra bats enable"
+    - "&f  &a/terra bats disable"
   general:
     - "&f  &a/terra bypass <player>"
     - "&f  &a/terra bypasslist"

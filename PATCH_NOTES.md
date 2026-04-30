@@ -4,6 +4,11 @@ This file keeps the more detailed feature ledger for the current code snapshot. 
 
 | Date | Feature | Notes |
 | --- | --- | --- |
+| 2026-04-30 | guild-first territory layer | Added a guild system with treasury, stockpile, roles, permissions, progression, upkeep-backed country claims, guild UI, and legacy country compatibility. |
+| 2026-04-30 | guild invite UX | Added timed guild invites with clickable accept or deny chat actions, resend support, officer notifications, inviter tracking, and GUI-based pending invite management. |
+| 2026-04-30 | onboarding and quest admin improvements | Added WorldEdit selection support for tutorial locations, a more interaction-driven quest editor flow, Fancy NPC random repeat dialogue, and NPC delivery quests. |
+| 2026-04-30 | NPC custom-item reward persistence | Fancy NPC reward inventories now preserve full custom item stacks, including Terra item metadata, through save, load, and reward delivery. |
+| 2026-04-30 | bat spawn toggle | Added config and commands to enable or disable bat spawning and remove existing bats when the toggle is turned off. |
 | 2026-04-23 | Terra workbench playtest system | Added a standalone Terra crafting subsystem with placeable specialist workbenches, floating bench labels, saved placed-block identities, and dedicated crafting GUIs. |
 | 2026-04-23 | `/terra catalog` | Added an admin GUI for spawning Terra workbench, ore, material, block, armor, and tool playtest items. |
 | 2026-04-23 | placeholder Terra content set | Added a first placeholder batch of Terra ores, refined materials, blocks, armor, and tools intended to be reskinned through ItemsAdder later. |

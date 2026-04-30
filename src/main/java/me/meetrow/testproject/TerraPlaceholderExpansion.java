@@ -60,8 +60,15 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
             case "player_country" -> getPlayerCountryPlaceholder(player);
             case "player_country_level" -> getPlayerCountryLevelPlaceholder(player);
             case "player_countrytag" -> getPlayerCountryTagPlaceholder(player);
+            case "player_guild" -> getPlayerGuildPlaceholder(player);
+            case "player_guild_tag" -> getPlayerGuildTagPlaceholder(player);
+            case "player_guild_level" -> getPlayerGuildLevelPlaceholder(player);
+            case "player_guild_balance" -> getPlayerGuildBalancePlaceholder(player);
+            case "player_guild_role" -> getPlayerGuildRolePlaceholder(player);
             case "current_country" -> getCurrentCountryPlaceholder(player);
             case "current_country_level" -> getCurrentCountryLevelPlaceholder(player);
+            case "current_country_owner" -> getCurrentCountryOwnerPlaceholder(player);
+            case "current_country_owner_tag" -> getCurrentCountryOwnerTagPlaceholder(player);
             case "profession" -> getProfessionPlaceholder(player);
             case "current_job" -> getProfessionPlaceholder(player);
             case "profession_display" -> getProfessionDisplayPlaceholder(player);
@@ -209,6 +216,61 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
         }
 
         return country.getTag();
+    }
+
+    private String getPlayerGuildPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return guild != null ? guild.getName() : "None";
+    }
+
+    private String getPlayerGuildTagPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return guild != null ? guild.getTag() : "none";
+    }
+
+    private String getPlayerGuildLevelPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return String.valueOf(guild != null ? plugin.getGuildLevel(guild) : 0);
+    }
+
+    private String getPlayerGuildBalancePlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return guild != null ? plugin.formatSignedMoney(guild.getBalance()) : "0.00";
+    }
+
+    private String getPlayerGuildRolePlaceholder(OfflinePlayer player) {
+        GuildRole role = plugin.getGuildRole(player.getUniqueId());
+        return role != null ? role.name().toLowerCase(Locale.ROOT) : "none";
+    }
+
+    private String getCurrentCountryOwnerPlaceholder(OfflinePlayer player) {
+        if (player.getPlayer() == null) {
+            return "wilderness";
+        }
+        Country country = plugin.getCountryAt(player.getPlayer().getLocation());
+        if (country == null) {
+            return "wilderness";
+        }
+        Guild guild = plugin.getOwningGuild(country);
+        if (guild != null) {
+            return guild.getName();
+        }
+        return country.hasOwner() ? plugin.safeOfflineName(country.getOwnerId()) : "none";
+    }
+
+    private String getCurrentCountryOwnerTagPlaceholder(OfflinePlayer player) {
+        if (player.getPlayer() == null) {
+            return "none";
+        }
+        Country country = plugin.getCountryAt(player.getPlayer().getLocation());
+        if (country == null) {
+            return "none";
+        }
+        Guild guild = plugin.getOwningGuild(country);
+        if (guild != null) {
+            return guild.getTag();
+        }
+        return country.hasTag() ? country.getTag() : "none";
     }
 
     private String getProfessionPlaceholder(OfflinePlayer player) {

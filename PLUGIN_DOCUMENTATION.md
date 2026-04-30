@@ -8,6 +8,7 @@ Terra combines these major systems:
 
 - a first-hour onboarding and tutorial framework with delayed profession lock-in
 - profession progression with enforced specialization
+- guild management with treasury, roles, permissions, recruitment, progression, stockpiles, and guild-backed territorial ownership
 - country management with roles, treasury, upgrades, boosts, territory, and hidden system-country support
 - climate-aware farming and sapling growth
 - structural stability and support logic
@@ -101,6 +102,8 @@ Player and admin profession root.
 
 Country root for membership, territory, and progression.
 
+This is still present because parts of the tutorial and some older admin flows still depend on it. The long-term player-facing ownership model is now guild-first.
+
 Core membership:
 
 - `create`
@@ -167,6 +170,78 @@ Notes:
 - Country homes and trader spawns must be placed inside the country’s linked territory.
 - Farmland limits depend on linked territory and current member count.
 - Hidden system countries are excluded from normal player-facing lookup, browser, HUD, and info flows.
+- Guild ownership can sit on top of the country layer. A country can be legacy-managed, guild-claimed, or both depending on the admin flow used.
+
+### `/guild`
+
+Guild root for the newer treasury, recruitment, and country-claim flow.
+
+Core membership and recruitment:
+
+- `menu`
+  Opens the guild dashboard if the player is in a guild, otherwise opens the guild browser.
+- `create <name> <tag>`
+  Creates a guild. Tags are limited to letters and filtered against blocked language.
+- `info [guild]`
+  Shows guild summary, progression, treasury, recruiting state, and claimed countries.
+- `invite <player>`
+  Sends a timed guild invite.
+- `resendinvite <player>` or `resend <player>`
+  Refreshes an existing invite and resends the clickable chat prompt.
+- `accept <guild>` or `join <guild>`
+  Accepts an invite or joins an open-recruiting guild.
+- `deny <guild>`
+  Denies a pending guild invite.
+- `leave`
+  Leaves the current guild if the player is not the leader.
+- `kick <player>`
+  Removes a guild member if the actor has permission.
+
+Treasury, stockpile, and claiming:
+
+- `deposit <amount>`
+  Deposits Terra balance into the guild treasury.
+- `withdraw <amount>`
+  Withdraws from the guild treasury if the actor has permission and is inside their role-based limit.
+- `stockpile`
+  Shows a stockpile summary.
+- `stockpile deposit <amount>`
+  Deposits held materials into the guild stockpile.
+- `claim <country>`
+  Claims a country for the guild if treasury, cooldown, member-count, and guild progression requirements are met.
+
+Roles, permissions, and leadership:
+
+- `role <player> <member|admiral|officer>`
+  Sets the member role.
+- `permissions <role|player> <target> <permission> <allow|deny|default>`
+  Adjusts permission overrides per role or player.
+- `transferleader <player>`
+  Transfers guild leadership.
+- `disband`
+  Disbands the guild and releases any guild-owned countries.
+
+Profile and visibility:
+
+- `description <text>`
+  Sets guild description.
+- `motd <text>`
+  Sets guild MOTD shown on join.
+- `recruiting <open|closed>`
+  Toggles open recruitment.
+- `logs [page]`
+  Shows recent guild audit entries.
+- `list`
+  Lists visible guilds.
+
+Guild notes:
+
+- Guild invites are timed and can be accepted or denied by clicking directly in chat.
+- Officers and other members with `INVITE_PLAYERS` permission are notified when invites are accepted, denied, cancelled, or expired.
+- The guild GUI exposes pending invites with resend and cancel actions.
+- Guild claims use the existing country map and territory layer rather than replacing it.
+- Weekly upkeep is based on country size. One unpaid week can push treasury negative; a second failed week releases the country.
+- Guilds gain level from guild XP and score factors such as members, job levels, treasury strength, stockpile contribution, and controlled countries.
 
 ### `/climate`
 
@@ -285,7 +360,7 @@ Key behavior:
 - The item is soulbound and additionally locked to that slot.
 - It cannot be moved, dropped, hotbar-swapped, offhand-swapped, or placed into containers.
 - Right-clicking it opens the main player hub.
-- The current guide includes player stats, jobs access, personal skills, contracts, country access, and ore-sense toggles.
+- The current guide includes player stats, jobs access, personal skills, contracts, guild access, and ore-sense toggles.
 
 ### Tutorial And Onboarding
 
@@ -296,11 +371,14 @@ Key behavior:
 - New players can remain profession-unlocked while onboarding is active.
 - The tutorial can require trial completion and playtime before the first real job choice unlocks.
 - Tutorial progress is quest-driven and supports guide opens, location visits, block actions, NPC interactions, profession trials, country steps, and delayed profession lock-in.
+- Tutorial visit-location markers can be saved from a WorldEdit cuboid selection or a direct point marker.
 - New players can be routed to a starter hub spawn before they choose a primary profession.
 - The starter hub can be bound to a real country entry while still being treated as a hidden admin/system country.
 - Tutorial NPCs can be generic marked entities or persistent custom NPCs spawned through ItemsAdder.
 - Tutorial NPCs can also be existing FancyNpcs NPCs, with Terra only binding tutorial logic to them.
 - When an onboarding player interacts with a tutorial NPC, Terra can temporarily clear chat, lock movement and hotbar actions, suppress inventory and chat use, and keep the player camera focused on that NPC while dialogue lines display.
+- Fancy NPC repeat dialogue can use a random post-introduction line pool instead of a single fixed repeat line.
+- Delivery quests can now require handing a defined item amount to a target NPC.
 
 Important limitation:
 
@@ -311,6 +389,27 @@ Important limitation:
 - Players earn skill points from profession level-ups and from playtime.
 - Skill points can be spent on health, XP gain, cooldown reduction, trader bonuses, merchant cooldown reduction, double-drop bonuses, growth proc bonuses, and ore-sense unlocks.
 - The guide also exposes a personal work-order system that rewards money and skill points for profession XP progress.
+
+### Guilds
+
+Guilds are now the main player-facing ownership and cooperation layer.
+
+They include:
+
+- leader, officer, admiral, and member roles
+- role-based permission defaults plus per-player permission overrides
+- treasury deposits, withdrawals, role-based withdraw limits, and audit logs
+- timed invites, open recruitment, MOTD, description, and a guild browser
+- stockpile storage for contributed materials
+- guild XP, level, claim cap, member cap, and derived progression score
+- capital-country tracking and guild-backed country claims
+
+Important effects:
+
+- Guilds claim the existing country objects rather than replacing the territory layer.
+- Claiming can require treasury funds, member count, total job strength, and available claim slots.
+- Weekly upkeep scales with country size and can place a guild treasury into temporary debt before control is lost.
+- The guild GUI is now the main player-facing management surface for recruitment, treasury overview, countries, and pending invites.
 
 ### Countries
 
@@ -327,6 +426,8 @@ Important effects:
 - Country upgrades can change farmland capacity, cooldowns, profession XP bonuses, and trader or money bonuses.
 - Country state updates trigger territory sync and tag refresh logic.
 - Country dashboards and admin GUIs are the primary management surface.
+- Countries still exist as the territory and progression object even when a guild owns them.
+- Some older flows still use direct country membership because the tutorial and admin tooling were built around it first.
 
 ### Climate and Farming
 
@@ -371,9 +472,10 @@ It includes:
 
 ### Economy
 
-The plugin owns its own money storage and country treasury logic.
+The plugin owns its own money storage, guild treasury logic, and country treasury logic.
 
 - Player balances live in `data.yml`.
+- Guild treasury, stockpile, invite, and progression state live in `guilds/data.yml`.
 - Country treasury and progression state live in `countries/data.yml`.
 - Block rewards, trader rewards, and some upgrades scale from config.
 
@@ -397,8 +499,15 @@ Terra exposes PlaceholderAPI placeholders for scoreboards, menus, and chat integ
 Common placeholders include:
 
 - `%terra_balance%`
+- `%terra_player_guild%`
+- `%terra_player_guild_tag%`
+- `%terra_player_guild_level%`
+- `%terra_player_guild_balance%`
+- `%terra_player_guild_role%`
 - `%terra_player_country%`
 - `%terra_player_country_level%`
+- `%terra_current_country_owner%`
+- `%terra_current_country_owner_tag%`
 - `%terra_profession_display%`
 - `%terra_current_job_level%`
 - `%terra_current_job_xp%`
@@ -568,19 +677,21 @@ Recommended first-hour sequence:
 
 ### 4. Save named tutorial locations in-world
 
-Use these commands while standing at the correct spot:
+Use one of these flows depending on whether you want a point marker or a region marker:
 
 - `/terra tutorial setlocation <key> [radius] [display name]`
+- `/terra tutorial setlocationselection <key> [display name]`
 - `/terra tutorial clearlocation <key>`
 - `/terra tutorial locations`
 
 Examples:
 
 - `/terra tutorial setlocation starter_hub 12 Starter Hub`
+- `/terra tutorial setlocationselection starter_hub Starter Hub`
 - `/terra tutorial setlocation embassy_board 8 Embassy Board`
 - `/terra tutorial setlocation forge_yard 10 Forge Yard`
 
-Location keys should match the `key` values used by any `visit_location` tutorial quest.
+`setlocationselection` uses the current WorldEdit selection. Location keys should match the `key` values used by any `visit_location` tutorial quest.
 
 ### 5. Add tutorial NPCs
 

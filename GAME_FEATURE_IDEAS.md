@@ -9,7 +9,8 @@ It should only track features, polish passes, and loop improvements that are sti
 Terra already has the foundation:
 
 - professions with specialization pressure
-- countries with progression structure
+- guilds with progression structure and country-claiming flow
+- countries as the territorial and settlement object underneath that flow
 - climate and stability as environmental friction
 - merchants and traders as economic systems
 - a Terra-owned crafting layer and player guide hub
@@ -21,12 +22,12 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
 ### 1. Better First-Session Flow
 
 - Problem: new players can access many systems, but the first hour still risks feeling like a list of mechanics instead of a clear survival plan.
-- Goal: turn the first session into a readable path from spawn to profession to country contribution.
+- Goal: turn the first session into a readable path from spawn to profession to guild contribution.
 - Candidate work:
   - a staged first-hour checklist tied to the guide item
   - profession recommendations based on what the player actually does first
   - clearer "why am I blocked" messages for crafting, climate, and profession restrictions
-  - an early settlement objective that introduces storage, food, crafting, and country value in one arc
+  - an early settlement objective that introduces storage, food, crafting, and guild value in one arc
   - a short recovery path when players ignore the intended loop and get stuck
 
 ### 2. Stronger Repeatable Profession Work
@@ -40,16 +41,16 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
   - work that asks for quality or category of output instead of only raw quantity
   - better reasons to keep crafting low and mid-tier items after unlocks
 
-### 3. Countries Need Shared Projects, Not Just Shared Ownership
+### 3. Guilds Need Shared Projects, Not Just Shared Ownership
 
-- Problem: countries have tools and progression, but still need more cooperative work that naturally pulls multiple players together.
-- Goal: make a country feel like an ongoing settlement project.
+- Problem: guilds have tools and progression, but still need more cooperative work that naturally pulls multiple players together.
+- Goal: make a guild and its claimed countries feel like an ongoing settlement project.
 - Candidate work:
   - public build projects that consume treasury plus materials over time
   - settlement tiers unlocked through infrastructure, activity, and profession balance
   - civic projects like granaries, workshops, watch posts, roads, and market halls
-  - visible country milestones that change presentation or unlock new utility
-  - country maintenance tasks that create soft pressure without becoming a chore
+  - visible guild or country milestones that change presentation or unlock new utility
+  - guild maintenance tasks that create soft pressure without becoming a chore
 
 ### 4. Progression Needs Better Payoff Moments
 
@@ -58,7 +59,7 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
 - Candidate work:
   - clearer unlock callouts on profession level-up
   - "newly available recipes" views in the guide or benches
-  - country milestone announcements with practical rewards attached
+  - guild milestone announcements with practical rewards attached
   - stronger contrast between early, mid, and high-tier profession identity
   - a visible mastery track after normal job leveling slows down
 
@@ -68,8 +69,8 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
 
 - bench UIs should explain missing ingredients, missing profession access, and wrong workbench type more directly
 - blocked actions should point players toward the correct next step instead of only denying them
-- guide menus should surface "recommended next actions" based on profession, level, and country status
-- country and profession menus should show pending tasks, not just static data
+- guide menus should surface "recommended next actions" based on profession, level, guild status, and territory status
+- guild and profession menus should show pending tasks, not just static data
 - climate feedback should be easier to interpret at a glance during farming
 
 ### Better World Readability
@@ -97,16 +98,16 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
   - complete seasonal farmer supply demands before weather shifts
 - Why this matters: contracts turn routine gathering and crafting into directed gameplay with visible payoff.
 
-### Country Projects And Infrastructure
+### Guild Projects And Infrastructure
 
 - Add long-duration projects that multiple players contribute to over time.
 - Good project categories:
   - roads that improve movement or route safety
-  - warehouses that improve country storage or trade handling
+  - warehouses that improve guild storage or trade handling
   - workshops that boost specific profession output
   - irrigation or granary projects that stabilize food production
   - defensive structures that improve country resilience or alerts
-- Why this matters: countries need more than membership and upgrades. They need shared construction goals.
+- Why this matters: guilds need more than membership and upgrades. They need shared construction goals.
 
 ### Regional Trade Pressure
 
@@ -114,9 +115,9 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
 - Candidate directions:
   - regional demand modifiers
   - merchant appetite that changes with season or settlement state
-  - local oversupply penalties for one-country self-sufficiency
+  - local oversupply penalties for one-guild self-sufficiency
   - caravans or shipment tasks that move goods between named points
-  - country prosperity tied partly to export variety, not just raw stockpiles
+  - guild prosperity tied partly to export variety, not just raw stockpiles
 - Why this matters: trade becomes more interesting when location matters and full self-sufficiency is inefficient.
 
 ### Profession Synergy Chains
@@ -138,7 +139,7 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
   - dangerous extraction zones with better output
   - temporary wilderness objectives that reward teamwork
   - transport missions where getting goods home matters as much as finding them
-  - country-sponsored expeditions that produce prestige and materials
+  - guild-sponsored expeditions that produce prestige and materials
 - Why this matters: exploration needs a stronger role in the economy and progression loop.
 
 ## Midgame And Endgame Expansion
@@ -152,7 +153,7 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
   - signature outputs that are visibly better than baseline crafted goods
   - specialization branches inside each job
 
-### Country Ambition Layer
+### Guild Ambition Layer
 
 - Add large goals that established countries can chase for weeks.
 - Candidate work:
@@ -182,20 +183,21 @@ The biggest remaining need is not more disconnected systems. It is stronger loop
 
 - moving goods should matter more than teleporting progress through menus
 - roads, pack routes, or shipment systems could become real settlement investments
-- countries should feel the difference between local production and imported supply
+- guild-held settlements should feel the difference between local production and imported supply
 
 ### Social Glue
 
 - shared boards, public projects, contribution logs, and settlement announcements would help players feel that their work changed something
-- solo players need ways to contribute meaningfully to a country without relying on voice-chat level coordination
+- solo players need ways to contribute meaningfully to a guild without relying on voice-chat level coordination
 
 ## Keep Out Of This File
 
 Do not re-add these as generic backlog items unless the goal is a major redesign:
 
-- the core country system
-- country treasury, resources, roles, upgrades, and boosts
-- local, country, and global chat routing
+- the core guild system
+- guild treasury, stockpile, invites, roles, permissions, and claim flow
+- the core country system as the territorial layer
+- local, guild or country, and global chat routing
 - climate-aware crop and sapling growth
 - the player guide item and its current hub role
 - the current Terra workbench and specialist bench framework

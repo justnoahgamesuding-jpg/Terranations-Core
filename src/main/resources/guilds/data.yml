@@ -1,0 +1,7 @@
+# --------------------------------------------------------------------
+# Guild data
+# --------------------------------------------------------------------
+# This file stores persistent guild definitions, members, permissions,
+# treasury, and claimed country links.
+
+guilds: {}

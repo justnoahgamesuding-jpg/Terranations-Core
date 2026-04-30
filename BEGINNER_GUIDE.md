@@ -4,15 +4,16 @@ This is the player-facing quick start for Terra.
 
 ## What Terra Is
 
-Terra is built around specialization and cooperation rather than fast vanilla survival.
+Terra is built around specialization, cooperation, and structured progression rather than fast vanilla survival.
 
 The core loop is:
 
-1. Choose a profession.
-2. Use the Terra Guide in hotbar slot 9 as your main reference item.
-3. Join or build up a country.
-4. Level by doing work that matches your role.
-5. Respect climate, land use, and support rules.
+1. Follow the starter tutorial.
+2. Use the `Terra Guide` in hotbar slot 9 as your main hub item.
+3. Choose a profession.
+4. Join or build a guild.
+5. Help your guild earn, stockpile, and eventually claim countries.
+6. Respect climate, land use, and support rules while you level.
 
 ## Core Professions
 
@@ -26,15 +27,19 @@ The core loop is:
   Construction-focused placement and settlement development.
 - `Blacksmith`
   Smelting, forge workflows, and metal-focused progression.
+- `Trader`
+  Market-facing progression, merchant interaction, and economy support.
+- `Soldier`
+  Combat-oriented progression and late settlement defense support.
 
 ## First 15 Minutes
 
-1. Pick a profession with `/jobs`.
-2. Keep your `Terra Guide` in hotbar slot 9. It is locked there and will become your main hub item.
-3. Check your current profession state with `/jobs info`.
-4. Open the country browser with `/country list`.
-5. Join an open country with `/country join <name>`, or ask staff if the server is still organizing countries.
-6. Start doing profession-matching work immediately.
+1. Follow the onboarding flow and read the NPC dialogue instead of skipping it.
+2. Keep your `Terra Guide` in hotbar slot 9. It is locked there and acts as your main menu.
+3. Check your profession state with `/jobs info`.
+4. Open the guild browser with `/guild` or `/guild list`.
+5. Join an open guild, accept an invite, or work toward creating your own guild later.
+6. Start doing profession-matching work immediately so you build money, levels, and guild value.
 
 ## Commands You Will Actually Use
 
@@ -44,15 +49,22 @@ The core loop is:
 - `/jobs info`
 - `/jobs switch <job>`
 
+### Guilds
+
+- `/guild`
+- `/guild list`
+- `/guild info`
+- `/guild accept <guild>`
+- `/guild deny <guild>`
+- `/guild leave`
+- `/guild deposit <amount>`
+
 ### Countries
 
 - `/country`
-- `/country list`
-- `/country join <country>`
-- `/country home`
 - `/country info`
+- `/country home`
 - `/country farmland`
-- `/country leave`
 
 ### Chat
 
@@ -68,6 +80,32 @@ The core loop is:
 - Your active profession decides what you can do efficiently and, in some cases, what you can do at all.
 - Some tools, crafting paths, farming workflows, and block placements are profession-gated.
 - A second profession is something you unlock later, not something you start with.
+- Guild progression is separate from player job progression. Your work can strengthen both at the same time.
+
+## Guilds and Countries
+
+Guilds are now the main player cooperation layer.
+
+Guilds provide:
+
+- a treasury
+- recruitment and invites
+- shared progression
+- role-based permissions
+- stockpile contribution
+- country claiming
+
+Countries are still the territory object underneath that system.
+
+That means:
+
+- guilds claim countries
+- countries still hold territory, homes, upgrades, and local progression
+- some tutorial and admin flows still mention countries directly
+
+Practical rule:
+
+- if you are new, think `guild first`, `country second`
 
 ## Climate Matters
 
@@ -107,21 +145,6 @@ Safer building patterns use:
 
 If you build or mine like normal fast-survival vanilla, Terra will punish that sooner or later.
 
-## Countries Are More Than Chat Groups
-
-Countries are where most long-term play happens.
-
-They provide:
-
-- territory
-- farmland limits and planning
-- homes and travel points
-- treasury and resources
-- progression upgrades and boosts
-- trader and merchant interaction points
-
-If you are playing alone, joining a functioning country still makes the early game much clearer.
-
 ## Starter Items
 
 Some starter items are soulbound.
@@ -138,15 +161,17 @@ The `Terra Guide` is stricter than normal soulbound items:
 - it always lives in hotbar slot 9
 - it cannot be moved to another slot
 - it cannot be placed in inventories or containers
-- it opens your main player hub for stats, skills, contracts, jobs, and country access
+- it opens your main player hub for stats, skills, contracts, jobs, and guild access
 
 ## Good Early Priorities
 
-1. Pick a job you actually want to play for a while.
-2. Join a country that needs that role.
-3. Learn one useful loop for your job.
-4. Avoid large unsupported digs or rushed heavy builds.
-5. If you are farming, test the land before committing to a big field.
+1. Finish the starter tutorial cleanly.
+2. Pick a job you actually want to play for a while.
+3. Join a guild that is active and recruiting.
+4. Learn one useful loop for your job.
+5. Deposit money into your guild instead of holding all progress personally.
+6. Avoid large unsupported digs or rushed heavy builds.
+7. If you are farming, test the land before committing to a big field.
 
 ## Job Advice
 
@@ -176,13 +201,23 @@ The `Terra Guide` is stricter than normal soulbound items:
 - Work closely with miners and farmers.
 - Furnace and forge workflows matter more here than in vanilla survival.
 
+### Trader
+
+- Learn where value is moving.
+- Treasury and supply lines matter more than raw combat or gathering speed.
+
+### Soldier
+
+- Expect this to matter more once settlements and territorial pressure are established.
+
 ## If You Are Lost
 
 Use these in order:
 
-1. `/jobs info`
-2. `/country`
-3. `/country list`
-4. `/country info`
+1. Open the `Terra Guide`
+2. `/jobs info`
+3. `/guild`
+4. `/guild info`
+5. `/country info`
 
-If that still does not answer your next step, ask your country what role is needed most right now.
+If that still does not answer your next step, ask your guild what role or resource they need most right now.

@@ -12,6 +12,7 @@ public enum PlayerQuestType {
     PLACE_BLOCK,
     INTERACT_BLOCK,
     INTERACT_NPC,
+    DELIVER_ITEM,
     COMPLETE_TRIAL,
     PLAYTIME,
     JOIN_COUNTRY,

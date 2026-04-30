@@ -1,11 +1,12 @@
 # Terra Nations Core
 
-Terra Nations Core is a Paper 1.21 plugin that combines profession-based progression, countries, climate-aware farming, structural stability, route traders, merchant waves, staff tooling, and server utility systems in one codebase.
+Terra Nations Core is a Paper 1.21 plugin that combines profession-based progression, a guild-first territorial economy, legacy countries, climate-aware farming, structural stability, route traders, merchant waves, staff tooling, and server utility systems in one codebase.
 
 ## What It Includes
 
 - Seven core professions: Miner, Lumberjack, Farmer, Builder, Blacksmith, Trader, and Soldier
-- Country management with territory links, homes, treasury, resources, roles, upgrades, boosts, and trader access
+- Guild management with treasury, roles, permissions, invite flows, progression, stockpiles, and guild-backed country claims
+- Country management with territory links, homes, treasury, resources, roles, upgrades, boosts, trader access, and legacy tutorial compatibility
 - Climate, seasons, rainfall, altitude, and biome-aware crop or sapling growth
 - Stability and support-structure rules for excavation and large builds
 - A standalone Terra workbench playtest system with placeable specialist benches, placeholder custom ores, materials, armor, tools, and blocks
@@ -43,6 +44,7 @@ The shaded jar is produced in `target/`.
 
 - `/terra`
 - `/jobs`
+- `/guild`
 - `/country`
 - `/climate`
 - `/trader`
@@ -85,4 +87,5 @@ The shaded jar is produced in `target/`.
 - `src/main/resources/jobs/*.yml`
 - `src/main/resources/messages/messages.yml`
 - `src/main/resources/data.yml`
+- `src/main/resources/guilds/data.yml`
 - `src/main/resources/countries/data.yml`

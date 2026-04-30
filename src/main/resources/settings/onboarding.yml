@@ -1,0 +1,61 @@
+# Tutorial and onboarding settings.
+
+onboarding:
+  enabled: true
+  intro-speaker: "Terra Guide"
+  required-trials: 3
+  required-playtime-minutes: 20
+  starter-hub:
+    enabled: true
+    country-key: ""
+    use-global-spawn: true
+    world: ""
+    x: 0.0
+    y: 64.0
+    z: 0.0
+    yaw: 0.0
+    pitch: 0.0
+  trial-thresholds:
+    miner: 8
+    lumberjack: 6
+    farmer: 6
+    builder: 12
+    blacksmith: 3
+    trader: 3
+  objective-hud:
+    enabled: true
+    label: "&6Next Goal"
+  npc-focus:
+    enabled: true
+    line-millis: 2400
+    typewriter-char-millis: 35
+    typewriter-sound-enabled: true
+    typewriter-sound: "BLOCK_NOTE_BLOCK_HAT"
+    typewriter-sound-volume: 0.35
+    typewriter-sound-pitch: 1.75
+    post-type-hold-millis: 2400
+    chat-clear-lines: 80
+    transcript-to-chat: true
+    zoom-slowness-amplifier: 1
+  npc-dialogue:
+    intro:
+      - "&fWelcome to Terra. You start here in the starter hub so you can learn the world before locking in your first job."
+      - "&fUse the &eTerra Guide&f, explore the trial areas, and speak to guides around the island to understand each loop."
+      - "&fYou are free to try mining, farming, building, smithing, and trade before choosing the profession you want to keep."
+      - "&fWhen you complete enough of the tutorial, your first job choice unlocks and you can commit to the path that fits you."
+    default:
+      - "&7Take a second to look around and read what the world is asking of you."
+      - "&7Your guide will keep updating as you learn new systems."
+    trader_npc:
+      - "&fRoutes connect countries together through supply, demand, and timing."
+      - "&fEven if you do not lock Trader first, learn where money and goods move."
+    merchant_npc:
+      - "&fMerchants are a simple market loop: buy what you need, sell what you have."
+      - "&fUse them to understand value before you choose your first profession."
+    embassy_guide:
+      - "&fCountries are the long-term social loop."
+      - "&fThe starter island is where you meet them before committing to your path."
+
+quests:
+  starter:
+    list: {}

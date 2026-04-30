@@ -50,14 +50,17 @@ public final class OnboardingProgressListener implements Listener {
         Player player = event.getPlayer();
         String key = plugin.getOnboardingNpcKey(event.getRightClicked());
         if (key != null) {
+            plugin.handleNpcItemDelivery(player, key);
             plugin.recordOnboardingNpcInteraction(player, key);
             return;
         }
         if (plugin.isTraderNpc(event.getRightClicked())) {
+            plugin.handleNpcItemDelivery(player, "trader_npc");
             plugin.recordOnboardingNpcInteraction(player, "trader_npc");
             return;
         }
         if (plugin.isMerchantNpc(event.getRightClicked())) {
+            plugin.handleNpcItemDelivery(player, "merchant_npc");
             plugin.recordOnboardingNpcInteraction(player, "merchant_npc");
         }
     }

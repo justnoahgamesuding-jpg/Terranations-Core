@@ -28,6 +28,10 @@ public class Country {
     private String lastTraderName;
     private String lastTraderSpecialty;
     private long lastTraderSeenAtMillis;
+    private String ownerGuildId;
+    private long nextUpkeepAtMillis;
+    private double unpaidUpkeepDebt;
+    private long reclaimAvailableAtMillis;
     private int level;
     private double treasuryBalance;
     private int resourceStockpile;
@@ -46,7 +50,8 @@ public class Country {
                    Set<UUID> members, Set<UUID> coOwners, Set<UUID> stewards, Set<UUID> invitedPlayers,
                    String traderSpawnWorld, double traderSpawnX, double traderSpawnY, double traderSpawnZ,
                    float traderSpawnYaw, float traderSpawnPitch, Set<String> allowedTradeCountries,
-                   String lastTraderName, String lastTraderSpecialty, long lastTraderSeenAtMillis, int level,
+                   String lastTraderName, String lastTraderSpecialty, long lastTraderSeenAtMillis,
+                   String ownerGuildId, long nextUpkeepAtMillis, double unpaidUpkeepDebt, long reclaimAvailableAtMillis, int level,
                    double treasuryBalance, int resourceStockpile, String activeBoostKey, long activeBoostUntilMillis,
                    Set<String> unlockedUpgradeKeys) {
         this.name = name;
@@ -72,6 +77,10 @@ public class Country {
         this.lastTraderName = lastTraderName;
         this.lastTraderSpecialty = lastTraderSpecialty;
         this.lastTraderSeenAtMillis = lastTraderSeenAtMillis;
+        this.ownerGuildId = ownerGuildId;
+        this.nextUpkeepAtMillis = Math.max(0L, nextUpkeepAtMillis);
+        this.unpaidUpkeepDebt = unpaidUpkeepDebt;
+        this.reclaimAvailableAtMillis = Math.max(0L, reclaimAvailableAtMillis);
         this.level = Math.max(1, level);
         this.treasuryBalance = treasuryBalance;
         this.resourceStockpile = resourceStockpile;
@@ -287,6 +296,38 @@ public class Country {
 
     public void setLastTraderSeenAtMillis(long lastTraderSeenAtMillis) {
         this.lastTraderSeenAtMillis = lastTraderSeenAtMillis;
+    }
+
+    public String getOwnerGuildId() {
+        return ownerGuildId;
+    }
+
+    public void setOwnerGuildId(String ownerGuildId) {
+        this.ownerGuildId = ownerGuildId;
+    }
+
+    public long getNextUpkeepAtMillis() {
+        return nextUpkeepAtMillis;
+    }
+
+    public void setNextUpkeepAtMillis(long nextUpkeepAtMillis) {
+        this.nextUpkeepAtMillis = Math.max(0L, nextUpkeepAtMillis);
+    }
+
+    public double getUnpaidUpkeepDebt() {
+        return unpaidUpkeepDebt;
+    }
+
+    public void setUnpaidUpkeepDebt(double unpaidUpkeepDebt) {
+        this.unpaidUpkeepDebt = unpaidUpkeepDebt;
+    }
+
+    public long getReclaimAvailableAtMillis() {
+        return reclaimAvailableAtMillis;
+    }
+
+    public void setReclaimAvailableAtMillis(long reclaimAvailableAtMillis) {
+        this.reclaimAvailableAtMillis = Math.max(0L, reclaimAvailableAtMillis);
     }
 
     public Set<UUID> getMembers() {

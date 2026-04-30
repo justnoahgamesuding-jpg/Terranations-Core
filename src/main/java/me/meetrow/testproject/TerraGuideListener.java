@@ -55,7 +55,11 @@ public final class TerraGuideListener implements Listener {
         }
 
         event.setCancelled(true);
-        openMainMenu(event.getPlayer());
+        if (plugin.isOnboardingActive(event.getPlayer().getUniqueId())) {
+            openOnboardingMenu(event.getPlayer());
+        } else {
+            openMainMenu(event.getPlayer());
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -90,11 +94,16 @@ public final class TerraGuideListener implements Listener {
     }
 
     public void openMainMenu(Player player) {
+        if (plugin.isOnboardingActive(player.getUniqueId())) {
+            openOnboardingMenu(player);
+            return;
+        }
         plugin.recordOnboardingGuideOpened(player);
         Inventory inventory = Bukkit.createInventory(new TerraGuideHolder(GuidePage.MAIN), GUI_SIZE, plugin.legacyComponent("&8Terra Guide"));
         fillEmpty(inventory);
 
         Country country = plugin.getPlayerCountry(player.getUniqueId());
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
         boolean canManageCountry = plugin.canManageCountry(country, player.getUniqueId()) || player.hasPermission(Testproject.COUNTRY_ADMIN_PERMISSION) || player.isOp();
 
         inventory.setItem(4, createItem(Material.NETHER_STAR, "&6Terra Guide", List.of(
@@ -124,8 +133,8 @@ public final class TerraGuideListener implements Listener {
                     "&eClick to open."
             )));
         }
-        inventory.setItem(28, createItem(Material.BLUE_BANNER, country != null ? "&9Country Dashboard" : "&9Country Browser", List.of(
-                country != null ? "&7Open your player country dashboard." : "&7Browse and join server countries."
+        inventory.setItem(28, createItem(Material.BLUE_BANNER, guild != null ? "&9Guild Dashboard" : "&9Guild Browser", List.of(
+                guild != null ? "&7Open your guild treasury, claims, and members." : "&7Browse guilds or check invite status."
         )));
         if (canManageCountry && country != null) {
             inventory.setItem(30, createItem(Material.LODESTONE, "&cCountry Owner Panel", List.of(
@@ -157,6 +166,7 @@ public final class TerraGuideListener implements Listener {
 
         inventory.setItem(4, createItem(Material.PLAYER_HEAD, "&b" + player.getName(), List.of(
                 "&7Country: &f" + (country != null ? country.getName() : "None"),
+                "&7Guild: &f" + (plugin.getPlayerGuild(playerId) != null ? plugin.getPlayerGuild(playerId).getName() : "None"),
                 "&7Balance: &f$" + plugin.formatMoney(plugin.getBalance(player)),
                 "&7Trader reputation: &f" + plugin.formatTraderReputation(plugin.getTraderReputation(playerId))
         )));
@@ -282,13 +292,7 @@ public final class TerraGuideListener implements Listener {
                     openOnboardingMenu(player);
                 }
             }
-            case 28 -> {
-                if (country != null) {
-                    plugin.openCountryMenu(player);
-                } else {
-                    plugin.openCountryListMenu(player);
-                }
-            }
+            case 28 -> plugin.openGuildMenu(player);
             case 30 -> {
                 if (country != null && (plugin.canManageCountry(country, player.getUniqueId()) || player.hasPermission(Testproject.COUNTRY_ADMIN_PERMISSION) || player.isOp())) {
                     plugin.openCountryAdminMenu(player, country);
@@ -301,6 +305,7 @@ public final class TerraGuideListener implements Listener {
     }
 
     private void openOnboardingMenu(Player player) {
+        plugin.recordOnboardingGuideOpened(player);
         Inventory inventory = Bukkit.createInventory(new TerraGuideHolder(GuidePage.ONBOARDING), GUI_SIZE, plugin.legacyComponent("&8First Hour Guide"));
         fillEmpty(inventory);
 
@@ -310,11 +315,33 @@ public final class TerraGuideListener implements Listener {
         int requiredMinutes = plugin.getRequiredOnboardingPlaytimeMinutes();
         long elapsedMinutes = plugin.getOnboardingElapsedMinutes(playerId);
         boolean ready = plugin.isPrimaryProfessionChoiceUnlocked(playerId);
+        String objective = plugin.getTutorialQuestObjective(playerId);
+        String hint = plugin.getTutorialQuestHint(playerId);
+        String questProgress = plugin.getTutorialQuestProgressText(playerId);
 
         inventory.setItem(ONBOARDING_INFO_SLOT, createItem(Material.COMPASS, "&6Onboarding Progress", List.of(
                 "&7Trials: &f" + Math.min(completedTrials, requiredTrials) + "&7/&f" + requiredTrials,
                 "&7Playtime: &f" + Math.min(elapsedMinutes, requiredMinutes) + "&7/&f" + requiredMinutes + " min",
                 ready ? "&aYour first profession choice is unlocked." : "&7Keep exploring the starter flow first."
+        )));
+
+        inventory.setItem(11, createItem(Material.WRITABLE_BOOK, "&eCurrent Objective", List.of(
+                "&7" + stripColors(objective),
+                questProgress.isBlank() ? "&7Progress: &f0/0" : "&7Progress: &f" + questProgress,
+                hint.isBlank() ? "&7No extra hint right now." : "&7Hint: &f" + stripColors(hint)
+        )));
+
+        inventory.setItem(13, createItem(Material.TARGET, "&6Profession Trials", List.of(
+                "&7Try several roles before you commit.",
+                "&7Completed: &f" + Math.min(completedTrials, requiredTrials) + "&7/&f" + requiredTrials,
+                "&eReview the trial cards below."
+        )));
+
+        inventory.setItem(15, createItem(Material.BLUE_BANNER, "&9Recruitment & Guilds", List.of(
+                "&7Meet recruiters, inspect guilds,",
+                "&7and find a group before leaving Freeport.",
+                "",
+                "&eClick to browse guilds."
         )));
 
         int[] trialSlots = {19, 20, 21, 22, 23, 24};
@@ -333,21 +360,29 @@ public final class TerraGuideListener implements Listener {
                     )));
         }
 
-        inventory.setItem(31, createItem(Material.BLUE_BANNER, "&9Countries", List.of(
-                "&7Browse countries and meet recruiters",
-                "&7before you lock in your first job."
+        inventory.setItem(29, createItem(Material.CHEST, "&6Starter Hub Systems", List.of(
+                "&7Use crop plots, trial stations,",
+                "&7resource nodes, traders, and guides",
+                "&7to learn the loop hands-on."
         )));
-        inventory.setItem(32, createItem(Material.ANVIL, "&6Starter Hub", List.of(
-                "&7Use the hub to try workstations,",
-                "&7storage, crops, and resource loops."
+
+        inventory.setItem(31, createItem(Material.CLOCK, "&eUnlock Progress", List.of(
+                "&7Playtime: &f" + Math.min(elapsedMinutes, requiredMinutes) + "&7/&f" + requiredMinutes + " min",
+                "&7Trials: &f" + Math.min(completedTrials, requiredTrials) + "&7/&f" + requiredTrials,
+                "&7Status: " + (ready ? "&aReady to choose." : "&f" + plugin.getOnboardingUnlockRequirementText(playerId))
         )));
+
         inventory.setItem(33, createItem(ready ? Material.EMERALD : Material.GRAY_DYE, ready ? "&aChoose First Profession" : "&7Profession Locked", List.of(
                 ready ? "&7You are ready to choose your first job." : "&7Requirement:",
                 ready ? "&eClick to open the jobs menu." : "&f" + plugin.getOnboardingUnlockRequirementText(playerId)
         )));
 
-        inventory.setItem(BACK_SLOT, createItem(Material.ARROW, "&eBack", List.of("&7Return to the main guide menu.")));
-        inventory.setItem(CLOSE_SLOT, createItem(Material.BARRIER, "&cClose", List.of("&7Close the Terra Guide.")));
+        inventory.setItem(BACK_SLOT, createItem(Material.BARRIER, "&cClose", List.of("&7Close the First Hour Guide.")));
+        inventory.setItem(CLOSE_SLOT, createItem(Material.NETHER_STAR, "&6Why This Guide Matters", List.of(
+                "&7This guide replaces the old intro.",
+                "&7Keep checking it while you learn",
+                "&7the first-hour tutorial."
+        )));
         player.openInventory(inventory);
     }
 
@@ -428,13 +463,16 @@ public final class TerraGuideListener implements Listener {
             return;
         }
         switch (slot) {
-            case 31 -> plugin.openCountryListMenu(player);
+            case 15, 31 -> plugin.openGuildMenu(player);
             case 33 -> {
                 if (plugin.isPrimaryProfessionChoiceUnlocked(player.getUniqueId())) {
                     plugin.openProfessionMenu(player);
                 } else {
                     player.sendMessage(plugin.colorize("&cYour first profession is still locked. &7" + plugin.getOnboardingUnlockRequirementText(player.getUniqueId())));
                 }
+            }
+            case BACK_SLOT -> player.closeInventory();
+            case CLOSE_SLOT -> {
             }
             default -> {
             }
@@ -451,6 +489,10 @@ public final class TerraGuideListener implements Listener {
             return true;
         }
         return false;
+    }
+
+    private String stripColors(String value) {
+        return value == null ? "" : org.bukkit.ChatColor.stripColor(plugin.colorize(value));
     }
 
     private void fillEmpty(Inventory inventory) {

@@ -14,11 +14,13 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerPickupArrowEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.event.block.Action;
 
 public final class OnboardingFocusListener implements Listener {
     private final Testproject plugin;
@@ -67,9 +69,22 @@ public final class OnboardingFocusListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
-        if (plugin.isPlayerInOnboardingFocus(event.getPlayer().getUniqueId())) {
-            event.setCancelled(true);
+        if (!plugin.isPlayerInOnboardingFocus(event.getPlayer().getUniqueId())) {
+            return;
         }
+        if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+            plugin.advanceOnboardingFocus(event.getPlayer());
+        }
+        event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+        if (!plugin.isPlayerInOnboardingFocus(event.getPlayer().getUniqueId())) {
+            return;
+        }
+        plugin.advanceOnboardingFocus(event.getPlayer());
+        event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

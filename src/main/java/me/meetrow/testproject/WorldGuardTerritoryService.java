@@ -116,8 +116,8 @@ public class WorldGuardTerritoryService implements TerritoryService {
             return TerritoryOperationResult.failure("region-not-found");
         }
 
-        region.setOwners(createOwnersDomain(country.getOwnerId()));
-        region.setMembers(createMembersDomain(country.getMembers(), country.getOwnerId()));
+        region.setOwners(createOwnersDomain(plugin.getCountryTerritoryOwnerId(country)));
+        region.setMembers(createMembersDomain(plugin.getCountryTerritoryMemberIds(country), plugin.getCountryTerritoryOwnerId(country)));
 
         TerritoryOperationResult saveResult = saveRegionManager(bukkitWorld);
         if (!saveResult.success()) {
@@ -307,6 +307,37 @@ public class WorldGuardTerritoryService implements TerritoryService {
         }
 
         return farmlandCount;
+    }
+
+    @Override
+    public int getTerritoryArea(Country country) {
+        if (country == null || !country.hasTerritory()) {
+            return 0;
+        }
+        org.bukkit.World bukkitWorld = Bukkit.getWorld(country.getTerritoryWorld());
+        if (bukkitWorld == null) {
+            return 0;
+        }
+        ProtectedRegion region = getRegion(bukkitWorld, country.getTerritoryRegionId());
+        if (region == null) {
+            return 0;
+        }
+        if (region instanceof ProtectedPolygonalRegion polygonalRegion) {
+            List<BlockVector2> points = polygonalRegion.getPoints();
+            if (points.size() < 3) {
+                return 0;
+            }
+            long doubleArea = 0L;
+            for (int i = 0; i < points.size(); i++) {
+                BlockVector2 current = points.get(i);
+                BlockVector2 next = points.get((i + 1) % points.size());
+                doubleArea += (long) current.x() * next.z() - (long) next.x() * current.z();
+            }
+            return (int) Math.max(0L, Math.round(Math.abs(doubleArea) / 2.0D));
+        }
+        BlockVector3 min = region.getMinimumPoint();
+        BlockVector3 max = region.getMaximumPoint();
+        return Math.max(0, (max.x() - min.x() + 1) * (max.z() - min.z() + 1));
     }
 
     private boolean containsBlock(ProtectedRegion region, int x, int y, int z) {

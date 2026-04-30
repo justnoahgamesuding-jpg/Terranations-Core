@@ -178,6 +178,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return handlePhantomsCommand(sender, args);
         }
 
+        if (args[0].equalsIgnoreCase("bats")) {
+            return handleBatsCommand(sender, args);
+        }
+
         if (args[0].equalsIgnoreCase("setxpboost")) {
             return handleSetXpBoostCommand(sender, args);
         }
@@ -716,6 +720,38 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
+        if (args.length >= 3 && args[1].equalsIgnoreCase("setlocationselection")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            Region selection = getWorldEditSelectionRegion(player);
+            if (selection == null) {
+                return true;
+            }
+            String key = args[2];
+            String displayName = args.length >= 4
+                    ? String.join(" ", Arrays.copyOfRange(args, 3, args.length))
+                    : key;
+            BlockVector3 min = selection.getMinimumPoint();
+            BlockVector3 max = selection.getMaximumPoint();
+            if (plugin.setOnboardingLocationMarkerRegion(
+                    key,
+                    player.getWorld(),
+                    min.x(),
+                    min.y(),
+                    min.z(),
+                    max.x(),
+                    max.y(),
+                    max.z(),
+                    displayName
+            )) {
+                player.sendMessage(plugin.colorize("&aSaved onboarding region marker &f" + key + "&a from your WorldEdit selection."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not save that onboarding region marker."));
+            }
+            return true;
+        }
         if (args.length == 3 && args[1].equalsIgnoreCase("clearlocation")) {
             if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
                 player.sendMessage(plugin.getMessage("general.no-permission"));
@@ -728,109 +764,18 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
-        if (args.length >= 3 && args[1].equalsIgnoreCase("marknpc")) {
+        if (args.length >= 3 && args[1].equalsIgnoreCase("linkfancynpc")) {
             if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
                 player.sendMessage(plugin.getMessage("general.no-permission"));
                 return true;
             }
-            Entity target = player.getTargetEntity(8);
-            if (target == null) {
-                player.sendMessage(plugin.colorize("&cLook at an entity within 8 blocks first."));
-                return true;
-            }
-            if (plugin.markOnboardingNpc(target, args[2])) {
-                player.sendMessage(plugin.colorize("&aMarked that NPC with onboarding key &f" + args[2] + "&a."));
-            } else {
-                player.sendMessage(plugin.colorize("&cCould not mark that NPC."));
-            }
-            return true;
-        }
-        if (args.length >= 5 && args[1].equalsIgnoreCase("spawnnpc")) {
-            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
-                player.sendMessage(plugin.getMessage("general.no-permission"));
-                return true;
-            }
-            String npcId = args[2];
-            String questKey = args[3];
-            String itemsAdderEntityId = args[4];
-            String dialogueKey = args.length >= 6 && !args[5].equals("-") ? args[5] : null;
-            int displayNameStart = args.length >= 6 ? 6 : 5;
+            String dialogueKey = args.length >= 4 && !args[3].equals("-") ? args[3] : null;
+            int displayNameStart = args.length >= 4 ? 4 : 3;
             String displayName = args.length > displayNameStart
                     ? String.join(" ", Arrays.copyOfRange(args, displayNameStart, args.length))
-                    : npcId;
-            if (plugin.spawnOnboardingCustomNpc(npcId, questKey, dialogueKey, itemsAdderEntityId, player.getLocation(), displayName)) {
-                player.sendMessage(plugin.colorize("&aSpawned onboarding NPC &f" + npcId + "&a using ItemsAdder entity &f" + itemsAdderEntityId + "&a."));
-            } else {
-                player.sendMessage(plugin.colorize("&cCould not spawn that ItemsAdder onboarding NPC. Check the entity id and that ItemsAdder is loaded."));
-            }
-            return true;
-        }
-        if (args.length >= 5 && args[1].equalsIgnoreCase("registernpc")) {
-            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
-                player.sendMessage(plugin.getMessage("general.no-permission"));
-                return true;
-            }
-            Entity target = player.getTargetEntity(8);
-            if (target == null) {
-                player.sendMessage(plugin.colorize("&cLook at an entity within 8 blocks first."));
-                return true;
-            }
-            String npcId = args[2];
-            String questKey = args[3];
-            String itemsAdderEntityId = args[4];
-            String dialogueKey = args.length >= 6 && !args[5].equals("-") ? args[5] : null;
-            int displayNameStart = args.length >= 6 ? 6 : 5;
-            String displayName = args.length > displayNameStart
-                    ? String.join(" ", Arrays.copyOfRange(args, displayNameStart, args.length))
-                    : npcId;
-            if (plugin.registerExistingOnboardingCustomNpc(target, npcId, questKey, dialogueKey, itemsAdderEntityId, displayName)) {
-                player.sendMessage(plugin.colorize("&aRegistered that entity as onboarding NPC &f" + npcId + "&a."));
-            } else {
-                player.sendMessage(plugin.colorize("&cCould not register that entity as an onboarding NPC."));
-            }
-            return true;
-        }
-        if (args.length == 3 && args[1].equalsIgnoreCase("removenpc")) {
-            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
-                player.sendMessage(plugin.getMessage("general.no-permission"));
-                return true;
-            }
-            if (plugin.removeOnboardingCustomNpc(args[2])) {
-                player.sendMessage(plugin.colorize("&aRemoved onboarding NPC &f" + args[2] + "&a."));
-            } else {
-                player.sendMessage(plugin.colorize("&cNo custom onboarding NPC exists for &f" + args[2] + "&c."));
-            }
-            return true;
-        }
-        if (args.length >= 4 && args[1].equalsIgnoreCase("renamenpc")) {
-            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
-                player.sendMessage(plugin.getMessage("general.no-permission"));
-                return true;
-            }
-            String npcId = args[2];
-            String displayName = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
-            if (plugin.renameOnboardingCustomNpc(npcId, displayName)) {
-                player.sendMessage(plugin.colorize("&aRenamed onboarding NPC &f" + npcId + "&a to &f" + displayName + "&a."));
-            } else {
-                player.sendMessage(plugin.colorize("&cCould not rename that onboarding NPC."));
-            }
-            return true;
-        }
-        if (args.length == 2 && args[1].equalsIgnoreCase("clearnpc")) {
-            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
-                player.sendMessage(plugin.getMessage("general.no-permission"));
-                return true;
-            }
-            Entity target = player.getTargetEntity(8);
-            if (target == null) {
-                player.sendMessage(plugin.colorize("&cLook at an entity within 8 blocks first."));
-                return true;
-            }
-            if (plugin.clearOnboardingNpc(target)) {
-                player.sendMessage(plugin.colorize("&aCleared that onboarding NPC marker."));
-            } else {
-                player.sendMessage(plugin.colorize("&cThat entity does not have an onboarding NPC marker."));
-            }
+                    : null;
+            plugin.armPendingOnboardingFancyNpcLink(player, args[2], dialogueKey, displayName);
+            player.sendMessage(plugin.colorize("&eRight-click the FancyNpcs NPC you want to link to onboarding key &f" + args[2] + "&e."));
             return true;
         }
         if (args.length == 2 && args[1].equalsIgnoreCase("locations")) {
@@ -840,15 +785,6 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             List<String> keys = plugin.getOnboardingLocationMarkerKeys();
             player.sendMessage(plugin.colorize("&6Onboarding location markers: &f" + (keys.isEmpty() ? "none" : String.join(", ", keys))));
-            return true;
-        }
-        if (args.length == 2 && args[1].equalsIgnoreCase("npcs")) {
-            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
-                player.sendMessage(plugin.getMessage("general.no-permission"));
-                return true;
-            }
-            List<String> ids = plugin.getOnboardingCustomNpcIds();
-            player.sendMessage(plugin.colorize("&6Onboarding custom NPCs: &f" + (ids.isEmpty() ? "none" : String.join(", ", ids))));
             return true;
         }
         if (args.length >= 4 && args[1].equalsIgnoreCase("bindfancynpc")) {
@@ -889,6 +825,24 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
+        if (args.length >= 4 && args[1].equalsIgnoreCase("createfancynpc")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            String questKey = args[2];
+            String dialogueKey = !args[3].equals("-") ? args[3] : null;
+            String displayName = args.length >= 5
+                    ? String.join(" ", Arrays.copyOfRange(args, 4, args.length))
+                    : "New Guide";
+            String generatedId = plugin.spawnSimpleOnboardingFancyNpc(player, questKey, dialogueKey, displayName, player.getLocation());
+            if (generatedId != null) {
+                player.sendMessage(plugin.colorize("&aCreated FancyNpcs NPC &f" + generatedId + "&a with name &f" + displayName + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not create that FancyNpcs onboarding NPC."));
+            }
+            return true;
+        }
         if (args.length >= 4 && args[1].equalsIgnoreCase("skinfancynpc")) {
             if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
                 player.sendMessage(plugin.getMessage("general.no-permission"));
@@ -914,6 +868,67 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage(plugin.colorize("&aRenamed FancyNpcs NPC &f" + fancyNpcId + "&a to &f" + displayName + "&a."));
             } else {
                 player.sendMessage(plugin.colorize("&cCould not rename that FancyNpcs NPC."));
+            }
+            return true;
+        }
+        if (args.length >= 4 && args[1].equalsIgnoreCase("colorfancynpc")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            String fancyNpcId = args[2];
+            String colorCode = args[3];
+            String displayName = args.length >= 5
+                    ? String.join(" ", Arrays.copyOfRange(args, 4, args.length))
+                    : null;
+            if (plugin.recolorOnboardingFancyNpc(fancyNpcId, colorCode, displayName)) {
+                player.sendMessage(plugin.colorize("&aUpdated FancyNpcs NPC color for &f" + fancyNpcId + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not recolor that FancyNpcs NPC."));
+            }
+            return true;
+        }
+        if (args.length == 2 && args[1].equalsIgnoreCase("dialoggui")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            plugin.openFancyNpcDialogueEditor(player);
+            return true;
+        }
+        if (args.length == 3 && (args[1].equalsIgnoreCase("setnpcdialog") || args[1].equalsIgnoreCase("dialoggui"))) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            if (plugin.resolveExistingFancyNpcId(args[2]) == null) {
+                player.sendMessage(plugin.colorize("&cCould not find a FancyNpcs NPC with id &f" + args[2] + "&c."));
+            } else {
+                plugin.openFancyNpcDialogueEditor(player, args[2]);
+            }
+            return true;
+        }
+        if (args.length == 3 && args[1].equalsIgnoreCase("clearnpcdialog")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            if (plugin.clearOnboardingFancyNpcDialogue(args[2])) {
+                player.sendMessage(plugin.colorize("&aCleared dialogue for FancyNpcs NPC &f" + args[2] + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not clear dialogue for that FancyNpcs NPC."));
+            }
+            return true;
+        }
+        if (args.length == 3 && args[1].equalsIgnoreCase("deletefancynpc")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            if (plugin.deleteOnboardingFancyNpc(args[2])) {
+                player.sendMessage(plugin.colorize("&aDeleted FancyNpcs NPC &f" + args[2] + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not delete that FancyNpcs NPC."));
             }
             return true;
         }
@@ -1528,6 +1543,26 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         }
 
         for (String line : plugin.getMessageList("help.terra.phantoms")) {
+            sender.sendMessage(line);
+        }
+        return true;
+    }
+
+    private boolean handleBatsCommand(CommandSender sender, String[] args) {
+        if (args.length == 2) {
+            if (args[1].equalsIgnoreCase("enable")) {
+                plugin.setBatsEnabled(true);
+                sender.sendMessage(plugin.getMessage("terra.bats.enabled"));
+                return true;
+            }
+            if (args[1].equalsIgnoreCase("disable")) {
+                plugin.setBatsEnabled(false);
+                sender.sendMessage(plugin.getMessage("terra.bats.disabled"));
+                return true;
+            }
+        }
+
+        for (String line : plugin.getMessageList("help.terra.bats")) {
             sender.sendMessage(line);
         }
         return true;
@@ -3280,7 +3315,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         boolean admin = hasAdminAccess(sender);
         List<HelpEntry> entries = new ArrayList<>();
         entries.add(new HelpEntry("/terra help [page]", "Open this command list.", ignored -> true));
-        entries.add(new HelpEntry("/terra tutorial", "Advance tutorial prompts and manage onboarding markers and NPCs.", ignored -> sender instanceof Player));
+        entries.add(new HelpEntry("/terra tutorial", "Advance tutorial prompts and manage onboarding markers and FancyNpcs bindings.", ignored -> sender instanceof Player));
 
         if (!admin) {
             return entries;
@@ -3306,6 +3341,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         entries.add(new HelpEntry("/terra rewards <enable|disable|money>", "Control block reward systems.", ignored -> true));
         entries.add(new HelpEntry("/terra hostilemobs <enable|disable>", "Toggle hostile mob spawning.", ignored -> true));
         entries.add(new HelpEntry("/terra phantoms <enable|disable>", "Toggle phantom spawning.", ignored -> true));
+        entries.add(new HelpEntry("/terra bats <enable|disable>", "Toggle bat spawning.", ignored -> true));
         entries.add(new HelpEntry("/terra setxpboost <amount> <time|off>", "Manage the global XP boost.", ignored -> true));
         entries.add(new HelpEntry("/terra cleardata <player>", "Reset a player's Terra data.", ignored -> true));
         entries.add(new HelpEntry("/terra jobcap <job> <amount>", "Set a profession player cap.", ignored -> true));
@@ -3570,6 +3606,10 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args[0].equalsIgnoreCase("phantoms") && args.length == 2) {
+            return partialMatches(args[1], List.of("enable", "disable"));
+        }
+
+        if (args[0].equalsIgnoreCase("bats") && args.length == 2) {
             return partialMatches(args[1], List.of("enable", "disable"));
         }
 
@@ -4034,18 +4074,19 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                     "next",
                     "redo",
                     "setlocation",
+                    "setlocationselection",
                     "clearlocation",
                     "locations",
-                    "marknpc",
-                    "clearnpc",
-                    "spawnnpc",
-                    "registernpc",
-                    "removenpc",
-                    "renamenpc",
-                    "npcs",
+                    "linkfancynpc",
+                    "createfancynpc",
                     "spawnfancynpc",
                     "skinfancynpc",
                     "renamefancynpc",
+                    "colorfancynpc",
+                    "dialoggui",
+                    "setnpcdialog",
+                    "clearnpcdialog",
+                    "deletefancynpc",
                     "bindfancynpc",
                     "unbindfancynpc",
                     "fancynpcs"
@@ -4065,16 +4106,21 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                 suggestions.addAll(List.of("starter_hub", "builder_yard", "farm_plots", "forge_yard", "embassy_board", "trader_stop"));
                 return partialMatches(args[2], dedupeSuggestions(suggestions));
             }
+            if (action.equals("setlocationselection")) {
+                List<String> suggestions = new ArrayList<>(plugin.getOnboardingLocationMarkerKeys());
+                suggestions.addAll(List.of("starter_hub", "builder_yard", "farm_plots", "forge_yard", "embassy_board", "trader_stop"));
+                return partialMatches(args[2], dedupeSuggestions(suggestions));
+            }
             if (action.equals("clearlocation")) {
                 return partialMatches(args[2], plugin.getOnboardingLocationMarkerKeys());
             }
-            if (action.equals("marknpc")) {
+            if (action.equals("linkfancynpc")) {
                 return partialMatches(args[2], getSuggestedTutorialQuestKeys());
             }
-            if (action.equals("removenpc") || action.equals("spawnnpc") || action.equals("registernpc") || action.equals("renamenpc")) {
-                return partialMatches(args[2], getSuggestedTutorialNpcIds());
+            if (action.equals("createfancynpc")) {
+                return partialMatches(args[2], getSuggestedTutorialQuestKeys());
             }
-            if (action.equals("bindfancynpc") || action.equals("unbindfancynpc") || action.equals("spawnfancynpc") || action.equals("skinfancynpc") || action.equals("renamefancynpc")) {
+            if (action.equals("bindfancynpc") || action.equals("unbindfancynpc") || action.equals("spawnfancynpc") || action.equals("skinfancynpc") || action.equals("renamefancynpc") || action.equals("colorfancynpc") || action.equals("deletefancynpc") || action.equals("setnpcdialog") || action.equals("clearnpcdialog") || action.equals("dialoggui")) {
                 return partialMatches(args[2], getSuggestedFancyNpcIds());
             }
         }
@@ -4082,8 +4128,20 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             if (action.equals("setlocation")) {
                 return partialMatches(args[3], List.of("6", "8", "10", "12", "16", "24"));
             }
-            if (action.equals("spawnnpc") || action.equals("registernpc")) {
-                return partialMatches(args[3], getSuggestedTutorialQuestKeys());
+            if (action.equals("setlocationselection")) {
+                return partialMatches(args[3], plugin.getOnboardingLocationMarkerKeys());
+            }
+            if (action.equals("linkfancynpc")) {
+                List<String> suggestions = new ArrayList<>();
+                suggestions.add("-");
+                suggestions.addAll(getSuggestedTutorialDialogueKeys());
+                return partialMatches(args[3], dedupeSuggestions(suggestions));
+            }
+            if (action.equals("createfancynpc")) {
+                List<String> suggestions = new ArrayList<>();
+                suggestions.add("-");
+                suggestions.addAll(getSuggestedTutorialDialogueKeys());
+                return partialMatches(args[3], dedupeSuggestions(suggestions));
             }
             if (action.equals("bindfancynpc")) {
                 return partialMatches(args[3], getSuggestedTutorialQuestKeys());
@@ -4094,15 +4152,9 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             if (action.equals("skinfancynpc")) {
                 return partialMatches(args[3], getKnownPlayerNames());
             }
-        }
-        if (args.length == 5 && (action.equals("spawnnpc") || action.equals("registernpc"))) {
-            return partialMatches(args[4], List.of(
-                    "terra:guide_npc",
-                    "terra:trader_guide",
-                    "terra:merchant_guide",
-                    "terra:embassy_guide",
-                    "yournamespace:npc_id"
-            ));
+            if (action.equals("colorfancynpc")) {
+                return partialMatches(args[3], List.of("&f", "&e", "&6", "&a", "&b", "&c", "&d", "&#ffaa00"));
+            }
         }
         if (args.length == 5 && action.equals("bindfancynpc")) {
             List<String> suggestions = new ArrayList<>();
@@ -4110,26 +4162,30 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             suggestions.addAll(getSuggestedTutorialDialogueKeys());
             return partialMatches(args[4], dedupeSuggestions(suggestions));
         }
-        if (args.length == 5 && action.equals("spawnfancynpc")) {
-            List<String> suggestions = new ArrayList<>();
-            suggestions.add("-");
-            suggestions.addAll(getSuggestedTutorialDialogueKeys());
-            return partialMatches(args[4], dedupeSuggestions(suggestions));
-        }
-        if (args.length == 6 && (action.equals("spawnnpc") || action.equals("registernpc"))) {
-            List<String> suggestions = new ArrayList<>();
-            suggestions.add("-");
-            suggestions.addAll(getSuggestedTutorialDialogueKeys());
-            return partialMatches(args[5], dedupeSuggestions(suggestions));
-        }
-        if (args.length >= 7 && (action.equals("spawnnpc") || action.equals("registernpc"))) {
+        if (args.length >= 5 && action.equals("linkfancynpc")) {
             return partialMatches(args[args.length - 1], List.of(
                     "Starter Guide",
                     "Embassy Guide",
                     "Trader Guide",
                     "Merchant Guide",
-                    "Builder Guide"
+                    "Country Recruiter"
             ));
+        }
+        if (args.length >= 5 && action.equals("createfancynpc")) {
+            return partialMatches(args[args.length - 1], List.of(
+                    "Starter Guide",
+                    "Embassy Guide",
+                    "Trader Guide",
+                    "Merchant Guide",
+                    "Country Recruiter",
+                    "Freeport Guide"
+            ));
+        }
+        if (args.length == 5 && action.equals("spawnfancynpc")) {
+            List<String> suggestions = new ArrayList<>();
+            suggestions.add("-");
+            suggestions.addAll(getSuggestedTutorialDialogueKeys());
+            return partialMatches(args[4], dedupeSuggestions(suggestions));
         }
         if (args.length >= 6 && action.equals("bindfancynpc")) {
             return partialMatches(args[args.length - 1], List.of(
@@ -4149,7 +4205,22 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                     "Country Recruiter"
             ));
         }
-        if (args.length >= 4 && (action.equals("renamenpc") || action.equals("renamefancynpc"))) {
+        if (args.length >= 4 && action.equals("renamefancynpc")) {
+            return partialMatches(args[args.length - 1], List.of(
+                    "&6Starter Guide",
+                    "&eEmbassy Guide",
+                    "&aTrader Guide",
+                    "&bMerchant Guide",
+                    "&dCountry Recruiter",
+                    "Starter Guide",
+                    "Embassy Guide",
+                    "Trader Guide",
+                    "Merchant Guide",
+                    "Country Recruiter",
+                    "Freeport Guide"
+            ));
+        }
+        if (args.length >= 5 && action.equals("colorfancynpc")) {
             return partialMatches(args[args.length - 1], List.of(
                     "Starter Guide",
                     "Embassy Guide",
@@ -4168,19 +4239,6 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                 "starter_hub",
                 "trader_npc",
                 "merchant_npc",
-                "embassy_guide",
-                "builder_guide",
-                "farm_guide",
-                "forge_guide",
-                "country_recruiter"
-        ));
-        return dedupeSuggestions(suggestions);
-    }
-
-    private List<String> getSuggestedTutorialNpcIds() {
-        List<String> suggestions = new ArrayList<>(plugin.getOnboardingCustomNpcIds());
-        suggestions.addAll(List.of(
-                "starter_guide",
                 "embassy_guide",
                 "builder_guide",
                 "farm_guide",

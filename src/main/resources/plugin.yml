@@ -2,7 +2,7 @@ name: testproject
 version: '1.0-SNAPSHOT'
 main: me.meetrow.testproject.Testproject
 api-version: '1.21'
-softdepend: [Vault, PlaceholderAPI, ItemsAdder, FancyNpcs, LuckPerms, WorldEdit, WorldGuard, dynmap, CoreProtect]
+softdepend: [Vault, PlaceholderAPI, ItemsAdder, FancyNpcs, LuckPerms, WorldEdit, WorldGuard, dynmap, CoreProtect, SimpleScore]
 commands:
   terra:
     description: Terra plugin commands
@@ -30,6 +30,9 @@ commands:
   country:
     description: Country commands
     usage: /country <create|setowner|join|home|invite|acceptinvite|transfercountry|accepttransfer|disband|joinstatus|leave|kick|info|list|rename|addtag|addtagtocountry|territory|manage|trade|admin|settraderreputation> ...
+  guild:
+    description: Guild commands
+    usage: /guild <menu|create|info|invite|resendinvite|accept|deny|deposit|withdraw|claim|role|permissions|description|motd|recruiting|stockpile|logs|kick|leave|transferleader|disband|list>
   staff:
     description: Staff tools and moderation utilities
     usage: /staff [menu|mode|vanish|freeze|heal|tp|bring]
@@ -117,6 +120,9 @@ permissions:
     default: op
   terra.country.warpadmin:
     description: Allows using the admin country warp command
+    default: op
+  terra.guild.use:
+    description: Allows using guild commands
     default: op
   terra.country.territory:
     description: Allows linking and syncing country territories with WorldGuard and Dynmap

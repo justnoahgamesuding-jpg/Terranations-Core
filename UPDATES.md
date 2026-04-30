@@ -2,6 +2,37 @@
 
 This file is the short, high-level timeline for the current repository snapshot.
 
+## 2026-04-30
+
+### Guilds became the main player-facing ownership layer
+
+- A guild-first system now sits on top of the existing country layer.
+- Guilds gained treasury, stockpiles, progression, permissions, recruitment, role management, and country-claiming flow.
+- Guild upkeep now governs claimed countries, including temporary debt and release on extended nonpayment.
+- The Terra Guide and guild UI now push players toward guild management before older country-only flows.
+
+### Guild invite flow became interactive
+
+- Guild invites can now be accepted or denied by clicking directly in chat.
+- Invite responses and expiries now notify guild recruiters.
+- Invites track who sent them.
+- Pending invites can now be reviewed, resent, and cancelled from the guild GUI.
+
+### Onboarding and quest setup moved further away from typed admin flow
+
+- Tutorial location markers can now be saved from a WorldEdit cuboid selection.
+- The quest admin GUI became more interaction-driven and less chat-input heavy.
+- Fancy NPC repeat dialogue can now pull from a random repeat pool after first interaction.
+- NPC delivery quests were added for handing item amounts to a target NPC.
+
+### Fancy NPC rewards now preserve custom Terra items
+
+- Fancy NPC reward inventories now keep full item stack metadata instead of degrading custom rewards to plain vanilla material and amount pairs.
+
+### Bat spawning gained a direct toggle
+
+- Bat spawns can now be disabled and existing bats can be purged when the toggle is switched off.
+
 ## 2026-04-29
 
 ### Terra workbench stick crafting no longer points players at bamboo
@@ -31,7 +62,7 @@ This file is the short, high-level timeline for the current repository snapshot.
 
 - Every player now receives a locked `Terra Guide` item in hotbar slot 9.
 - The guide item is soulbound and cannot be moved, dropped, swapped, or stored.
-- The guide now opens the first real player hub with stats, personal skills, contracts, jobs access, country access, and ore-sense toggles.
+- The guide now opens the first real player hub with stats, personal skills, contracts, jobs access, guild access, and ore-sense toggles.
 - Players now earn skill points from level-ups and playtime, and can spend them on permanent progression bonuses.
 
 ## 2026-04-06

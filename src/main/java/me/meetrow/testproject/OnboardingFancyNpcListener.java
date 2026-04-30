@@ -18,7 +18,7 @@ public final class OnboardingFancyNpcListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onNpcInteract(NpcInteractEvent event) {
         Npc npc = event.getNpc();
         if (npc == null) {
@@ -28,13 +28,27 @@ public final class OnboardingFancyNpcListener implements Listener {
         if (data == null || data.getId() == null || data.getId().isBlank()) {
             return;
         }
-        Testproject.OnboardingFancyNpcBinding binding = plugin.getOnboardingFancyNpcBinding(data.getId());
-        if (binding == null) {
+        Player player = event.getPlayer();
+        if (player == null) {
+            return;
+        }
+        if (plugin.isPlayerInOnboardingFocus(player.getUniqueId())) {
+            event.setCancelled(true);
+            plugin.advanceOnboardingFocus(player);
             return;
         }
 
-        Player player = event.getPlayer();
-        if (player == null) {
+        String displayName = data.getDisplayName();
+        if ((displayName == null || displayName.isBlank()) && data.getName() != null && !data.getName().isBlank()) {
+            displayName = data.getName();
+        }
+        if (plugin.resolvePendingOnboardingFancyNpcSelection(player, data.getId(), displayName)) {
+            event.setCancelled(true);
+            return;
+        }
+
+        Testproject.OnboardingFancyNpcBinding binding = plugin.getOnboardingFancyNpcBinding(data.getId());
+        if (binding == null) {
             return;
         }
 
@@ -42,7 +56,7 @@ public final class OnboardingFancyNpcListener implements Listener {
         Location focusLocation = data.getLocation();
         Consumer<Player> onClick = event.getOnClick();
         Runnable completionAction = onClick == null ? null : () -> onClick.accept(player);
-        String displayName = binding.displayName();
+        displayName = binding.displayName();
         if ((displayName == null || displayName.isBlank()) && data.getDisplayName() != null && !data.getDisplayName().isBlank()) {
             displayName = data.getDisplayName();
         }
@@ -50,11 +64,9 @@ public final class OnboardingFancyNpcListener implements Listener {
             displayName = data.getName() != null && !data.getName().isBlank() ? data.getName() : data.getId();
         }
 
-        plugin.beginOnboardingFancyNpcInteraction(
+        plugin.handleOnboardingFancyNpcInteraction(
                 player,
                 data.getId(),
-                binding.questKey(),
-                binding.dialogueKey(),
                 displayName,
                 focusLocation,
                 completionAction

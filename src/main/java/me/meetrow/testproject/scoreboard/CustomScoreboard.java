@@ -2,6 +2,7 @@ package me.meetrow.testproject.scoreboard;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import me.meetrow.testproject.Country;
+import me.meetrow.testproject.Guild;
 import me.meetrow.testproject.Profession;
 import me.meetrow.testproject.Testproject;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
@@ -88,6 +89,9 @@ public final class CustomScoreboard {
 
     private void updatePlayer(Player player) {
         if (player == null || !player.isOnline()) {
+            return;
+        }
+        if (plugin.isPlayerInOnboardingFocus(player.getUniqueId())) {
             return;
         }
 
@@ -235,6 +239,7 @@ public final class CustomScoreboard {
         }
 
         Country country = plugin.getPlayerCountry(player.getUniqueId());
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
         Profession profession = plugin.getProfession(player.getUniqueId());
         double maxHealth = getMaxHealth(player);
         double armor = getArmor(player);
@@ -246,6 +251,9 @@ public final class CustomScoreboard {
                 .replace("%player%", player.getName())
                 .replace("%display_name%", player.getDisplayName())
                 .replace("%world%", player.getWorld().getName())
+                .replace("%guild%", guild != null ? guild.getName() : "None")
+                .replace("%guild_tag%", guild != null ? guild.getTag() : "")
+                .replace("%guild_level%", guild != null ? String.valueOf(plugin.getGuildLevel(guild)) : "0")
                 .replace("%country%", country != null ? country.getName() : "None")
                 .replace("%country_tag%", country != null ? country.getTag() : "")
                 .replace("%country_level%", country != null ? String.valueOf(country.getLevel()) : "0")

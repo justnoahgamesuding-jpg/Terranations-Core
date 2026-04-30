@@ -1,5 +1,7 @@
 package me.meetrow.testproject;
 
+import org.bukkit.Material;
+
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -16,6 +18,12 @@ public final class PlayerQuestDefinition {
     private final Profession profession;
     private final PlayerQuestType type;
     private final Set<String> requiresCompleted;
+    private final double rewardMoney;
+    private final int rewardProfessionXp;
+    private final Profession rewardProfession;
+    private final Material rewardItemMaterial;
+    private final int rewardItemAmount;
+    private final Material requiredItemMaterial;
 
     public PlayerQuestDefinition(
             String id,
@@ -28,7 +36,13 @@ public final class PlayerQuestDefinition {
             String key,
             Profession profession,
             PlayerQuestType type,
-            Set<String> requiresCompleted
+            Set<String> requiresCompleted,
+            double rewardMoney,
+            int rewardProfessionXp,
+            Profession rewardProfession,
+            Material rewardItemMaterial,
+            int rewardItemAmount,
+            Material requiredItemMaterial
     ) {
         this.id = id;
         this.order = order;
@@ -41,6 +55,12 @@ public final class PlayerQuestDefinition {
         this.profession = profession;
         this.type = type;
         this.requiresCompleted = Collections.unmodifiableSet(new LinkedHashSet<>(requiresCompleted));
+        this.rewardMoney = rewardMoney;
+        this.rewardProfessionXp = rewardProfessionXp;
+        this.rewardProfession = rewardProfession;
+        this.rewardItemMaterial = rewardItemMaterial;
+        this.rewardItemAmount = rewardItemAmount;
+        this.requiredItemMaterial = requiredItemMaterial;
     }
 
     public String getId() {
@@ -85,5 +105,29 @@ public final class PlayerQuestDefinition {
 
     public Set<String> getRequiresCompleted() {
         return requiresCompleted;
+    }
+
+    public double getRewardMoney() {
+        return rewardMoney;
+    }
+
+    public int getRewardProfessionXp() {
+        return rewardProfessionXp;
+    }
+
+    public Profession getRewardProfession() {
+        return rewardProfession;
+    }
+
+    public Material getRewardItemMaterial() {
+        return rewardItemMaterial;
+    }
+
+    public int getRewardItemAmount() {
+        return rewardItemAmount;
+    }
+
+    public Material getRequiredItemMaterial() {
+        return requiredItemMaterial;
     }
 }

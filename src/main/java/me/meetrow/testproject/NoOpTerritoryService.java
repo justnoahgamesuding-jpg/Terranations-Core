@@ -81,4 +81,9 @@ public class NoOpTerritoryService implements TerritoryService {
     public int countFarmlandBlocks(Country country) {
         return 0;
     }
+
+    @Override
+    public int getTerritoryArea(Country country) {
+        return 0;
+    }
 }
