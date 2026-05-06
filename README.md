@@ -1,36 +1,36 @@
 # Terra Nations Core
 
-Terra Nations Core is a Paper 1.21 plugin that combines profession-based progression, a guild-first territorial economy, legacy countries, climate-aware farming, structural stability, route traders, merchant waves, staff tooling, and server utility systems in one codebase.
+Terra Nations Core is a Paper `1.21.1` plugin that combines professions, guild-backed country ownership, climate, stability, custom crafting, traders, onboarding, and staff utilities in one codebase.
 
-## What It Includes
+This repository is documented for two audiences:
 
-- Seven core professions: Miner, Lumberjack, Farmer, Builder, Blacksmith, Trader, and Soldier
-- Guild management with treasury, roles, permissions, invite flows, progression, stockpiles, and guild-backed country claims
-- Country management with territory links, homes, treasury, resources, roles, upgrades, boosts, trader access, and legacy tutorial compatibility
-- Climate, seasons, rainfall, altitude, and biome-aware crop or sapling growth
-- Stability and support-structure rules for excavation and large builds
-- A standalone Terra workbench playtest system with placeable specialist benches, placeholder custom ores, materials, armor, tools, and blocks
-- Traveling trader and wandering merchant systems
-- Local, country, and opt-in global chat routing
-- Terra-owned player balances and country treasury support
-- A locked hotbar guide item that opens player stats, personal skills, contracts, and hub menus
-- Staff tools, vanish, fly speed, lag reduction, maintenance mode, and utility commands
+- server admins who need to install, configure, and operate it
+- server developers who need to build it, inspect its layout, and extend it safely
+
+## What matters
+
+- Main admin reference: [PLUGIN_DOCUMENTATION.md](PLUGIN_DOCUMENTATION.md)
+- ItemsAdder HUD content: [examples/itemsadder/contents/terra_quest_hud/README.md](examples/itemsadder/contents/terra_quest_hud/README.md)
+- Standalone vanilla resource pack example: [examples/resourcepacks/terranations_hud_pack/README.md](examples/resourcepacks/terranations_hud_pack/README.md)
 
 ## Platform
 
-- Java 21
+- Java `21`
 - Maven
 - Paper `1.21.1-R0.1-SNAPSHOT`
 
-Optional integrations used by specific systems:
+Optional runtime integrations used by specific systems:
 
 - Vault
 - PlaceholderAPI
+- ItemsAdder
+- FancyNpcs
 - LuckPerms
 - WorldEdit
 - WorldGuard
 - Dynmap
 - CoreProtect
+- SimpleScore
 
 ## Build
 
@@ -38,54 +38,83 @@ Optional integrations used by specific systems:
 mvn clean package
 ```
 
-The shaded jar is produced in `target/`.
+The plugin jar is produced in `target/`.
 
-## Main Command Roots
+## Install
+
+1. Build the jar with Maven.
+2. Place the jar in `plugins/`.
+3. Start the server once to generate runtime data.
+4. Review the settings files under `plugins/testproject/`.
+5. If you use the HUD pack, install the ItemsAdder example content and run `/iazip`.
+6. If you use territory sync, also install and configure WorldGuard. Dynmap is optional.
+
+## Command roots
+
+Admin-facing roots:
 
 - `/terra`
-- `/jobs`
-- `/guild`
-- `/country`
-- `/climate`
 - `/trader`
 - `/merchant`
+- `/climate`
 - `/staff`
-- `/balance`
-- `/spawn`
 - `/flyspeed`
 - `/vanish`
-- `/countrychat` (`/cc`)
-- `/globalchat` (`/gc`)
 - `/rollbackarea`
 - `/undoarea`
 
-## Current Playtest Crafting Layer
+Mixed player and admin roots:
 
-- `/terra catalog` opens an admin GUI for spawning Terra workbenches, placeholder ores, materials, blocks, armor, and tools.
-- Vanilla crafting tables are blocked on interaction so players are pushed toward Terra workbenches instead.
-- Placed Terra workbenches show a floating title above the block and open a dedicated crafting GUI on right-click.
-- Each workbench has a linked specialist profession that gets extra output on eligible recipes and one specialist-only pattern.
-- The current content set is intentionally placeholder-driven so ItemsAdder models, blocks, armor, and textures can be swapped in later without rebuilding the logic.
+- `/jobs`
+- `/guild`
+- `/country`
+- `/balance`
+- `/spawn`
+- `/countrychat` (`/cc`)
+- `/globalchat` (`/gc`)
 
-## Documentation
+Use `/terra help` for the current admin command surface.
 
-- Admin and system reference: [PLUGIN_DOCUMENTATION.md](PLUGIN_DOCUMENTATION.md)
-- Player-facing guide: [BEGINNER_GUIDE.md](BEGINNER_GUIDE.md)
-- High-level timeline: [UPDATES.md](UPDATES.md)
-- Detailed feature ledger: [PATCH_NOTES.md](PATCH_NOTES.md)
-- Future backlog: [GAME_FEATURE_IDEAS.md](GAME_FEATURE_IDEAS.md)
+## Runtime layout
 
-## Important Resource Files
+Bundled config and message files live in `src/main/resources/`.
 
-- `src/main/resources/plugin.yml`
-- `src/main/resources/settings/core.yml`
-- `src/main/resources/settings/climate.yml`
-- `src/main/resources/settings/stability.yml`
-- `src/main/resources/settings/merchant.yml`
-- `src/main/resources/settings/territories.yml`
-- `src/main/resources/jobs/config.yml`
-- `src/main/resources/jobs/*.yml`
-- `src/main/resources/messages/messages.yml`
-- `src/main/resources/data.yml`
-- `src/main/resources/guilds/data.yml`
-- `src/main/resources/countries/data.yml`
+The most important ones are:
+
+- `plugin.yml`
+- `settings/core.yml`
+- `settings/guilds.yml`
+- `settings/climate.yml`
+- `settings/stability.yml`
+- `settings/territories.yml`
+- `settings/merchant.yml`
+- `settings/freeport-merchants.yml`
+- `settings/onboarding.yml`
+- `settings/quests.yml`
+- `jobs/config.yml`
+- `jobs/*.yml`
+- `messages/messages.yml`
+- `messages/territories.yml`
+- `scoreboard/config.yml`
+- `chat/config.yml`
+
+Generated runtime storage files include:
+
+- `data.yml`
+- `countries/data.yml`
+- `guilds/data.yml`
+
+## Current model
+
+- `guild` is the main player-facing ownership and progression layer
+- `country` is still the territory and settlement object underneath it
+- climate, stability, merchants, and crafting are active gameplay systems, not placeholders
+- some onboarding and legacy admin flows still reference countries directly
+
+## Notes for maintainers
+
+- `src/main/java/me/meetrow/testproject/Testproject.java` is the central plugin class and owns most runtime state.
+- Command handling is split mainly across `TerraCommand`, `GuildCommand`, and `CountryCommand`.
+- The repository currently includes example pack content and generated zip artifacts for manual pack work.
+
+For the operational details, config map, and admin workflows, use [PLUGIN_DOCUMENTATION.md](PLUGIN_DOCUMENTATION.md).

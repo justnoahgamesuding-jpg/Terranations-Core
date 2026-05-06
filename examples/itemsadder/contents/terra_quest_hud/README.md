@@ -1,8 +1,22 @@
 # Terra Quest HUD ItemsAdder Content
 
-Use this folder as the single source of truth for the in-game ItemsAdder HUD.
+This folder is the canonical ItemsAdder content pack for Terra's HUD and hotbar presentation.
 
-Folder layout:
+## Install
+
+Copy this folder to:
+
+```text
+plugins/ItemsAdder/contents/terra_quest_hud
+```
+
+Then run:
+
+```text
+/iazip
+```
+
+## Required layout
 
 ```text
 configs/terra_quest_hud.yml
@@ -11,23 +25,27 @@ resourcepack/assets/terrahud/textures/font/hud/top_status/
 resourcepack/assets/minecraft/
 ```
 
-What goes where:
+## What each path is for
 
-- `textures/font/hud/top_status/` keeps the source panel images with the content config.
-- `resourcepack/assets/terrahud/textures/font/hud/top_status/` is the runtime namespace path ItemsAdder actually reads for `terrahud:*` font images.
-- `resourcepack/assets/minecraft/` contains vanilla overrides such as boss bar, hotbar, hearts, hunger, and XP bar.
+- `textures/font/hud/top_status/`
+  Source panel images stored next to the content config.
+- `resourcepack/assets/terrahud/textures/font/hud/top_status/`
+  Runtime namespace path for `terrahud:*` font images.
+- `resourcepack/assets/minecraft/`
+  Vanilla HUD overrides such as boss bar, hotbar, hearts, hunger, and XP bar.
 
-Do not duplicate these files into:
+## Important rules
 
-- `resourcepack/minecraft/`
-- `resourcepack/terrahud/`
+- Do not duplicate these files into `resourcepack/minecraft/` or `resourcepack/terrahud/`.
+- Keep the active top status panel PNGs mirrored into `resourcepack/assets/terrahud/textures/font/hud/top_status/`.
+- If those mirrored files are missing, ItemsAdder will fail to resolve the font images.
 
-Do keep the active top status panel PNGs mirrored in `resourcepack/assets/terrahud/textures/font/hud/top_status/`, otherwise ItemsAdder will log `Image not found for font_image 'terrahud:...'`.
+## Related Terra config
 
-Install by copying this folder to:
+The runtime toggle and layout settings for the top status HUD live in:
 
-```text
-plugins/ItemsAdder/contents/terra_quest_hud
-```
+- `plugins/testproject/settings/core.yml`
 
-Then run `/iazip`.
+Relevant section:
+
+- `itemsadder-top-status`
