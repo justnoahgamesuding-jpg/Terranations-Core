@@ -628,6 +628,374 @@ Recommended process:
 
 This order saves a lot of confusion later.
 
+## Recommended values by server size
+
+These are not the only workable values, but they are solid starting points if you want a balanced setup without spending days tuning from scratch.
+
+Treat them as launch presets, not permanent law.
+
+### Small server preset
+
+This is a good fit for a smaller community where:
+
+- players know each other
+- early settlement progress should happen reasonably fast
+- you want fewer hard progression walls
+- you still want guilds and land control to matter
+
+Recommended values:
+
+#### `settings/guilds.yml`
+
+```yml
+guilds:
+  creation:
+    create-cost: 150.0
+
+  invites:
+    duration-hours: 48
+
+  treasury:
+    officer-base-withdraw-limit: 200.0
+    officer-per-level-withdraw-limit: 50.0
+    admiral-base-withdraw-limit: 50.0
+    admiral-per-level-withdraw-limit: 15.0
+
+  claims:
+    country-claim-base-cost: 300.0
+    reclaim-cooldown-days: 2
+    minimum-claim-members: 2
+    minimum-claim-total-levels: 18
+
+  upkeep:
+    leader-inactivity-days: 21
+```
+
+#### `settings/core.yml`
+
+```yml
+economy:
+  reward-scale: 0.22
+  price-scale: 0.20
+
+hunger:
+  speed-multiplier: 0.95
+
+hostile-mobs:
+  spawning-enabled: true
+
+phantoms:
+  enabled: false
+
+wilderness-regeneration:
+  enabled: true
+  seconds: 900
+  build-decay-seconds: 600
+```
+
+#### `settings/stability.yml`
+
+```yml
+stability:
+  strictness:
+    percent: 90
+```
+
+Why this works:
+
+- guild creation is reachable early
+- first claims happen without needing a large active population
+- stability still matters, but is a little more forgiving
+- hunger and world friction stay present without exhausting newer players
+
+### Medium server preset
+
+This is a better fit for a more active public server where:
+
+- several guilds may compete at once
+- claims need to feel earned
+- economy abuse matters more
+- staff need stronger progression gates
+
+Recommended values:
+
+#### `settings/guilds.yml`
+
+```yml
+guilds:
+  creation:
+    create-cost: 250.0
+
+  invites:
+    duration-hours: 48
+
+  treasury:
+    officer-base-withdraw-limit: 300.0
+    officer-per-level-withdraw-limit: 75.0
+    admiral-base-withdraw-limit: 75.0
+    admiral-per-level-withdraw-limit: 25.0
+
+  claims:
+    country-claim-base-cost: 500.0
+    reclaim-cooldown-days: 3
+    minimum-claim-members: 3
+    minimum-claim-total-levels: 30
+
+  upkeep:
+    leader-inactivity-days: 30
+```
+
+#### `settings/core.yml`
+
+```yml
+economy:
+  reward-scale: 0.20
+  price-scale: 0.20
+
+hunger:
+  speed-multiplier: 1.0
+
+hostile-mobs:
+  spawning-enabled: true
+
+phantoms:
+  enabled: false
+
+wilderness-regeneration:
+  enabled: true
+  seconds: 600
+  build-decay-seconds: 300
+```
+
+#### `settings/stability.yml`
+
+```yml
+stability:
+  strictness:
+    percent: 100
+```
+
+Why this works:
+
+- guild creation still happens at a healthy pace
+- claims take real coordination
+- treasury misuse is harder
+- land ownership feels competitive instead of automatic
+- the world keeps its intended survival pressure
+
+### When to move away from these presets
+
+Change them if:
+
+- claims are happening in the first day and you do not want that
+- no guild can realistically reach a claim
+- players are hoarding money faster than land or upkeep can drain it
+- cave-ins are driving people away instead of teaching better building
+- new players are getting stuck before they even understand the main loop
+
+## Step-by-step territory claim example
+
+This is a practical example of how to go from an empty world area to a live claimed settlement that players can actually use.
+
+### Stage 1: choose the settlement area
+
+Start by choosing the land before you touch commands.
+
+Pick an area that:
+
+- has enough flat or workable space for a settlement
+- has a clear center
+- has reasonable access to starter resources
+- is not overlapping another planned country
+
+At this stage, decide:
+
+- the settlement name
+- whether it is meant for public players, a starter settlement, or a guild target
+- where the country home should eventually be
+- where traders or merchant-related spawns should eventually sit
+
+### Stage 2: prepare the physical space
+
+Before creating regions, make sure the area is actually ready.
+
+You should already know:
+
+- the rough outer border
+- the main roads or entry points
+- the area players will think of as the center
+- where important utility points belong
+
+Do not create a territory first and figure out the build later. That usually leads to ugly borders and confusing home placement.
+
+### Stage 3: create the WorldGuard region
+
+Use WorldEdit to select the land, then create the region with WorldGuard.
+
+The important part is not the exact WorldGuard syntax. The important part is that the region:
+
+- has a clean name
+- matches the intended playable area
+- does not accidentally include a huge amount of wilderness
+- does not cut buildings in half
+
+Good region naming matters. Use consistent names that staff can understand later.
+
+Example pattern:
+
+- `oakvale`
+- `freeport`
+- `ironreach`
+
+### Stage 4: create the country
+
+Now create the Terra country object that will represent the settlement.
+
+Use:
+
+```text
+/country create Oakvale
+```
+
+After that:
+
+- confirm the country exists
+- confirm the owner is correct
+- decide whether it is a normal public-facing country or part of a more controlled admin flow
+
+If you are building a staff-prepared country, make sure the ownership and name are finalized before inviting or moving real players into it.
+
+### Stage 5: link the territory to the country
+
+Once the WorldGuard region and country both exist, connect them.
+
+Use the territory command flow:
+
+```text
+/country territory setregion <world> <region-id> <country>
+```
+
+Example:
+
+```text
+/country territory setregion world oakvale Oakvale
+```
+
+Then verify it:
+
+```text
+/country territory info Oakvale
+```
+
+At this point, confirm:
+
+- the region linked successfully
+- the country now recognizes its territory
+- staff can inspect the territory cleanly
+
+### Stage 6: test entry and border behavior
+
+Before anyone lives there, walk in and out of the territory yourself.
+
+Test:
+
+- chat notifications
+- title notifications
+- border particles
+- Dynmap markers if Dynmap is enabled
+
+If something looks wrong here, fix it now. Do not wait until players start using the settlement.
+
+### Stage 7: set the country home
+
+Stand inside the linked territory and set the settlement home.
+
+Use:
+
+```text
+/country sethome
+```
+
+Then test:
+
+```text
+/country home
+```
+
+This matters because country home behavior is territory-aware. If the home is not valid, players will feel the setup is broken immediately.
+
+### Stage 8: prepare trader and merchant points if needed
+
+If the country is supposed to participate in trader or merchant loops, set those points while you are still in setup mode.
+
+Depending on the intended design, use the available country management and merchant admin flows to place:
+
+- trader spawn points
+- merchant access points
+- admin-managed settlement utility positions
+
+Do this before the settlement becomes active so the economy layer feels intentional from day one.
+
+### Stage 9: create or prepare the guild that will claim it
+
+If the settlement is meant to be claimed through the live guild system, now prepare the guild side.
+
+That means making sure the future claimant guild:
+
+- exists
+- has enough members
+- has enough total job levels
+- has enough treasury value
+- meets your claim rules
+
+If you are testing as staff, you can simulate this by creating a test guild and funding it properly instead of bypassing everything blindly.
+
+### Stage 10: claim the country through the guild flow
+
+Once the guild is ready, claim the country.
+
+Use:
+
+```text
+/guild claim Oakvale
+```
+
+After the claim:
+
+- check guild info
+- check country info
+- confirm the settlement is now tied to the intended guild
+- confirm upkeep expectations are understood
+
+### Stage 11: live player validation
+
+Before calling the settlement finished, test it from a real player perspective.
+
+A normal player should be able to:
+
+- enter the settlement and get the right notifications
+- use `/country info`
+- use `/country home` if appropriate
+- understand who owns the place
+- interact with the guild/country structure without confusing messages
+
+If any of that feels messy, the settlement is not really finished yet.
+
+### Stage 12: monitor the first week
+
+The first week after a new settlement goes live is where most setup mistakes show up.
+
+Watch for:
+
+- home complaints
+- border confusion
+- guild claim confusion
+- upkeep misunderstandings
+- trader/merchant placement problems
+- climate or stability interactions that make the settlement less usable than intended
+
+The right fix is usually not "add more commands." It is usually better setup, clearer messaging, or better placement.
+
 ## Recommended pre-launch test pass
 
 Before opening the server, test these with a fresh account and an admin account.
