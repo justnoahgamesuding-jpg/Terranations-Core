@@ -1,332 +1,671 @@
-# Terra Operations And Development Reference
+# Terra Server Setup Guide
 
-This document is the working reference for server admins and plugin developers. It is focused on installation, configuration, runtime behavior, and the command surface that actually matters in production.
+This document is written for server owners, admins, and builders who need to set Terra up properly and understand how the plugin behaves in play.
 
-## 1. System summary
+The goal here is simple:
 
-Terra currently ships these main systems:
+- explain what each major system does
+- explain which files control it
+- explain how to set it up in a sensible order
+- keep the writing easy to read without turning it into a shallow summary
 
-- profession progression with specialization pressure
-- guilds as the main ownership, treasury, stockpile, and progression layer
-- countries as the territory and settlement layer underneath guild claims
-- climate-aware crops and saplings
-- structural stability and excavation support rules
-- Terra workbench and specialist bench crafting
-- route traders, merchant shops, and fixed Freeport starter merchants
-- onboarding, quest assignment, and NPC-driven setup flows
-- local, country, and global chat routing
+## What Terra is
+
+Terra is not a small utility plugin. It is a full survival framework built around progression, specialization, territory, economy, and server-controlled world rules.
+
+The main parts of the plugin are:
+
+- professions and job progression
+- guilds
+- countries and territory
+- climate-based farming
+- stability and cave-in rules
+- Terra workbench crafting
+- traders and merchants
+- onboarding and tutorial content
 - Terra-owned player balances
-- PlaceholderAPI, ItemsAdder, FancyNpcs, WorldGuard, Dynmap, and staff utility integrations
+- chat routing
+- staff and server utility tools
 
-## 2. Build and runtime requirements
+The current live model is `guild first`.
+
+That means players will mainly feel the server through guilds, but countries still matter because they hold the actual settlement and territory layer underneath guild claims.
+
+## Before you install it
+
+### Required platform
 
 - Java `21`
-- Maven
 - Paper `1.21.1-R0.1-SNAPSHOT`
+- Maven if you are building from source
 
-Optional but important integrations:
+### Optional integrations
 
-- `Vault`: economy bridge support where applicable
-- `PlaceholderAPI`: Terra placeholders
-- `ItemsAdder`: HUD pack and custom item presentation
-- `FancyNpcs`: onboarding and dialogue integrations
-- `LuckPerms`: permission-aware behavior
-- `WorldEdit`: admin setup flows that use selections
-- `WorldGuard`: country territory linking
-- `Dynmap`: optional territory map markers
-- `CoreProtect`: `/rollbackarea` and `/undoarea`
-- `SimpleScore`: optional scoreboard/dialog support
+Terra can run without every integration, but some systems are much better when the matching plugin is installed.
 
-## 3. Startup checklist
+- `WorldGuard`
+  Needed for proper country territory linking.
+- `WorldEdit`
+  Useful for setup flows that use selections.
+- `Dynmap`
+  Optional map display for country regions.
+- `ItemsAdder`
+  Used for the HUD/resource pack path this project now prefers.
+- `FancyNpcs`
+  Used by the onboarding and dialogue systems.
+- `PlaceholderAPI`
+  Used for placeholders in HUD or external displays.
+- `CoreProtect`
+  Needed for `/rollbackarea` and `/undoarea`.
+- `LuckPerms`
+  Useful for server permission structure.
+- `Vault`
+  Present as a soft dependency, though Terra owns its own balance storage.
+- `SimpleScore`
+  Optional scoreboard support.
 
-1. Build with `mvn clean package`.
-2. Place the jar in the server `plugins/` directory.
-3. Start the server once to generate plugin data.
-4. Review all settings under `plugins/testproject/`.
-5. Review message files before going live.
-6. Install ItemsAdder content if you use the HUD.
-7. Install WorldGuard before enabling territory-linked country workflows.
-8. Back up `data.yml`, `countries/data.yml`, and `guilds/data.yml` before large admin edits or testing resets.
+## Install order
 
-## 4. Runtime file map
+If you want the cleanest setup, do it in this order instead of configuring everything at once.
 
-### Core configuration
+1. Install Terra and start the server once.
+2. Stop the server and review every file under `plugins/testproject/`.
+3. Configure the core gameplay file first.
+4. Configure guilds and countries next.
+5. Configure climate and stability before opening survival.
+6. Configure onboarding and quests before inviting fresh players.
+7. Configure merchants and traders after your economy pace feels right.
+8. Add ItemsAdder HUD content if you want the visual layer.
+9. Link territories only after your WorldGuard regions are ready.
+10. Back up your Terra data before testing resets, claims, or admin cleanup commands.
+
+## Important files
+
+These are the files most server admins will actually need.
+
+### Main settings
 
 - `settings/core.yml`
-  Global gameplay toggles, economy scale, hunger, world systems, MOTD, HUD, join/leave presentation, lag reduction, and maintenance behavior.
 - `settings/guilds.yml`
-  Guild create cost, invite timing, withdrawal limits, claim rules, upkeep, XP, score, and level thresholds.
 - `settings/climate.yml`
-  Climate model tuning, seasons, rainfall, crop behavior, and display settings.
 - `settings/stability.yml`
-  Stability strictness, material classes, support logic, and collapse behavior.
 - `settings/territories.yml`
-  Territory sync, entry notifications, Dynmap integration, and border particle settings.
 - `settings/merchant.yml`
-  Wandering merchant and route merchant runtime settings.
 - `settings/freeport-merchants.yml`
-  Fixed starter merchant inventories and cooldowns.
 - `settings/onboarding.yml`
-  Onboarding, tutorial, marker, and related setup values.
 - `settings/quests.yml`
-  General and tutorial quest definitions.
 
-### Supporting configuration
+### Supporting settings
 
 - `jobs/config.yml`
-  Shared profession settings.
 - `jobs/*.yml`
-  Profession-specific progression and tuning.
 - `messages/messages.yml`
-  Main chat, status, admin, and gameplay messages.
 - `messages/territories.yml`
-  Territory protection and territory-specific messaging.
 - `chat/config.yml`
-  Chat presentation settings.
 - `scoreboard/config.yml`
-  Scoreboard and HUD support config.
 
-### Runtime storage
+### Runtime data
 
 - `data.yml`
-  Main plugin data store.
 - `countries/data.yml`
-  Country state.
 - `guilds/data.yml`
-  Guild state.
 
-## 5. Ownership model
+If you are going to test destructive admin commands, change progression rules heavily, or wipe player state, back these files up first.
 
-The current production model is:
+## First server setup
 
-- players mainly interact through `guild`
-- guilds claim and sustain `countries`
-- countries still hold territory, homes, boosts, and related settlement state
+This is the safest first-pass setup for a live Terra server.
 
-That means:
+### 1. Review `settings/core.yml`
 
-- country tools still matter for setup, legacy flows, and some admin actions
-- guild rules are the main live progression and treasury rules
-- documentation and staff training should be guild-first
+This file controls the broad server rules.
 
-## 6. Command map
+The most important sections are:
 
-This is the practical command surface. It is not a full syntax dump; it is the set of roots admins and maintainers need to know.
+- `block-delay`
+  Shared break/place cooldown behavior.
+- `rewards`
+  Whether block actions give rewards.
+- `economy`
+  Global money scaling.
+- `hunger`
+  Hunger rate and climate-related hunger pressure.
+- `items`
+  Ender pearl, shulker box, and per-material restrictions.
+- `hostile-mobs`, `phantoms`, `bats`
+  Core mob toggles.
+- `wilderness-regeneration`
+  Wilderness cleanup and decay timing.
+- `realtime-clock`
+  Real-world time sync settings.
+- `server-list-motd`
+  Animated server list MOTD frames.
+- `itemsadder-top-status`
+  Top-center HUD display settings.
+- `lag-reduction`
+  Ground item clearing, item merging, and mob stacking.
+
+Practical advice:
+
+- keep `economy.reward-scale` conservative at launch
+- keep lag reduction enabled unless you have a strong reason not to
+- decide early whether you want phantom spawning on or off
+- review `items.materials` if you want to hard-block specific utility blocks
+
+### 2. Review `settings/guilds.yml`
+
+This file controls the main player ownership layer.
+
+Key sections:
+
+- `creation`
+  Guild creation cost and tag rules.
+- `invites`
+  Invite duration and recruiter notifications.
+- `treasury`
+  Withdraw limits by role.
+- `claims`
+  Country claim cost, reclaim cooldown, and minimum guild strength.
+- `upkeep`
+  Inactivity and upkeep reduction behavior.
+- `progression`
+  Guild XP, score, member cap, claim cap, and level thresholds.
+
+Practical advice:
+
+- set `create-cost` high enough that guild creation feels deliberate
+- keep `minimum-claim-members` and `minimum-claim-total-levels` high enough to stop instant land grabs
+- test `country-claim-base-cost` against your real earning pace, not your guess
+- be careful with officer and admiral withdrawal limits because treasury abuse is one of the easiest ways to destabilize settlement gameplay
+
+### 3. Review `settings/territories.yml`
+
+This file matters if countries are going to be linked to real land.
+
+It controls:
+
+- whether territory integration is enabled
+- chat notifications on entry
+- title notifications on entry
+- Dynmap marker style
+- passive country border particles
+
+Practical advice:
+
+- do not enable territory-heavy gameplay before your WorldGuard regions are named and tested
+- keep title notifications readable and not too noisy
+- if using Dynmap, confirm the color choices make open/closed/ownerless land easy to understand
+
+### 4. Review `settings/climate.yml`
+
+This is one of the most important balance files in the plugin because it changes where farming works well.
+
+It controls:
+
+- the master climate toggle
+- temperature unit
+- equator behavior
+- seasonal override
+- large-scale climate pattern
+- biome adaptation
+- altitude penalties
+- rain effects
+- crop particle effects
+- freeze-water behavior
+- climate debug displays
+
+What this system does in practice:
+
+- different places on the map will feel better or worse for different crops
+- altitude matters
+- rain helps in some conditions
+- seasons can shift how forgiving farming feels
+- biome blending helps custom world generation feel less wrong
+
+Practical advice:
+
+- leave `biome-adaptation.enabled` on unless you have a very controlled custom world reason to disable it
+- do not overtune temperature values before you playtest multiple regions
+- if your server uses large mountains, read the `altitude` section carefully
+- if players should survive more easily early on, tune hunger and climate together, not separately
+
+### 5. Review `settings/stability.yml`
+
+This file controls whether players can dig and build like vanilla or whether the world demands support and structure.
+
+It controls:
+
+- the master stability toggle
+- scan radius and warning delay
+- support detection rules
+- span allowances by material type
+- wetness stress
+- load and weight tracing
+- global strictness
+- separate mining leniency for natural terrain
+- rubble chance
+- stability meter behavior
+
+What this system does in practice:
+
+- unsupported mines can cave in
+- long spans and weak roofs are punished
+- player-built structures are judged more strictly than natural terrain
+- rain and nearby water can make areas riskier
+
+Practical advice:
+
+- if your community is not used to this kind of survival pressure, keep `strictness.percent` near the default at first
+- do not make underground tunneling too punishing until you test natural cave tolerance
+- when players complain about collapses, check whether the issue is real balance or just missing support education
+
+### 6. Review `settings/onboarding.yml` and `settings/quests.yml`
+
+These files control the first-hour experience.
+
+`onboarding.yml` covers:
+
+- whether onboarding is enabled
+- starter hub behavior
+- profession trial requirements
+- objective HUD
+- NPC focus mode
+- NPC dialogue text
+
+What onboarding does:
+
+- it delays full profession commitment
+- it pushes players through guided trials
+- it gives the server a controlled first impression instead of dumping players into raw survival
+
+Practical advice:
+
+- if Terra is central to your server identity, do not skip onboarding setup
+- use a real starter hub location instead of leaving it vague
+- make sure the dialogue and NPC positions match what players actually see in the world
+- keep trial thresholds high enough to teach the loop, but not so high that players feel trapped
+
+### 7. Review `settings/merchant.yml` and `settings/freeport-merchants.yml`
+
+These files control the merchant economy.
+
+`merchant.yml` controls:
+
+- wandering merchant wave timing
+- active duration
+- rotation frequency
+- trade cooldown
+- merchant spawn radius
+- buy rotations
+- sell offers
+
+`freeport-merchants.yml` controls:
+
+- fixed starter merchants
+- their display names
+- icons
+- exact offers
+- cooldowns
+
+What the merchant systems do:
+
+- `merchant-shop` is a rotating wave market
+- `freeport-merchants` are stable starter sellers/buyers for early progression
+
+Practical advice:
+
+- fixed starter merchants should help new players move, not let them skip progression
+- keep early prices modest and predictable
+- use the wave merchant for variety, not as the entire economy
+- do not set trade cooldowns so low that players can spam the market faster than gathering loops can support
+
+## Major gameplay systems
+
+This section explains the plugin's systems in plain server-owner terms.
+
+### Professions
+
+Terra is built around specialization. Players are not supposed to feel equally good at every loop from the start.
+
+The current core professions are:
+
+- Miner
+- Lumberjack
+- Farmer
+- Builder
+- Blacksmith
+- Trader
+- Soldier
+
+Profession files live under `jobs/`.
+
+What professions change:
+
+- leveling pace
+- access and efficiency
+- progression identity
+- how useful a player is inside a guild economy
+
+Admin guidance:
+
+- avoid making every profession level equally fast
+- make sure Trader and Builder are still worth choosing, not just Miner and Farmer
+- if players are power-leveling one job too easily, fix the reward or progression file for that job rather than inflating every other system around it
+
+### Guilds
+
+Guilds are the main social and progression layer players should care about.
+
+Guilds handle:
+
+- membership
+- treasury
+- stockpiles
+- role structure
+- permission overrides
+- recruiting state
+- progression level
+- claiming countries
+- upkeep on claimed land
+
+What makes guilds important:
+
+- they are the main bridge between personal progression and shared territory
+- they decide who can claim and hold land
+- they turn collected resources into long-term settlement power
+
+Admin guidance:
+
+- train staff to think in guild terms first
+- use countries as the territorial object, but explain the world to players through guilds
+- watch treasury values and withdrawal permissions closely during the first weeks of a server
+
+### Countries
+
+Countries are still important even though guilds are the main player-facing layer.
+
+Countries still hold:
+
+- territory links
+- homes
+- some progression and boosts
+- trader and settlement-related setup
+- legacy administrative flows
+
+Think of countries as the map object and guilds as the ownership and social layer sitting on top of them.
+
+Admin guidance:
+
+- keep country naming and region linking tidy
+- document which countries are player-facing and which are system-only
+- do not let hidden/system countries leak into public presentation if they are only there for backend logic
+
+### Climate
+
+Climate is not cosmetic. It changes farming and world feel.
+
+Players should learn that:
+
+- location matters
+- altitude matters
+- seasons matter
+- not every farming area is equally good
+
+Admin guidance:
+
+- test warm, cold, low, and high regions before launch
+- make sure staff can answer "why won't this crop grow well here?"
+- if players feel farming is random, the usual problem is feedback or setup, not the feature itself
+
+### Stability
+
+Stability exists to stop the world from playing like normal no-consequence vanilla mining and building.
+
+Players should learn that:
+
+- support matters
+- large unsupported spans are risky
+- poor excavation can cause cave-ins
+- bad terrain choices can punish greedy mining
+
+Admin guidance:
+
+- explain this system early in onboarding or server rules
+- staff should know the difference between intended collapse behavior and actual bugs
+- if a server is casual, reduce strictness instead of disabling the system entirely
+
+### Terra workbench crafting
+
+Terra includes its own crafting direction instead of relying only on vanilla crafting tables.
+
+The current setup includes:
+
+- specialist benches
+- custom crafting flows
+- admin catalog access
+- progression-linked crafting structure
+
+What this means for your server:
+
+- crafting can be used to push profession identity
+- stations matter
+- the plugin can control access and recipe flow more tightly than vanilla
+
+Admin guidance:
+
+- if using this system heavily, teach players which bench is for what
+- make sure starter areas actually expose the benches players are expected to learn
+- do not leave bench content half-configured if you want the system to feel intentional
+
+### Traders and merchants
+
+Terra has more than one economy-facing NPC loop.
+
+Broadly:
+
+- traders are route/economic progression systems
+- merchants are buy/sell shop systems
+- Freeport merchants are early-game fixed support merchants
+
+Admin guidance:
+
+- use Freeport merchants to stabilize the start
+- use merchant waves to create movement and short-term opportunities
+- do not let buy prices trivialize core gathering loops
+
+### Onboarding and tutorial
+
+This system matters more than most servers think.
+
+A plugin as large as Terra becomes much harder to understand if new players spawn in with no guidance.
+
+What good onboarding should do:
+
+- introduce the survival tone
+- explain the Terra Guide and starter flow
+- teach that profession choice matters
+- teach that guilds matter
+- prepare players for climate and stability rules
+
+Admin guidance:
+
+- keep onboarding enabled unless your server has a deliberate alternative
+- match NPC placement, signs, and routes to the actual dialogue text
+- test the full onboarding flow with a fresh account before every major release
+
+### Chat routing
+
+Terra supports local, country, and global chat behavior.
+
+This matters because it changes how a survival server feels socially.
+
+Admin guidance:
+
+- decide whether you want a quieter local-first world or a louder server-wide chat culture
+- make sure staff understand the available chat channels before launch
+
+### Staff utilities
+
+Terra also includes server utility and moderation support.
+
+This includes:
+
+- staff tools
+- vanish
+- fly speed
+- maintenance support
+- lag reduction controls
+- rollback helpers
+- world spawn and realtime clock tools
+
+Admin guidance:
+
+- only give `terra.admin` and `terra.staff` to trusted roles
+- treat rollback commands as serious recovery tools, not everyday toys
+- test maintenance mode before using it during an actual live incident
+
+## Commands you will use the most
+
+This is not every argument. It is the command surface most admins need to remember.
 
 ### `/terra`
 
-Primary admin root. Most subcommands require `terra.admin`.
+Main admin root.
 
-Main groups:
+Important uses:
 
-- server control: `reload`, `hardrestart`, `maintenance`, `lag`, `setworldspawn`, `realtimeclock`
-- world rules: `blockdelay`, `wildernessregen`, `hungerspeed`, `hostilemobs`, `phantoms`, `bats`, `items`, `rewards`
-- profession/admin tuning: `blockvalue`, `jobcap`, `jobeditor`, `setxpboost`, `cleardata`
-- climate and stability support: `cooldowndebug`, `orevision`, `stability`
-- mining and resource tools: `fixedore`, `fixedoretool`, `bypass`, `bypasslist`
-- onboarding and quests: `tutorial`, `quests`, `questdebug`
-- crafting playtest/admin content: `catalog`, `guieditor`
-
-Operational notes:
-
-- `/terra reload` reloads configs, cached state, and item metadata refresh passes.
-- `/terra hardrestart` is a staged plugin-owned restart workflow, not a generic server restart wrapper.
-- `/terra catalog` is the current admin entry point for Terra crafting content and specialist benches.
-- `/terra tutorial` and `/terra quests` are part of the onboarding/admin setup surface.
+- `reload`
+- `hardrestart`
+- `maintenance`
+- `lag`
+- `setworldspawn`
+- `realtimeclock`
+- `blockdelay`
+- `wildernessregen`
+- `hungerspeed`
+- `hostilemobs`
+- `phantoms`
+- `bats`
+- `items`
+- `rewards`
+- `jobcap`
+- `setxpboost`
+- `cleardata`
+- `stability`
+- `fixedore`
+- `fixedoretool`
+- `tutorial`
+- `quests`
+- `catalog`
 
 ### `/jobs`
 
-Profession root.
+Use this for:
 
-Key usage:
-
-- `/jobs`
-- `/jobs open`
-- `/jobs info`
-- `/jobs switch <job>`
-- `/jobs admin ...`
-
-Use this when validating profession state, switching active owned jobs, or fixing a player profile.
+- checking job state
+- opening the profession GUI
+- switching active jobs
+- admin profession edits
 
 ### `/guild`
 
-Primary player-facing social and ownership root.
+Use this for:
 
-Main groups:
-
-- membership: `create`, `invite`, `resendinvite`, `accept`, `deny`, `leave`, `kick`
-- treasury and stockpile: `deposit`, `withdraw`, `stockpile`
-- ownership: `claim`
-- governance: `role`, `permissions`, `transferleader`, `disband`
-- visibility and administration: `info`, `description`, `motd`, `recruiting`, `logs`, `list`
-
-Operational notes:
-
-- guild invites are timed and can be accepted from chat
-- claims sit on top of the existing country layer
-- upkeep failure can release countries after extended nonpayment
+- invite flow
+- treasury deposits and withdrawals
+- stockpile management
+- claims
+- guild role and permission control
 
 ### `/country`
 
-Legacy and administrative country root. Still required for territory, settlement, and some compatibility flows.
+Use this for:
 
-Main groups:
-
-- membership and state: `create`, `join`, `invite`, `acceptinvite`, `leave`, `kick`, `disband`, `joinstatus`
-- presentation and movement: `info`, `list`, `home`, `sethome`, `borders`, `chat`
-- economy and progression: `balance`, `deposit`, `contribute`, `upgrade`, `boost`, `role`
-- ownership/admin: `setowner`, `transfercountry`, `accepttransfer`, `rename`, `addtag`, `addtagtocountry`
-- territory and trader admin: `territory`, `manage`, `trade`, `admin`, `settraderreputation`
-
-Operational notes:
-
-- country homes and trader spawns are territory-aware
-- `/country` with no arguments opens the country GUI
-- hidden system countries are intentionally excluded from normal player browsing
+- settlement setup
+- homes
+- territory linking
+- borders
+- progression and boosts
+- country admin cleanup
 
 ### `/climate`
 
-Admin root for climate inspection and tuning support.
+Use this for:
 
-Key usage includes:
+- climate checks
+- season testing
+- debug display
+- crop/climate testing
 
-- checking local climate data
-- enabling or freezing climate simulation
-- season and display controls
-- crop debug and preview flows
-
-Use this together with `settings/climate.yml` when tuning farming behavior.
-
-### `/trader` and `/merchant`
-
-Admin roots for trader route and merchant runtime systems.
-
-Use them for:
-
-- status checks
-- spawn timing
-- manual spawn or removal
-- merchant management GUI access
-
-### `/staff`, `/flyspeed`, `/vanish`
-
-Staff and moderation tools.
+### `/merchant` and `/trader`
 
 Use these for:
 
-- staff mode
-- player utility actions
-- direct vanish control
-- direct fly speed control
+- status checks
+- spawn timing
+- manual runtime control
+- merchant management access
 
-### `/balance`
+### `/staff`, `/vanish`, `/flyspeed`
 
-Terra-owned player balance command. Use this when validating or correcting plugin-owned economy state.
+Use these for staff operation and moderation support.
 
-### `/spawn`
+## Setting up land and settlements properly
 
-Admin country warp and related UI surface.
+If your server uses countries seriously, do not improvise the territory side.
 
-### `/rollbackarea` and `/undoarea`
+Recommended process:
 
-CoreProtect-backed rollback helpers. These should be considered destructive admin tooling and used with normal rollback discipline.
+1. Build or choose the settlement area first.
+2. Create the WorldGuard region cleanly.
+3. Confirm the region name and boundaries.
+4. Link the region through the country territory command flow.
+5. Test entry notifications.
+6. Test country borders.
+7. Test country home placement.
+8. If using Dynmap, confirm map markers.
+9. Only then allow claims and live player use.
 
-## 7. Permissions that matter
+This order saves a lot of confusion later.
 
-Declared root permissions in `plugin.yml`:
+## Recommended pre-launch test pass
 
-- `terra.admin`
-- `terra.plugins.view`
-- `terra.country.use`
-- `terra.country.admin`
-- `terra.country.create`
-- `terra.country.join`
-- `terra.country.invite`
-- `terra.country.acceptinvite`
-- `terra.country.home`
-- `terra.country.disband`
-- `terra.country.joinstatus`
-- `terra.country.leave`
-- `terra.country.kick`
-- `terra.country.info`
-- `terra.country.farmland`
-- `terra.country.list`
-- `terra.country.rename`
-- `terra.country.setowner`
-- `terra.country.transfer`
-- `terra.country.accepttransfer`
-- `terra.country.sethome`
-- `terra.country.warpadmin`
-- `terra.guild.use`
-- `terra.country.territory`
-- `terra.country.tag`
-- `terra.staff`
+Before opening the server, test these with a fresh account and an admin account.
 
-Guild internal permissions are separate and configured through guild roles and `/guild permissions ...`.
+### Fresh player test
 
-## 8. Recommended admin workflows
+- spawn flow
+- onboarding
+- profession trial progress
+- first guild interaction
+- early merchant use
+- climate feedback on crops
+- any starter crafting path you expect players to use
 
-### First deployment
+### Admin test
 
-1. Configure `settings/core.yml`.
-2. Configure guild claim and upkeep values in `settings/guilds.yml`.
-3. Configure climate and stability before opening the server.
-4. If using territories, verify WorldGuard region names and Dynmap behavior.
-5. If using ItemsAdder HUD assets, install the example content and run `/iazip`.
-6. Start a controlled test world and validate onboarding, guild creation, claims, and merchant behavior.
+- `/terra reload`
+- guild creation
+- guild claim attempt
+- country territory link
+- merchant and trader runtime
+- stability behavior in a test mine
+- maintenance mode
+- rollback commands if CoreProtect is installed
 
-### Territory setup
+## Common mistakes
 
-1. Create or verify the WorldGuard region.
-2. Use the `/country territory ...` admin flow to link the region.
-3. Confirm entry messaging and border particles.
-4. If Dynmap is enabled, confirm markers render correctly.
+- leaving onboarding enabled but not actually finishing the onboarding area
+- enabling territory play before regions are ready
+- setting guild claim costs without testing the real earning pace
+- turning climate or stability on without warning players that the server is no longer vanilla-like
+- using merchants to bypass progression instead of support it
+- forgetting to back up Terra data before admin cleanup or reset work
 
-### Onboarding and NPC setup
+## Final advice
 
-1. Configure `settings/onboarding.yml` and `settings/quests.yml`.
-2. Use `/terra tutorial ...` to set markers and onboarding helpers.
-3. Validate FancyNpcs and ItemsAdder dependent flows on a live test account.
+Terra works best when the server owner treats it as a connected survival framework, not as a pile of separate features.
 
-### Guild economy tuning
+If you configure guilds without thinking about countries, or climate without thinking about farming, or merchants without thinking about progression, the server will feel messy even if each individual file looks correct.
 
-1. Set guild create cost, claim cost, and upkeep first.
-2. Tune withdrawal limits by role.
-3. Validate progression thresholds against your intended server pace.
-4. Test a claim, an upkeep cycle, and an unpaid upkeep path before launch.
-
-## 9. ItemsAdder and pack notes
-
-Terra no longer uses a standalone plugin-managed resource pack URL.
-
-Use ItemsAdder content from:
-
-- `examples/itemsadder/contents/terra_quest_hud`
-
-Reference:
-
-- [examples/itemsadder/contents/terra_quest_hud/README.md](examples/itemsadder/contents/terra_quest_hud/README.md)
-
-The standalone pack example remains here for manual pack work:
-
-- `examples/resourcepacks/terranations_hud_pack`
-
-Reference:
-
-- [examples/resourcepacks/terranations_hud_pack/README.md](examples/resourcepacks/terranations_hud_pack/README.md)
-
-## 10. Developer notes
-
-- `Testproject.java` is the central runtime owner and currently contains most state management.
-- `TerraCommand.java`, `GuildCommand.java`, and `CountryCommand.java` are the main command entry points.
-- Most config-backed systems are wired directly from `src/main/resources/settings/`.
-- This is a stateful plugin with multiple runtime maps and generated YAML data stores, so documentation and code changes should be validated together.
-
-## 11. Change discipline
-
-When updating this plugin:
-
-- verify command docs against `plugin.yml` and the command handler classes
-- verify config docs against the actual resource file names
-- treat guild and country docs as a coupled system
-- document operator-facing changes before adding more backlog or design notes
+Set it up in layers, test it in the same order players will meet it, and keep the first hour of gameplay extremely deliberate.
