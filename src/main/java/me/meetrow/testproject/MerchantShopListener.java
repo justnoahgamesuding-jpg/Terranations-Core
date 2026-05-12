@@ -146,7 +146,7 @@ public final class MerchantShopListener implements Listener {
             MerchantShopOffer offer = offers.get(i);
             inventory.setItem(OFFER_LIST_SLOTS[i], createSimpleItem(offer.getMaterial(), "&a" + plugin.formatMaterialName(offer.getMaterial()), List.of(
                     "&7Amount: &f" + offer.getAmount(),
-                    "&7Price: &f$" + plugin.formatMoney(offer.getPrice()),
+                    "&7Price: &f⛃" + plugin.formatMoney(offer.getPrice()),
                     "&7Stock: &f" + offer.getStock(),
                     "&eClick to edit"
             )));
@@ -172,7 +172,7 @@ public final class MerchantShopListener implements Listener {
             MerchantShopOffer offer = offers.get(i);
             inventory.setItem(OFFER_LIST_SLOTS[i], createSimpleItem(offer.getMaterial(), "&6" + plugin.formatMaterialName(offer.getMaterial()), List.of(
                     "&7Amount per trade: &f" + offer.getAmount(),
-                    "&7Payout per item: &f$" + plugin.formatMoney(offer.getPrice()),
+                    "&7Payout per item: &f⛃" + plugin.formatMoney(offer.getPrice()),
                     "&eClick to edit"
             )));
         }
@@ -196,7 +196,7 @@ public final class MerchantShopListener implements Listener {
         fillEditorSlots(inventory, holder.buy());
         inventory.setItem(OFFER_EDITOR_INFO_SLOT, createSimpleItem(offer.getMaterial(), (holder.buy() ? "&a" : "&6") + plugin.formatMaterialName(offer.getMaterial()), List.of(
                 "&7Amount: &f" + offer.getAmount(),
-                "&7Price: &f$" + plugin.formatMoney(offer.getPrice()),
+                "&7Price: &f⛃" + plugin.formatMoney(offer.getPrice()),
                 holder.buy() ? "&7Stock: &f" + offer.getStock() : "&7Type: &fSell offer",
                 "",
                 "&7Use the item on your cursor or in your",
@@ -520,7 +520,7 @@ public final class MerchantShopListener implements Listener {
                 offer.getMaterial(),
                 "&aBuy &f" + offer.getAmount() + " " + plugin.formatMaterialName(offer.getMaterial()),
                 List.of(
-                        "&7Price: &f$" + plugin.formatMoney(offer.getPrice()),
+                        "&7Price: &f⛃" + plugin.formatMoney(offer.getPrice()),
                         "&7Shared stock left: &f" + remaining + "&7/&f" + offer.getStock(),
                         remaining <= 0 ? "&cSold out for this rotation." : "&8Click to buy."
                 )
@@ -533,7 +533,7 @@ public final class MerchantShopListener implements Listener {
                 offer.getMaterial(),
                 "&6Sell &fup to " + offer.getAmount() + " " + plugin.formatMaterialName(offer.getMaterial()),
                 List.of(
-                        "&7Current payout per item: &f$" + plugin.formatMoney(payout),
+                        "&7Current payout per item: &f⛃" + plugin.formatMoney(payout),
                         "&7Daily supply affects this price.",
                         "&8Click to sell what you have."
                 )

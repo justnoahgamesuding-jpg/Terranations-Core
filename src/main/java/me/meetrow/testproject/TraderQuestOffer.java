@@ -5,6 +5,7 @@ import org.bukkit.Material;
 public final class TraderQuestOffer {
     private final Profession profession;
     private final Material requestedMaterial;
+    private final String requestedContentId;
     private final int requestedAmount;
     private final double rewardMoney;
     private final int rewardXp;
@@ -14,6 +15,7 @@ public final class TraderQuestOffer {
     public TraderQuestOffer(
             Profession profession,
             Material requestedMaterial,
+            String requestedContentId,
             int requestedAmount,
             double rewardMoney,
             int rewardXp,
@@ -22,6 +24,7 @@ public final class TraderQuestOffer {
     ) {
         this.profession = profession;
         this.requestedMaterial = requestedMaterial;
+        this.requestedContentId = requestedContentId;
         this.requestedAmount = requestedAmount;
         this.rewardMoney = rewardMoney;
         this.rewardXp = rewardXp;
@@ -35,6 +38,14 @@ public final class TraderQuestOffer {
 
     public Material getRequestedMaterial() {
         return requestedMaterial;
+    }
+
+    public String getRequestedContentId() {
+        return requestedContentId;
+    }
+
+    public boolean hasRequestedContent() {
+        return requestedContentId != null && !requestedContentId.isBlank();
     }
 
     public int getRequestedAmount() {

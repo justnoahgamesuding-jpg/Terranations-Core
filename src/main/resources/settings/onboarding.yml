@@ -3,8 +3,9 @@
 onboarding:
   enabled: true
   intro-speaker: "Terra Guide"
-  required-trials: 3
-  required-playtime-minutes: 20
+  # Keep this low enough that players learn the server instead of feeling trapped in a tutorial.
+  required-trials: 2
+  required-playtime-minutes: 12
   starter-hub:
     enabled: true
     country-key: ""
@@ -16,46 +17,114 @@ onboarding:
     yaw: 0.0
     pitch: 0.0
   trial-thresholds:
-    miner: 8
-    lumberjack: 6
-    farmer: 6
-    builder: 12
-    blacksmith: 3
-    trader: 3
+    # These are starter checks, not full profession tests.
+    miner: 5
+    lumberjack: 4
+    farmer: 4
+    builder: 8
+    blacksmith: 2
+    trader: 2
   objective-hud:
     enabled: true
-    label: "&6Next Goal"
+    label: "&6Do This Next"
+    show-progress: false
   npc-focus:
     enabled: true
-    line-millis: 2400
-    typewriter-char-millis: 35
+    # Lower timings keep dialogue readable without making players stand still too long.
+    line-millis: 1800
+    typewriter-char-millis: 25
     typewriter-sound-enabled: true
     typewriter-sound: "BLOCK_NOTE_BLOCK_HAT"
     typewriter-sound-volume: 0.35
     typewriter-sound-pitch: 1.75
-    post-type-hold-millis: 2400
-    chat-clear-lines: 80
+    post-type-hold-millis: 1400
+    chat-clear-lines: 40
     transcript-to-chat: true
     zoom-slowness-amplifier: 1
   npc-dialogue:
     intro:
-      - "&fWelcome to Terra. You start here in the starter hub so you can learn the world before locking in your first job."
-      - "&fUse the &eTerra Guide&f, explore the trial areas, and speak to guides around the island to understand each loop."
-      - "&fYou are free to try mining, farming, building, smithing, and trade before choosing the profession you want to keep."
-      - "&fWhen you complete enough of the tutorial, your first job choice unlocks and you can commit to the path that fits you."
+      - "&fWelcome to Terra. Open the &eTerra Guide&f in slot 9, finish two starter trials, and learn how the world works before you lock in a job."
+      - "&fTry the mining, farming, wood, smithing, or trade stations around the hub. You do not need to master everything here."
+      - "&fYour first goal is simple: learn the loops, choose a profession, then move toward a guild and a real settlement."
     default:
-      - "&7Take a second to look around and read what the world is asking of you."
-      - "&7Your guide will keep updating as you learn new systems."
+      - "&7Check the guide, follow the current objective, and do the nearest useful task instead of wandering blind."
+      - "&7If you are unsure, finish one more trial and then open the guide again."
     trader_npc:
-      - "&fRoutes connect countries together through supply, demand, and timing."
-      - "&fEven if you do not lock Trader first, learn where money and goods move."
+      - "&fTrader gameplay is about moving goods, timing sales, and feeding settlement demand."
+      - "&fYou do not need to main Trader now, but you should understand how money moves before joining a guild economy."
     merchant_npc:
-      - "&fMerchants are a simple market loop: buy what you need, sell what you have."
-      - "&fUse them to understand value before you choose your first profession."
+      - "&fMerchants are the easiest way to learn value: gather something useful, sell it, and watch how fast early money grows."
+      - "&fUse them for direction, not as a way to skip progression."
+    terra_workbench:
+      - "&fTerra workbenches replace mindless vanilla crafting with stations that match real jobs and progression."
+      - "&fUse the right bench, read the recipe pages, and do not waste starter stock guessing."
+    terra_workbench_workbench:
+      - "&fThis is the base workbench for early tools, simple stations, and everyday utility parts."
+      - "&fStart here when you need core gear before moving into more specialized loops."
+    terra_workbench_furnace_bench:
+      - "&fThe Terra Furnace runs several smelting lanes at once so ore and fuel management matter more than in vanilla."
+      - "&fLoad input on the left, fuel in the middle, and collect finished output on the right."
+    terra_workbench_refiner:
+      - "&fThe Refiner is the core material-processing station for ore, timber, masonry stock, and grain."
+      - "&fFeed the rack, wait through the timers, then collect refined settlement goods from the lower rows for trade, stockpiles, and better crafting."
+    terra_workbench_farmer_workbench:
+      - "&fThe Farmer Workbench turns harvests into meals, preserves, and more useful settlement stock."
+      - "&fRaw crops keep you alive. Processed food supports real work."
+    terra_workbench_builder_workbench:
+      - "&fThe Builder Workbench is for proper settlement pieces like boundaries, openings, fixtures, and structured build parts."
+      - "&fUse it when you want the world to look built, not improvised."
+    terra_workbench_campfire_bench:
+      - "&fThe Campfire Bench is for rough cooking and simple field meals."
+      - "&fUse it for quick survival food before you move into more complete food production."
+    freeport_miner_merchant:
+      - "&fBring me rough stone, coal, and early ore bars for steady starter money."
+      - "&fThis is a safe first loop for funding tools, guild deposits, and early settlement progress."
+    freeport_builder_merchant:
+      - "&fLogs, sand, clay, and practical building stock all move here."
+      - "&fGathering while you learn the island is enough to start earning immediately."
+    freeport_farmer_merchant:
+      - "&fHarvests and simple food sell well for new settlers who want steady money without leaving the starter loop."
+      - "&fUse this market to build your first treasury, not to bypass the rest of the server."
     embassy_guide:
-      - "&fCountries are the long-term social loop."
-      - "&fThe starter island is where you meet them before committing to your path."
+      - "&fGuilds are the main long-term social loop, and countries are the settlement layer underneath them."
+      - "&fThe starter island teaches you enough to choose a job, earn money, and move toward a real guild."
 
 quests:
   starter:
-    list: {}
+    list:
+      open_guide:
+        enabled: true
+        order: 1
+        type: open_guide
+        key: guide_opened
+        target: 1
+        title: "&6Open Your Guide"
+        objective: "Open the Terra Guide in slot 9"
+        hint: "Your guide shows the current objective and where to focus next."
+      complete_trials:
+        enabled: true
+        order: 2
+        type: complete_trial
+        key: any
+        target: 2
+        title: "&6Try Two Job Loops"
+        objective: "Complete any 2 starter trials"
+        hint: "Mine, chop, farm, smith, or trade until two trial bars are finished."
+      settle_in:
+        enabled: true
+        order: 3
+        type: playtime
+        key: starter_time
+        target: 12
+        title: "&6Learn The Hub"
+        objective: "Spend 12 minutes learning the starter hub"
+        hint: "Use the benches, talk to guides, and sell something useful before you commit."
+      choose_profession:
+        enabled: true
+        order: 4
+        type: select_profession
+        key: choose_profession
+        target: 1
+        title: "&6Choose Your First Profession"
+        objective: "Pick the job you want to keep after the tutorial"
+        hint: "Use /jobs or the Terra Guide once your starter requirements are complete."

@@ -7,16 +7,19 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.Event;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -41,6 +44,7 @@ public final class GuildGuiListener implements Listener {
     private static final int PERMISSIONS_SLOT = 33;
     private static final int STOCKPILE_SLOT = 35;
     private static final int INVITES_SLOT = 37;
+    private static final int TAG_COLOR_SLOT = 39;
     private static final int LEAVE_SLOT = 49;
     private static final int MANAGEMENT_SLOT = 51;
     private static final int CLOSE_SLOT = 53;
@@ -67,12 +71,46 @@ public final class GuildGuiListener implements Listener {
     private static final int ROLE_MEMBER_SLOT = 24;
     private static final int PLAYER_PERMISSIONS_SLOT = 31;
     private static final int[] PERMISSION_SLOTS = COUNTRY_SLOTS;
+    private static final int DESCRIPTION_SLOT = 20;
+    private static final int MOTD_SLOT = 22;
+    private static final int RECRUITING_SLOT = 24;
+    private static final int PROFILE_TAG_COLOR_SLOT = 31;
+    private static final int[] TAG_COLOR_SLOTS = {
+            10, 11, 12, 13, 14, 15, 16,
+            19, 20, 21, 22, 23, 24, 25,
+            28, 29
+    };
 
     private final Testproject plugin;
     private final Map<UUID, Double> selectedDepositAmounts = new ConcurrentHashMap<>();
+    private final Map<UUID, GuildProfileEditType> pendingProfileChatEdits = new ConcurrentHashMap<>();
 
     public GuildGuiListener(Testproject plugin) {
         this.plugin = plugin;
+        preloadGuiTypes();
+    }
+
+    private void preloadGuiTypes() {
+        GuildMenuViewType.values();
+        Class<?>[] holderTypes = {
+                GuildDashboardHolder.class,
+                GuildDepositHolder.class,
+                GuildMembersHolder.class,
+                GuildCountriesHolder.class,
+                GuildPermissionsHubHolder.class,
+                GuildRolePermissionsHolder.class,
+                GuildPlayerPermissionsBrowserHolder.class,
+                GuildPlayerPermissionsHolder.class,
+                GuildProfileHolder.class,
+                GuildTagColorHolder.class,
+                GuildInvitesHolder.class,
+                GuildBrowserHolder.class,
+                GuildProfileEditType.class,
+                TagColorOption.class
+        };
+        for (Class<?> holderType : holderTypes) {
+            holderType.getName();
+        }
     }
 
     public void openGuildMenu(Player player) {
@@ -99,6 +137,7 @@ public final class GuildGuiListener implements Listener {
         inventory.setItem(PERMISSIONS_SLOT, createPermissionsItem(guild, player.getUniqueId()));
         inventory.setItem(STOCKPILE_SLOT, createStockpileItem(guild));
         inventory.setItem(INVITES_SLOT, createInvitesItem(guild, player.getUniqueId()));
+        inventory.setItem(TAG_COLOR_SLOT, createTagColorItem(guild, player.getUniqueId()));
         inventory.setItem(LEAVE_SLOT, createLeaveItem(guild, player.getUniqueId()));
         inventory.setItem(MANAGEMENT_SLOT, createManagementItem(guild, player.getUniqueId()));
         inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
@@ -106,71 +145,140 @@ public final class GuildGuiListener implements Listener {
         player.openInventory(inventory);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        InventoryHolder holder = event.getView().getTopInventory().getHolder();
-        if (!(holder instanceof GuildInventoryHolder)) {
+        Inventory topInventory = event.getView().getTopInventory();
+        InventoryHolder holder = topInventory.getHolder();
+        GuildMenuViewType viewType = resolveGuildMenuViewType(event.getView(), holder);
+        if (viewType == null) {
             return;
         }
 
         event.setCancelled(true);
-        if (event.getClickedInventory() == null || event.getClickedInventory().getType() == InventoryType.PLAYER) {
+        event.setResult(Event.Result.DENY);
+        if (event.getRawSlot() < 0 || event.getRawSlot() >= topInventory.getSize()) {
             return;
         }
 
-        if (holder instanceof GuildDashboardHolder) {
-            handleDashboardClick(player, event.getSlot());
-            return;
-        }
-        if (holder instanceof GuildDepositHolder) {
-            handleDepositClick(player, event.getSlot());
-            return;
-        }
-        if (holder instanceof GuildMembersHolder) {
-            if (event.getSlot() == BACK_SLOT) {
-                openGuildMenu(player);
-            } else if (event.getSlot() == CLOSE_SLOT) {
-                player.closeInventory();
+        switch (viewType) {
+            case DASHBOARD -> handleDashboardClick(player, event.getSlot());
+            case DEPOSIT -> handleDepositClick(player, event.getSlot());
+            case MEMBERS -> {
+                if (event.getSlot() == BACK_SLOT) {
+                    openGuildMenu(player);
+                } else if (event.getSlot() == CLOSE_SLOT) {
+                    player.closeInventory();
+                }
             }
-            return;
-        }
-        if (holder instanceof GuildCountriesHolder countriesHolder) {
-            handleCountriesClick(player, countriesHolder, event.getSlot());
-            return;
-        }
-        if (holder instanceof GuildPermissionsHubHolder) {
-            handlePermissionsHubClick(player, event.getSlot());
-            return;
-        }
-        if (holder instanceof GuildRolePermissionsHolder rolePermissionsHolder) {
-            handleRolePermissionsClick(player, rolePermissionsHolder, event.getSlot(), event.getClick());
-            return;
-        }
-        if (holder instanceof GuildPlayerPermissionsBrowserHolder playerPermissionsBrowserHolder) {
-            handlePlayerPermissionsBrowserClick(player, playerPermissionsBrowserHolder, event.getSlot());
-            return;
-        }
-        if (holder instanceof GuildPlayerPermissionsHolder playerPermissionsHolder) {
-            handlePlayerPermissionsClick(player, playerPermissionsHolder, event.getSlot(), event.getClick());
-            return;
-        }
-        if (holder instanceof GuildInvitesHolder invitesHolder) {
-            handleInvitesClick(player, invitesHolder, event.getSlot(), event.getClick());
-            return;
-        }
-        if (holder instanceof GuildBrowserHolder browserHolder) {
-            handleBrowserClick(player, browserHolder, event.getSlot());
+            case COUNTRIES -> {
+                if (holder instanceof GuildCountriesHolder countriesHolder) {
+                    handleCountriesClick(player, countriesHolder, event.getSlot());
+                }
+            }
+            case PERMISSIONS_HUB -> handlePermissionsHubClick(player, event.getSlot());
+            case ROLE_PERMISSIONS -> {
+                if (holder instanceof GuildRolePermissionsHolder rolePermissionsHolder) {
+                    handleRolePermissionsClick(player, rolePermissionsHolder, event.getSlot(), event.getClick());
+                }
+            }
+            case PLAYER_PERMISSIONS_BROWSER -> {
+                if (holder instanceof GuildPlayerPermissionsBrowserHolder playerPermissionsBrowserHolder) {
+                    handlePlayerPermissionsBrowserClick(player, playerPermissionsBrowserHolder, event.getSlot());
+                }
+            }
+            case PLAYER_PERMISSIONS -> {
+                if (holder instanceof GuildPlayerPermissionsHolder playerPermissionsHolder) {
+                    handlePlayerPermissionsClick(player, playerPermissionsHolder, event.getSlot(), event.getClick());
+                }
+            }
+            case PROFILE -> handleProfileClick(player, event.getSlot());
+            case TAG_COLOR -> handleTagColorClick(player, event.getSlot());
+            case INVITES -> {
+                if (holder instanceof GuildInvitesHolder invitesHolder) {
+                    handleInvitesClick(player, invitesHolder, event.getSlot(), event.getClick());
+                }
+            }
+            case BROWSER -> {
+                if (holder instanceof GuildBrowserHolder browserHolder) {
+                    handleBrowserClick(player, browserHolder, event.getSlot());
+                }
+            }
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (event.getView().getTopInventory().getHolder() instanceof GuildInventoryHolder) {
-            event.setCancelled(true);
+        Inventory topInventory = event.getView().getTopInventory();
+        if (resolveGuildMenuViewType(event.getView(), topInventory.getHolder()) == null) {
+            return;
         }
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot >= 0 && rawSlot < topInventory.getSize()) {
+                event.setCancelled(true);
+                event.setResult(Event.Result.DENY);
+                return;
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryClickMonitor(InventoryClickEvent event) {
+        Inventory topInventory = event.getView().getTopInventory();
+        if (resolveGuildMenuViewType(event.getView(), topInventory.getHolder()) == null) {
+            return;
+        }
+        if (event.getRawSlot() >= 0 && event.getRawSlot() < topInventory.getSize()) {
+            event.setCancelled(true);
+            event.setResult(Event.Result.DENY);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryDragMonitor(InventoryDragEvent event) {
+        Inventory topInventory = event.getView().getTopInventory();
+        if (resolveGuildMenuViewType(event.getView(), topInventory.getHolder()) == null) {
+            return;
+        }
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot >= 0 && rawSlot < topInventory.getSize()) {
+                event.setCancelled(true);
+                event.setResult(Event.Result.DENY);
+                return;
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onProfileChatInput(AsyncPlayerChatEvent event) {
+        GuildProfileEditType editType = pendingProfileChatEdits.remove(event.getPlayer().getUniqueId());
+        if (editType == null) {
+            return;
+        }
+        event.setCancelled(true);
+        Player player = event.getPlayer();
+        String input = event.getMessage().trim();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+            if (guild == null) {
+                player.sendMessage(plugin.colorize("&cYou are no longer in a guild."));
+                return;
+            }
+            if (guild.getLeaderId() == null || !guild.getLeaderId().equals(player.getUniqueId())) {
+                player.sendMessage(plugin.colorize("&cOnly the guild leader can edit the guild profile."));
+                return;
+            }
+            if (editType == GuildProfileEditType.DESCRIPTION) {
+                plugin.setGuildDescription(guild, input.equalsIgnoreCase("clear") ? "" : input);
+                player.sendMessage(plugin.colorize("&aGuild description updated."));
+            } else if (editType == GuildProfileEditType.MOTD) {
+                plugin.setGuildMotd(guild, input.equalsIgnoreCase("clear") ? "" : input);
+                player.sendMessage(plugin.colorize("&aGuild MOTD updated."));
+            }
+            openProfileMenu(player, guild);
+        });
     }
 
     private void handleDashboardClick(Player player, int slot) {
@@ -196,8 +304,9 @@ public final class GuildGuiListener implements Listener {
                 player.sendMessage(plugin.colorize("&7Use &f/guild stockpile deposit <amount> &7while holding a material."));
             }
             case INVITES_SLOT -> openInvitesMenu(player, guild);
+            case TAG_COLOR_SLOT -> openTagColorMenu(player, guild);
             case LEAVE_SLOT -> handleLeave(player, guild);
-            case MANAGEMENT_SLOT -> sendManagementHelp(player, guild);
+            case MANAGEMENT_SLOT -> openProfileMenu(player, guild);
             case CLOSE_SLOT -> player.closeInventory();
             default -> {
             }
@@ -475,6 +584,78 @@ public final class GuildGuiListener implements Listener {
         openPlayerPermissionsMenu(player, guild, holder.targetId(), holder.page(), holder.browserPage());
     }
 
+    private void handleTagColorClick(Player player, int slot) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        if (guild == null) {
+            openGuildBrowserMenu(player, 0);
+            return;
+        }
+        if (slot == BACK_SLOT) {
+            openGuildMenu(player);
+            return;
+        }
+        if (slot == CLOSE_SLOT) {
+            player.closeInventory();
+            return;
+        }
+        int index = slotToIndex(slot, TAG_COLOR_SLOTS);
+        List<TagColorOption> options = getTagColorOptions();
+        if (index < 0 || index >= options.size()) {
+            return;
+        }
+        TagColorOption option = options.get(index);
+        String failure = plugin.setGuildTagColor(guild, player.getUniqueId(), option.key());
+        if (failure != null) {
+            player.sendMessage(plugin.colorize("&c" + failure));
+        } else {
+            player.sendMessage(plugin.colorize("&aGuild tag color changed to " + option.colorCode() + option.displayName() + "&a."));
+        }
+        openTagColorMenu(player, guild);
+    }
+
+    private void handleProfileClick(Player player, int slot) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        if (guild == null) {
+            openGuildBrowserMenu(player, 0);
+            return;
+        }
+        if (slot == BACK_SLOT) {
+            openGuildMenu(player);
+            return;
+        }
+        if (slot == CLOSE_SLOT) {
+            player.closeInventory();
+            return;
+        }
+        boolean leader = guild.getLeaderId() != null && guild.getLeaderId().equals(player.getUniqueId());
+        if (!leader) {
+            player.sendMessage(plugin.colorize("&cOnly the guild leader can edit the guild profile."));
+            openGuildMenu(player);
+            return;
+        }
+        switch (slot) {
+            case DESCRIPTION_SLOT -> beginProfileChatEdit(player, GuildProfileEditType.DESCRIPTION);
+            case MOTD_SLOT -> beginProfileChatEdit(player, GuildProfileEditType.MOTD);
+            case RECRUITING_SLOT -> {
+                plugin.setGuildRecruitingOpen(guild, !guild.isRecruitingOpen());
+                player.sendMessage(plugin.colorize("&aGuild recruiting is now &f" + (guild.isRecruitingOpen() ? "open" : "closed") + "&a."));
+                openProfileMenu(player, guild);
+            }
+            case PROFILE_TAG_COLOR_SLOT -> openTagColorMenu(player, guild);
+            default -> {
+            }
+        }
+    }
+
+    private void beginProfileChatEdit(Player player, GuildProfileEditType editType) {
+        pendingProfileChatEdits.put(player.getUniqueId(), editType);
+        player.closeInventory();
+        String fieldName = editType == GuildProfileEditType.DESCRIPTION ? "description" : "MOTD";
+        player.sendMessage(plugin.colorize("&6Guild Profile"));
+        player.sendMessage(plugin.colorize("&7Type the new guild " + fieldName + " in chat."));
+        player.sendMessage(plugin.colorize("&7Type &fclear &7to remove it."));
+    }
+
     private void openDepositMenu(Player player, Guild guild) {
         Inventory inventory = Bukkit.createInventory(
                 new GuildDepositHolder(player.getUniqueId()),
@@ -570,6 +751,64 @@ public final class GuildGuiListener implements Listener {
         for (int i = 0; i < COUNTRY_SLOTS.length && i < invitees.size(); i++) {
             inventory.setItem(COUNTRY_SLOTS[i], createInviteItem(guild, invitees.get(i)));
         }
+        inventory.setItem(BACK_SLOT, createSimpleItem(Material.ARROW, "&eBack", List.of("&7Return to the guild dashboard.")));
+        inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
+        player.openInventory(inventory);
+    }
+
+    private void openTagColorMenu(Player player, Guild guild) {
+        Inventory inventory = Bukkit.createInventory(
+                new GuildTagColorHolder(player.getUniqueId()),
+                GUI_SIZE,
+                plugin.legacyComponent("&8Guild Tag Color")
+        );
+        fillEmpty(inventory);
+        boolean leader = guild.getLeaderId() != null && guild.getLeaderId().equals(player.getUniqueId());
+        inventory.setItem(INFO_SLOT, createSimpleItem(Material.NAME_TAG, "&6Guild Tag Color", List.of(
+                "&7Guild: &f" + guild.getName(),
+                "&7Current tag: &8[" + plugin.formatGuildTag(guild) + "&8]",
+                leader ? "&7Select a color for the guild tag." : "&cOnly the guild leader can change this."
+        )));
+        List<TagColorOption> options = getTagColorOptions();
+        for (int i = 0; i < TAG_COLOR_SLOTS.length && i < options.size(); i++) {
+            inventory.setItem(TAG_COLOR_SLOTS[i], createTagColorOptionItem(guild, options.get(i)));
+        }
+        inventory.setItem(BACK_SLOT, createSimpleItem(Material.ARROW, "&eBack", List.of("&7Return to the guild dashboard.")));
+        inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
+        player.openInventory(inventory);
+    }
+
+    private void openProfileMenu(Player player, Guild guild) {
+        boolean leader = guild.getLeaderId() != null && guild.getLeaderId().equals(player.getUniqueId());
+        Inventory inventory = Bukkit.createInventory(
+                new GuildProfileHolder(player.getUniqueId()),
+                GUI_SIZE,
+                plugin.legacyComponent("&8Guild Profile")
+        );
+        fillEmpty(inventory);
+        inventory.setItem(INFO_SLOT, createSimpleItem(Material.WRITABLE_BOOK, "&6Guild Profile", List.of(
+                "&7Guild: &f" + guild.getName(),
+                "&7Leader: &f" + plugin.safeOfflineName(guild.getLeaderId()),
+                leader ? "&7Manage description, MOTD, recruiting, and tag color." : "&cOnly the guild leader can edit this menu."
+        )));
+        inventory.setItem(DESCRIPTION_SLOT, createSimpleItem(Material.BOOK, "&6Description", List.of(
+                "&7Current:",
+                "&f" + (guild.getDescription().isBlank() ? "None" : guild.getDescription()),
+                "",
+                leader ? "&eClick, then type the new description in chat." : "&7Leader only."
+        )));
+        inventory.setItem(MOTD_SLOT, createSimpleItem(Material.PAPER, "&6MOTD", List.of(
+                "&7Current:",
+                "&f" + (guild.getMotd().isBlank() ? "None" : guild.getMotd()),
+                "",
+                leader ? "&eClick, then type the new MOTD in chat." : "&7Leader only."
+        )));
+        inventory.setItem(RECRUITING_SLOT, createSimpleItem(guild.isRecruitingOpen() ? Material.LIME_BANNER : Material.RED_BANNER, "&6Recruiting", List.of(
+                "&7Current: &f" + (guild.isRecruitingOpen() ? "Open" : "Closed"),
+                "",
+                leader ? "&eClick to toggle recruiting." : "&7Leader only."
+        )));
+        inventory.setItem(PROFILE_TAG_COLOR_SLOT, createTagColorItem(guild, player.getUniqueId()));
         inventory.setItem(BACK_SLOT, createSimpleItem(Material.ARROW, "&eBack", List.of("&7Return to the guild dashboard.")));
         inventory.setItem(CLOSE_SLOT, createSimpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
         player.openInventory(inventory);
@@ -769,7 +1008,7 @@ public final class GuildGuiListener implements Listener {
 
     private ItemStack createGuildInfoItem(Guild guild, Player player, Country currentCountry) {
         GuildRole role = guild.getRole(player.getUniqueId());
-        return createSimpleItem(Material.NAME_TAG, "&6" + guild.getName() + " &8[" + guild.getTag() + "]", List.of(
+        return createSimpleItem(Material.NAME_TAG, "&6" + guild.getName() + " &8[" + plugin.formatGuildTag(guild) + "&8]", List.of(
                 "&7Role: &f" + (role != null ? role.getDisplayName() : "None"),
                 "&7Leader: &f" + plugin.safeOfflineName(guild.getLeaderId()),
                 "&7Guild level: &f" + plugin.getGuildLevel(guild) + " &8(score " + plugin.getGuildScore(guild) + ")",
@@ -869,8 +1108,8 @@ public final class GuildGuiListener implements Listener {
 
     private ItemStack createWithdrawItem(Guild guild, UUID playerId) {
         return createSimpleItem(Material.GOLD_NUGGET, "&6Withdraw Limit", List.of(
-                "&7Your limit: &fâ›ƒ" + plugin.formatMoney(plugin.getGuildWithdrawLimit(guild, playerId)),
-                "&7Guild treasury: &fâ›ƒ" + plugin.formatSignedMoney(guild.getBalance()),
+                "&7Your limit: &f⛃" + plugin.formatMoney(plugin.getGuildWithdrawLimit(guild, playerId)),
+                "&7Guild treasury: &f⛃" + plugin.formatSignedMoney(guild.getBalance()),
                 "",
                 "&7Use &f/guild withdraw <amount>"
         ));
@@ -910,6 +1149,16 @@ public final class GuildGuiListener implements Listener {
         lore.add("");
         lore.add(canManage ? "&eClick to manage invites." : "&7Invite management requires invite permission.");
         return createSimpleItem(canManage ? Material.WRITABLE_BOOK : Material.BOOK, "&6Pending Invites", lore);
+    }
+
+    private ItemStack createTagColorItem(Guild guild, UUID playerId) {
+        boolean leader = guild.getLeaderId() != null && guild.getLeaderId().equals(playerId);
+        return createSimpleItem(leader ? Material.GLOW_INK_SAC : Material.INK_SAC, "&6Guild Tag Color", List.of(
+                "&7Current: &8[" + plugin.formatGuildTag(guild) + "&8]",
+                "&7Color: &f" + plugin.getGuildTagColorDisplayName(guild.getTagColorKey()),
+                "",
+                leader ? "&eClick to change the guild tag color." : "&7Only the guild leader can change this."
+        ));
     }
 
     private ItemStack createRoleSummaryItem(Guild guild, GuildRole role, boolean canManage) {
@@ -993,8 +1242,8 @@ public final class GuildGuiListener implements Listener {
         GuildRole role = guild.getRole(playerId);
         boolean privileged = role == GuildRole.LEADER || role == GuildRole.OFFICER;
         return createSimpleItem(privileged ? Material.TOTEM_OF_UNDYING : Material.BOOK, "&6Management", List.of(
-                "&7Role tools and command shortcuts.",
-                privileged ? "&eClick to view management actions." : "&7Most management tools require officer or leader."
+                "&7Guild profile and leadership settings.",
+                privileged ? "&eClick to manage profile actions." : "&7Most management tools require officer or leader."
         ));
     }
 
@@ -1030,7 +1279,7 @@ public final class GuildGuiListener implements Listener {
     private ItemStack createGuildBrowserItem(Guild guild, UUID viewerId) {
         boolean invited = guild.getInvitedPlayers().contains(viewerId);
         return createSimpleItem(invited ? Material.LIME_BANNER : Material.BLUE_BANNER,
-                (invited ? "&a" : "&e") + guild.getName() + " &8[" + guild.getTag() + "]",
+                (invited ? "&a" : "&e") + guild.getName() + " &8[" + plugin.formatGuildTag(guild) + "&8]",
                 List.of(
                         "&7Leader: &f" + plugin.safeOfflineName(guild.getLeaderId()),
                         "&7Level: &f" + plugin.getGuildLevel(guild),
@@ -1052,6 +1301,18 @@ public final class GuildGuiListener implements Listener {
         lore.add("&eLeft-click to resend the invite.");
         lore.add("&cRight-click to cancel the invite.");
         return createPlayerItem(invitee, "&e" + plugin.safeOfflineName(invitee), lore);
+    }
+
+    private ItemStack createTagColorOptionItem(Guild guild, TagColorOption option) {
+        boolean selected = option.key().equalsIgnoreCase(guild.getTagColorKey());
+        return createSimpleItem(option.material(),
+                option.colorCode() + option.displayName(),
+                List.of(
+                        "&7Preview: &8[" + option.colorCode() + guild.getTag() + "&8]",
+                        "&7Selected: " + (selected ? "&aYes" : "&cNo"),
+                        "",
+                        selected ? "&7This color is currently active." : "&eClick to apply this color."
+                ));
     }
 
     private ItemStack createPlayerItem(OfflinePlayer player, String displayName, List<String> loreLines) {
@@ -1124,6 +1385,27 @@ public final class GuildGuiListener implements Listener {
             return hours + "h " + minutes + "m";
         }
         return minutes + "m";
+    }
+
+    private List<TagColorOption> getTagColorOptions() {
+        return List.of(
+                new TagColorOption("BLACK", "Black", "&0", Material.BLACK_DYE),
+                new TagColorOption("DARK_BLUE", "Dark Blue", "&1", Material.BLUE_DYE),
+                new TagColorOption("DARK_GREEN", "Dark Green", "&2", Material.GREEN_DYE),
+                new TagColorOption("DARK_AQUA", "Dark Aqua", "&3", Material.CYAN_DYE),
+                new TagColorOption("DARK_RED", "Dark Red", "&4", Material.RED_DYE),
+                new TagColorOption("DARK_PURPLE", "Dark Purple", "&5", Material.PURPLE_DYE),
+                new TagColorOption("GOLD", "Gold", "&6", Material.ORANGE_DYE),
+                new TagColorOption("GRAY", "Gray", "&7", Material.LIGHT_GRAY_DYE),
+                new TagColorOption("DARK_GRAY", "Dark Gray", "&8", Material.GRAY_DYE),
+                new TagColorOption("BLUE", "Blue", "&9", Material.LAPIS_LAZULI),
+                new TagColorOption("GREEN", "Green", "&a", Material.LIME_DYE),
+                new TagColorOption("AQUA", "Aqua", "&b", Material.LIGHT_BLUE_DYE),
+                new TagColorOption("RED", "Red", "&c", Material.REDSTONE),
+                new TagColorOption("LIGHT_PURPLE", "Light Purple", "&d", Material.MAGENTA_DYE),
+                new TagColorOption("YELLOW", "Yellow", "&e", Material.YELLOW_DYE),
+                new TagColorOption("WHITE", "White", "&f", Material.BONE_MEAL)
+        );
     }
 
     private GuildPermissionState nextPermissionState(GuildPermissionState current, ClickType clickType) {
@@ -1213,7 +1495,108 @@ public final class GuildGuiListener implements Listener {
         return -1;
     }
 
+    private GuildMenuViewType resolveGuildMenuViewType(org.bukkit.inventory.InventoryView view, InventoryHolder holder) {
+        if (holder instanceof GuildDashboardHolder) {
+            return GuildMenuViewType.DASHBOARD;
+        }
+        if (holder instanceof GuildDepositHolder) {
+            return GuildMenuViewType.DEPOSIT;
+        }
+        if (holder instanceof GuildMembersHolder) {
+            return GuildMenuViewType.MEMBERS;
+        }
+        if (holder instanceof GuildCountriesHolder) {
+            return GuildMenuViewType.COUNTRIES;
+        }
+        if (holder instanceof GuildPermissionsHubHolder) {
+            return GuildMenuViewType.PERMISSIONS_HUB;
+        }
+        if (holder instanceof GuildRolePermissionsHolder) {
+            return GuildMenuViewType.ROLE_PERMISSIONS;
+        }
+        if (holder instanceof GuildPlayerPermissionsBrowserHolder) {
+            return GuildMenuViewType.PLAYER_PERMISSIONS_BROWSER;
+        }
+        if (holder instanceof GuildPlayerPermissionsHolder) {
+            return GuildMenuViewType.PLAYER_PERMISSIONS;
+        }
+        if (holder instanceof GuildProfileHolder) {
+            return GuildMenuViewType.PROFILE;
+        }
+        if (holder instanceof GuildTagColorHolder) {
+            return GuildMenuViewType.TAG_COLOR;
+        }
+        if (holder instanceof GuildInvitesHolder) {
+            return GuildMenuViewType.INVITES;
+        }
+        if (holder instanceof GuildBrowserHolder) {
+            return GuildMenuViewType.BROWSER;
+        }
+        String plainTitle = PlainTextComponentSerializer.plainText().serialize(view.title()).trim();
+        return switch (plainTitle) {
+            case "Guild Dashboard" -> GuildMenuViewType.DASHBOARD;
+            case "Guild Treasury" -> GuildMenuViewType.DEPOSIT;
+            case "Guild Members" -> GuildMenuViewType.MEMBERS;
+            case "Guild Countries" -> GuildMenuViewType.COUNTRIES;
+            case "Guild Permissions" -> GuildMenuViewType.PERMISSIONS_HUB;
+            case "Guild Profile" -> GuildMenuViewType.PROFILE;
+            case "Guild Tag Color" -> GuildMenuViewType.TAG_COLOR;
+            case "Pending Invites" -> GuildMenuViewType.INVITES;
+            case "Guild Browser" -> GuildMenuViewType.BROWSER;
+            default -> resolveGuildMenuViewTypeByTitle(plainTitle);
+        };
+    }
+
+    private GuildMenuViewType resolveGuildMenuViewTypeByTitle(String plainTitle) {
+        if (plainTitle == null || plainTitle.isBlank()) {
+            return null;
+        }
+        if (plainTitle.contains("Guild Tag Color")) {
+            return GuildMenuViewType.TAG_COLOR;
+        }
+        if (plainTitle.contains("Guild Profile")) {
+            return GuildMenuViewType.PROFILE;
+        }
+        if (plainTitle.contains("Guild Permissions")) {
+            return GuildMenuViewType.PERMISSIONS_HUB;
+        }
+        if (plainTitle.contains("Pending Invites")) {
+            return GuildMenuViewType.INVITES;
+        }
+        if (plainTitle.contains("Guild Dashboard")) {
+            return GuildMenuViewType.DASHBOARD;
+        }
+        if (plainTitle.contains("Guild Treasury")) {
+            return GuildMenuViewType.DEPOSIT;
+        }
+        if (plainTitle.contains("Guild Members")) {
+            return GuildMenuViewType.MEMBERS;
+        }
+        if (plainTitle.contains("Guild Countries")) {
+            return GuildMenuViewType.COUNTRIES;
+        }
+        if (plainTitle.contains("Guild Browser")) {
+            return GuildMenuViewType.BROWSER;
+        }
+        return null;
+    }
+
     private interface GuildInventoryHolder extends InventoryHolder {
+    }
+
+    private enum GuildMenuViewType {
+        DASHBOARD,
+        DEPOSIT,
+        MEMBERS,
+        COUNTRIES,
+        PERMISSIONS_HUB,
+        ROLE_PERMISSIONS,
+        PLAYER_PERMISSIONS_BROWSER,
+        PLAYER_PERMISSIONS,
+        PROFILE,
+        TAG_COLOR,
+        INVITES,
+        BROWSER
     }
 
     private record GuildDashboardHolder(UUID playerId) implements GuildInventoryHolder {
@@ -1272,6 +1655,20 @@ public final class GuildGuiListener implements Listener {
         }
     }
 
+    private record GuildProfileHolder(UUID playerId) implements GuildInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record GuildTagColorHolder(UUID playerId) implements GuildInventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
     private record GuildInvitesHolder(UUID playerId, List<UUID> invitees) implements GuildInventoryHolder {
         @Override
         public Inventory getInventory() {
@@ -1284,5 +1681,13 @@ public final class GuildGuiListener implements Listener {
         public Inventory getInventory() {
             return null;
         }
+    }
+
+    private enum GuildProfileEditType {
+        DESCRIPTION,
+        MOTD
+    }
+
+    private record TagColorOption(String key, String displayName, String colorCode, Material material) {
     }
 }

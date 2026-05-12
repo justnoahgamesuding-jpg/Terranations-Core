@@ -15,6 +15,7 @@ import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
@@ -130,8 +131,30 @@ public final class CustomScoreboard {
             objective.getScore(makeUniqueSidebarLine(plugin.colorize(line), uniqueIndex++)).setScore(score--);
         }
 
+        applyNameplateTeams(scoreboard);
+
         activeScoreboards.put(playerId, scoreboard);
         player.setScoreboard(scoreboard);
+    }
+
+    private void applyNameplateTeams(Scoreboard scoreboard) {
+        for (Player target : plugin.getServer().getOnlinePlayers()) {
+            if (target == null || !target.isOnline()) {
+                continue;
+            }
+
+            String teamName = plugin.getPlayerNameplateTeamName(target);
+            Team team = scoreboard.getTeam(teamName);
+            if (team == null) {
+                team = scoreboard.registerNewTeam(teamName);
+            }
+
+            String prefix = plugin.getPlayerTagPrefix(target);
+            team.setPrefix(plugin.colorize(prefix));
+            if (!team.hasEntry(target.getName())) {
+                team.addEntry(target.getName());
+            }
+        }
     }
 
     private boolean shouldRespectCurrentScoreboard(Scoreboard current, Scoreboard active) {

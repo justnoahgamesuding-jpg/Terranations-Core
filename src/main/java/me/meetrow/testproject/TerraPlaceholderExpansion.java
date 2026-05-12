@@ -62,6 +62,7 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
             case "player_countrytag", "player_country_tag" -> getPlayerCountryTagPlaceholder(player);
             case "player_guild" -> getPlayerGuildPlaceholder(player);
             case "player_guild_tag" -> getPlayerGuildTagPlaceholder(player);
+            case "player_guild_tag_colored" -> getPlayerGuildTagColoredPlaceholder(player);
             case "player_guild_level" -> getPlayerGuildLevelPlaceholder(player);
             case "player_guild_balance" -> getPlayerGuildBalancePlaceholder(player);
             case "player_guild_role" -> getPlayerGuildRolePlaceholder(player);
@@ -76,6 +77,7 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
             case "current_country_level" -> getCurrentCountryLevelPlaceholder(player);
             case "current_country_owner" -> getCurrentCountryOwnerPlaceholder(player);
             case "current_country_owner_tag" -> getCurrentCountryOwnerTagPlaceholder(player);
+            case "current_country_owner_tag_colored" -> getCurrentCountryOwnerTagColoredPlaceholder(player);
             case "profession" -> getProfessionPlaceholder(player);
             case "current_job" -> getProfessionPlaceholder(player);
             case "profession_display" -> getProfessionDisplayPlaceholder(player);
@@ -248,6 +250,11 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
         return guild != null ? guild.getTag() : "none";
     }
 
+    private String getPlayerGuildTagColoredPlaceholder(OfflinePlayer player) {
+        Guild guild = plugin.getPlayerGuild(player.getUniqueId());
+        return guild != null ? plugin.colorize(plugin.formatGuildTag(guild)) : "none";
+    }
+
     private String getPlayerGuildLevelPlaceholder(OfflinePlayer player) {
         Guild guild = plugin.getPlayerGuild(player.getUniqueId());
         return String.valueOf(guild != null ? plugin.getGuildLevel(guild) : 0);
@@ -323,6 +330,21 @@ public class TerraPlaceholderExpansion extends PlaceholderExpansion {
         Guild guild = plugin.getOwningGuild(country);
         if (guild != null) {
             return guild.getTag();
+        }
+        return country.hasTag() ? country.getTag() : "none";
+    }
+
+    private String getCurrentCountryOwnerTagColoredPlaceholder(OfflinePlayer player) {
+        if (player.getPlayer() == null) {
+            return "none";
+        }
+        Country country = plugin.getCountryAt(player.getPlayer().getLocation());
+        if (country == null) {
+            return "none";
+        }
+        Guild guild = plugin.getOwningGuild(country);
+        if (guild != null) {
+            return plugin.colorize(plugin.formatGuildTag(guild));
         }
         return country.hasTag() ? country.getTag() : "none";
     }

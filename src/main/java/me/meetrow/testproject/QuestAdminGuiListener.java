@@ -76,6 +76,10 @@ public final class QuestAdminGuiListener implements Listener {
     private static final int EDIT_REWARD_ITEM_AMOUNT_SLOT = 52;
     private static final int EDIT_BACK_SLOT = 53;
     private static final int EDIT_REQUIRED_ITEM_SLOT = 46;
+    private static final int[] EDIT_REWARD_ITEM_SLOTS = {
+            0, 1, 2, 3, 5, 6, 7, 8,
+            9, 10, 11, 12, 13, 14, 15, 16, 17
+    };
 
     private static final int ASSIGN_PREVIOUS_SLOT = 45;
     private static final int ASSIGN_BACK_SLOT = 49;
@@ -237,12 +241,11 @@ public final class QuestAdminGuiListener implements Listener {
                 "&eLeft click: next",
                 "&eRight click: previous"
         )));
-        inventory.setItem(EDIT_REWARD_ITEM_MATERIAL_SLOT, createRewardItemMaterialItem(quest));
-        inventory.setItem(EDIT_REWARD_ITEM_AMOUNT_SLOT, createItem(Material.HOPPER, "&6Reward Item Amount", List.of(
-                "&7Current: &f" + quest.getRewardItemAmount(),
-                "&eLeft/right click: +/-1",
-                "&eShift left/right: +/-16"
-        )));
+        inventory.setItem(EDIT_REWARD_ITEM_MATERIAL_SLOT, createRewardItemsSummaryItem(quest));
+        inventory.setItem(EDIT_REWARD_ITEM_AMOUNT_SLOT, createClearRewardItemsItem(quest));
+        for (int i = 0; i < EDIT_REWARD_ITEM_SLOTS.length; i++) {
+            inventory.setItem(EDIT_REWARD_ITEM_SLOTS[i], createRewardItemEntry(quest, i));
+        }
         inventory.setItem(EDIT_DELETE_SLOT, createItem(Material.BARRIER, "&cDelete", List.of(
                 "&7Remove this " + (scope == QuestScope.ONBOARDING ? "step" : "quest") + " from config."
         )));
@@ -447,6 +450,12 @@ public final class QuestAdminGuiListener implements Listener {
         }
 
         int slot = event.getSlot();
+        int rewardItemIndex = indexOfRewardItemSlot(slot);
+        if (rewardItemIndex >= 0) {
+            handleRewardItemEntryClick(player, holder.scope(), quest, rewardItemIndex, event);
+            openQuestEditMenu(player, holder.scope(), quest.getId());
+            return;
+        }
         boolean refresh = true;
         switch (slot) {
             case EDIT_TYPE_SLOT -> setQuestType(holder.scope(), quest.getId(), cycleType(quest.getType(), event.isRightClick() ? -1 : 1));
@@ -485,8 +494,8 @@ public final class QuestAdminGuiListener implements Listener {
             case EDIT_TARGET_PLUS_ONE_SLOT -> setQuestTarget(holder.scope(), quest.getId(), quest.getTarget() + 1);
             case EDIT_TARGET_PLUS_TEN_SLOT -> setQuestTarget(holder.scope(), quest.getId(), quest.getTarget() + 10);
             case EDIT_REWARD_PROFESSION_SLOT -> setQuestRewardProfession(holder.scope(), quest.getId(), cycleProfession(quest.getRewardProfession(), event.isRightClick() ? -1 : 1));
-            case EDIT_REWARD_ITEM_MATERIAL_SLOT -> handleRewardItemMaterialClick(player, holder.scope(), quest, event);
-            case EDIT_REWARD_ITEM_AMOUNT_SLOT -> setQuestRewardItemAmount(holder.scope(), quest.getId(), adjustWholeNumber(quest.getRewardItemAmount(), event, 1, 16));
+            case EDIT_REWARD_ITEM_MATERIAL_SLOT -> handleRewardItemsSummaryClick(player, holder.scope(), quest, event);
+            case EDIT_REWARD_ITEM_AMOUNT_SLOT -> clearRewardItems(holder.scope(), quest.getId());
             case EDIT_ASSIGN_SLOT -> {
                 handleQuestActionClick(player, holder.scope(), quest, event);
                 return;
@@ -678,20 +687,51 @@ public final class QuestAdminGuiListener implements Listener {
         return setQuestKey(scope, quest.getId(), generated) ? generated : null;
     }
 
-    private void handleRewardItemMaterialClick(Player player, QuestScope scope, PlayerQuestDefinition quest, InventoryClickEvent event) {
+    private void handleRewardItemsSummaryClick(Player player, QuestScope scope, PlayerQuestDefinition quest, InventoryClickEvent event) {
         if (event.isRightClick()) {
-            setQuestRewardItemMaterial(scope, quest.getId(), null);
+            clearRewardItems(scope, quest.getId());
             return;
         }
         ItemStack reference = getReferenceItem(player, event);
-        if (reference != null && !reference.getType().isAir() && reference.getType().isItem()) {
-            setQuestRewardItemMaterial(scope, quest.getId(), reference.getType());
-            if (quest.getRewardItemAmount() <= 0) {
-                setQuestRewardItemAmount(scope, quest.getId(), Math.max(1, reference.getAmount()));
+        if (reference == null || reference.getType().isAir() || !reference.getType().isItem()) {
+            player.sendMessage(plugin.legacyComponent("&eHold a reward item on your cursor or in your main hand, then click again. Terra items are supported."));
+            return;
+        }
+        List<PlayerQuestDefinition.RewardItem> rewardItems = new ArrayList<>(quest.getRewardItems());
+        if (rewardItems.size() >= EDIT_REWARD_ITEM_SLOTS.length) {
+            player.sendMessage(plugin.legacyComponent("&cThis editor supports up to " + EDIT_REWARD_ITEM_SLOTS.length + " reward items per quest."));
+            return;
+        }
+        rewardItems.add(toRewardItem(reference));
+        setQuestRewardItems(scope, quest.getId(), rewardItems);
+    }
+
+    private void handleRewardItemEntryClick(Player player, QuestScope scope, PlayerQuestDefinition quest, int index, InventoryClickEvent event) {
+        List<PlayerQuestDefinition.RewardItem> rewardItems = new ArrayList<>(quest.getRewardItems());
+        if (event.isRightClick()) {
+            if (index >= 0 && index < rewardItems.size()) {
+                rewardItems.remove(index);
+                setQuestRewardItems(scope, quest.getId(), rewardItems);
             }
             return;
         }
-        player.sendMessage(plugin.legacyComponent("&eHold an item on your cursor or in your main hand, then click again. Right click clears the reward item."));
+        ItemStack reference = getReferenceItem(player, event);
+        if (reference == null || reference.getType().isAir() || !reference.getType().isItem()) {
+            player.sendMessage(plugin.legacyComponent("&eHold a reward item on your cursor or in your main hand, then click again. Right click removes the selected reward."));
+            return;
+        }
+        PlayerQuestDefinition.RewardItem rewardItem = toRewardItem(reference);
+        if (index < rewardItems.size()) {
+            rewardItems.set(index, rewardItem);
+            setQuestRewardItems(scope, quest.getId(), rewardItems);
+            return;
+        }
+        if (index == rewardItems.size() && rewardItems.size() < EDIT_REWARD_ITEM_SLOTS.length) {
+            rewardItems.add(rewardItem);
+            setQuestRewardItems(scope, quest.getId(), rewardItems);
+            return;
+        }
+        player.sendMessage(plugin.legacyComponent("&eFill reward item slots from left to right."));
     }
 
     private void handleRequiredItemMaterialClick(Player player, QuestScope scope, PlayerQuestDefinition quest, InventoryClickEvent event) {
@@ -754,7 +794,10 @@ public final class QuestAdminGuiListener implements Listener {
             case VISIT_LOCATION -> options.addAll(plugin.getOnboardingLocationMarkerKeys());
             case BREAK_BLOCK -> options.add("any_block_break");
             case PLACE_BLOCK -> options.add("any_block_place");
-            case INTERACT_BLOCK -> options.add("any_block_interact");
+            case INTERACT_BLOCK -> {
+                options.add("any_block_interact");
+                options.addAll(plugin.getTerraWorkbenchQuestKeys());
+            }
             case INTERACT_NPC, DELIVER_ITEM -> options.addAll(plugin.getOnboardingNpcQuestKeys());
             case COMPLETE_TRIAL -> {
                 options.add("any");
@@ -839,13 +882,45 @@ public final class QuestAdminGuiListener implements Listener {
         ));
     }
 
-    private ItemStack createRewardItemMaterialItem(PlayerQuestDefinition quest) {
-        Material material = quest.getRewardItemMaterial() != null ? quest.getRewardItemMaterial() : Material.CHEST;
+    private ItemStack createRewardItemsSummaryItem(PlayerQuestDefinition quest) {
+        int count = quest != null ? quest.getRewardItems().size() : 0;
         List<String> lore = new ArrayList<>();
-        lore.add("&7Current: &f" + (quest.getRewardItemMaterial() != null ? plugin.formatMaterialName(quest.getRewardItemMaterial()) : "None"));
-        lore.add("&eLeft click: use cursor or main hand item");
-        lore.add("&eRight click: clear");
-        return createItem(material, "&6Reward Item", lore);
+        lore.add("&7Current items: &f" + count + "&7/&f" + EDIT_REWARD_ITEM_SLOTS.length);
+        lore.add("&eLeft click: add held item");
+        lore.add("&eUse the top reward slots to replace or remove.");
+        lore.add("&7Held stack amount becomes the reward amount.");
+        return createItem(Material.CHEST, "&6Reward Items", lore);
+    }
+
+    private ItemStack createClearRewardItemsItem(PlayerQuestDefinition quest) {
+        int count = quest != null ? quest.getRewardItems().size() : 0;
+        return createItem(Material.BARRIER, "&cClear Reward Items", List.of(
+                "&7Current items: &f" + count,
+                "&eClick to remove every reward item."
+        ));
+    }
+
+    private ItemStack createRewardItemEntry(PlayerQuestDefinition quest, int index) {
+        List<PlayerQuestDefinition.RewardItem> rewardItems = quest != null ? quest.getRewardItems() : List.of();
+        if (index < 0 || index >= EDIT_REWARD_ITEM_SLOTS.length) {
+            return createItem(Material.GRAY_STAINED_GLASS_PANE, "&7Reward Slot", List.of("&7Invalid reward slot."));
+        }
+        if (index >= rewardItems.size()) {
+            return createItem(Material.GRAY_DYE, "&7Empty Reward Slot", List.of(
+                    "&eLeft click with a held item to add it here.",
+                    "&7Terra items are supported."
+            ));
+        }
+        PlayerQuestDefinition.RewardItem rewardItem = rewardItems.get(index);
+        ItemStack preview = createRewardItemPreview(rewardItem);
+        Material displayMaterial = preview != null && !preview.getType().isAir() ? preview.getType() : Material.CHEST;
+        String displayName = preview != null ? plugin.formatItemDisplayName(preview) : "Unknown Item";
+        List<String> lore = new ArrayList<>();
+        lore.add("&7Amount: &f" + rewardItem.amount());
+        lore.add("&7Type: &f" + (rewardItem.hasContentId() ? "Terra Item" : "Vanilla Item"));
+        lore.add("&eLeft click with a held item: replace");
+        lore.add("&eRight click: remove");
+        return createItem(displayMaterial, "&6Reward " + (index + 1) + ": &f" + displayName, lore);
     }
 
     private ItemStack createRequiredItemMaterialItem(PlayerQuestDefinition quest) {
@@ -993,10 +1068,20 @@ public final class QuestAdminGuiListener implements Listener {
                 : plugin.setGeneralQuestRewardItemMaterial(questId, material);
     }
 
-    private boolean setQuestRewardItemAmount(QuestScope scope, String questId, int amount) {
+    private boolean setQuestRewardItemContentId(QuestScope scope, String questId, String contentId) {
         return scope == QuestScope.ONBOARDING
-                ? plugin.setOnboardingQuestRewardItemAmount(questId, amount)
-                : plugin.setGeneralQuestRewardItemAmount(questId, amount);
+                ? plugin.setOnboardingQuestRewardItemContentId(questId, contentId)
+                : plugin.setGeneralQuestRewardItemContentId(questId, contentId);
+    }
+
+    private boolean setQuestRewardItems(QuestScope scope, String questId, List<PlayerQuestDefinition.RewardItem> rewardItems) {
+        return scope == QuestScope.ONBOARDING
+                ? plugin.setOnboardingQuestRewardItems(questId, rewardItems)
+                : plugin.setGeneralQuestRewardItems(questId, rewardItems);
+    }
+
+    private boolean clearRewardItems(QuestScope scope, String questId) {
+        return setQuestRewardItems(scope, questId, List.of());
     }
 
     private boolean setQuestRequiredItemMaterial(QuestScope scope, String questId, Material material) {
@@ -1049,6 +1134,36 @@ public final class QuestAdminGuiListener implements Listener {
             }
         }
         return -1;
+    }
+
+    private int indexOfRewardItemSlot(int slot) {
+        for (int i = 0; i < EDIT_REWARD_ITEM_SLOTS.length; i++) {
+            if (EDIT_REWARD_ITEM_SLOTS[i] == slot) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private PlayerQuestDefinition.RewardItem toRewardItem(ItemStack itemStack) {
+        String contentId = plugin.getTerraCraftingContentId(itemStack);
+        return new PlayerQuestDefinition.RewardItem(contentId == null ? itemStack.getType() : null, contentId, Math.max(1, itemStack.getAmount()));
+    }
+
+    private ItemStack createRewardItemPreview(PlayerQuestDefinition.RewardItem rewardItem) {
+        if (rewardItem == null || rewardItem.amount() <= 0) {
+            return null;
+        }
+        if (rewardItem.hasContentId()) {
+            ItemStack terraItem = plugin.createTerraCraftingItem(rewardItem.contentId(), rewardItem.amount());
+            if (terraItem != null && !terraItem.getType().isAir()) {
+                return terraItem;
+            }
+        }
+        if (rewardItem.hasMaterial()) {
+            return new ItemStack(rewardItem.material(), rewardItem.amount());
+        }
+        return null;
     }
 
     private void fillEmptySlots(Inventory inventory) {

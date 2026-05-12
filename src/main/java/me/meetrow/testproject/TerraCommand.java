@@ -843,6 +843,43 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
+        if (args.length == 3 && args[1].equalsIgnoreCase("createfreeportmerchant")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            String merchantKey = plugin.resolveFreeportStarterMerchantKey(args[2]);
+            if (merchantKey == null) {
+                player.sendMessage(plugin.colorize("&cUnknown Freeport merchant type. Use: &fminer&7, &fbuilder&7, or &ffarmer&c."));
+                return true;
+            }
+            String displayName = plugin.getFreeportStarterMerchantDisplayName(merchantKey);
+            String generatedId = plugin.spawnSimpleOnboardingFancyNpc(player, merchantKey, merchantKey, displayName, player.getLocation());
+            if (generatedId != null) {
+                player.sendMessage(plugin.colorize("&aCreated Freeport merchant &f" + displayName + "&a with FancyNpcs id &f" + generatedId + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not create that Freeport merchant NPC. Check that FancyNpcs is loaded."));
+            }
+            return true;
+        }
+        if (args.length == 4 && args[1].equalsIgnoreCase("bindfreeportmerchant")) {
+            if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
+                player.sendMessage(plugin.getMessage("general.no-permission"));
+                return true;
+            }
+            String merchantKey = plugin.resolveFreeportStarterMerchantKey(args[2]);
+            if (merchantKey == null) {
+                player.sendMessage(plugin.colorize("&cUnknown Freeport merchant type. Use: &fminer&7, &fbuilder&7, or &ffarmer&c."));
+                return true;
+            }
+            String displayName = plugin.getFreeportStarterMerchantDisplayName(merchantKey);
+            if (plugin.bindOnboardingFancyNpc(args[3], merchantKey, merchantKey, displayName)) {
+                player.sendMessage(plugin.colorize("&aBound FancyNpcs NPC &f" + args[3] + "&a as Freeport merchant &f" + displayName + "&a."));
+            } else {
+                player.sendMessage(plugin.colorize("&cCould not bind that FancyNpcs NPC as a Freeport merchant."));
+            }
+            return true;
+        }
         if (args.length >= 4 && args[1].equalsIgnoreCase("skinfancynpc")) {
             if (!player.hasPermission(Testproject.ADMIN_PERMISSION) && !player.isOp()) {
                 player.sendMessage(plugin.getMessage("general.no-permission"));
@@ -3827,7 +3864,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args[0].equalsIgnoreCase("trader") && args.length == 3 && args[1].equalsIgnoreCase("spawn")) {
-            return partialMatches(args[2], Arrays.stream(Profession.values())
+            return partialMatches(args[2], plugin.getConfiguredProfessions().stream()
                     .map(Profession::getKey)
                     .toList());
         }
@@ -4010,7 +4047,7 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             return partialMatches(args[0], List.of("status", "time", "spawn", "remove", "open", "manage"));
         }
         if (root.equalsIgnoreCase("trader") && args.length == 2 && args[0].equalsIgnoreCase("spawn")) {
-            return partialMatches(args[1], Arrays.stream(Profession.values())
+            return partialMatches(args[1], plugin.getConfiguredProfessions().stream()
                     .map(Profession::getKey)
                     .toList());
         }
@@ -4078,6 +4115,8 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
                     "clearlocation",
                     "locations",
                     "linkfancynpc",
+                    "createfreeportmerchant",
+                    "bindfreeportmerchant",
                     "createfancynpc",
                     "spawnfancynpc",
                     "skinfancynpc",
@@ -4117,6 +4156,12 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             if (action.equals("linkfancynpc")) {
                 return partialMatches(args[2], getSuggestedTutorialQuestKeys());
             }
+            if (action.equals("createfreeportmerchant")) {
+                return partialMatches(args[2], plugin.getFreeportStarterMerchantTypes());
+            }
+            if (action.equals("bindfreeportmerchant")) {
+                return partialMatches(args[2], plugin.getFreeportStarterMerchantTypes());
+            }
             if (action.equals("createfancynpc")) {
                 return partialMatches(args[2], getSuggestedTutorialQuestKeys());
             }
@@ -4145,6 +4190,9 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
             }
             if (action.equals("bindfancynpc")) {
                 return partialMatches(args[3], getSuggestedTutorialQuestKeys());
+            }
+            if (action.equals("bindfreeportmerchant")) {
+                return partialMatches(args[3], getSuggestedFancyNpcIds());
             }
             if (action.equals("spawnfancynpc")) {
                 return partialMatches(args[3], getSuggestedTutorialQuestKeys());
@@ -4235,6 +4283,8 @@ public class TerraCommand implements CommandExecutor, TabCompleter {
 
     private List<String> getSuggestedTutorialQuestKeys() {
         List<String> suggestions = new ArrayList<>(plugin.getTutorialQuestKeys());
+        suggestions.addAll(plugin.getTerraWorkbenchQuestKeys());
+        suggestions.addAll(plugin.getTerraWorkbenchCollectionQuestKeys());
         suggestions.addAll(List.of(
                 "starter_hub",
                 "trader_npc",

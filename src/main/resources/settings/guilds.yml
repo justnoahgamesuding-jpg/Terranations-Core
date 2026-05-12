@@ -1,0 +1,113 @@
+# Guild gameplay and progression settings.
+#
+# This file exists to keep the guild system separate from the broader core
+# settings file. Grouped sections are intended to make live tuning easier.
+#
+# Recommended launch presets:
+#
+# Small server example:
+#   creation.create-cost: 150.0
+#   treasury.officer-base-withdraw-limit: 200.0
+#   treasury.officer-per-level-withdraw-limit: 50.0
+#   treasury.admiral-base-withdraw-limit: 50.0
+#   treasury.admiral-per-level-withdraw-limit: 15.0
+#   claims.country-claim-base-cost: 300.0
+#   claims.reclaim-cooldown-days: 2
+#   claims.minimum-claim-members: 2
+#   claims.minimum-claim-total-levels: 18
+#   upkeep.leader-inactivity-days: 21
+#
+# Medium server example:
+#   creation.create-cost: 250.0
+#   treasury.officer-base-withdraw-limit: 300.0
+#   treasury.officer-per-level-withdraw-limit: 75.0
+#   treasury.admiral-base-withdraw-limit: 75.0
+#   treasury.admiral-per-level-withdraw-limit: 25.0
+#   claims.country-claim-base-cost: 500.0
+#   claims.reclaim-cooldown-days: 3
+#   claims.minimum-claim-members: 3
+#   claims.minimum-claim-total-levels: 30
+#   upkeep.leader-inactivity-days: 30
+#
+# The live defaults below are a little tighter than the medium preset so land,
+# treasury access, and reclaim timing stay deliberate on public servers.
+
+guilds:
+  creation:
+    # Raising this slows down "day one" guild spam.
+    create-cost: 300.0
+    tag:
+      min-length: 2
+      max-length: 5
+      default-color: "WHITE"
+      allowed-colors:
+        - BLACK
+        - DARK_BLUE
+        - DARK_GREEN
+        - DARK_AQUA
+        - DARK_RED
+        - DARK_PURPLE
+        - GOLD
+        - GRAY
+        - DARK_GRAY
+        - BLUE
+        - GREEN
+        - AQUA
+        - RED
+        - LIGHT_PURPLE
+        - YELLOW
+        - WHITE
+
+  invites:
+    # Long enough for offline players to answer, short enough to avoid stale clutter.
+    duration-hours: 48
+    notify-recruiters-on-response: true
+
+  treasury:
+    # These are per-role guardrails, not "spend everything" targets.
+    # If treasury theft or careless spending becomes a problem, lower the base limits first.
+    officer-base-withdraw-limit: 250.0
+    officer-per-level-withdraw-limit: 60.0
+    admiral-base-withdraw-limit: 50.0
+    admiral-per-level-withdraw-limit: 15.0
+
+  claims:
+    # Claim pacing is one of the easiest systems to mis-tune.
+    # If claims are happening too early, raise cost or total-level requirements before
+    # raising upkeep pressure.
+    country-claim-base-cost: 600.0
+    reclaim-cooldown-days: 4
+    minimum-claim-members: 4
+    minimum-claim-total-levels: 40
+
+  upkeep:
+    # Lower values recover dead guild claims faster, but can feel harsh on casual communities.
+    leader-inactivity-days: 21
+    max-level-upkeep-reduction-percent: 20
+    reduction-per-level-after-one-percent: 2
+
+  progression:
+    guild-xp:
+      create: 25
+      member-join: 10
+      deposit-per-250-money: 1
+      minimum-deposit-award: 1
+      stockpile-per-8-items: 1
+      claim-base: 40
+      claim-per-country-level: 5
+      upkeep-payment: 5
+    member-cap:
+      # Keep this modest so leveling still matters for recruitment growth.
+      base: 10
+      per-level: 5
+    claim-cap:
+      base: 1
+      extra-slot-every-levels-after-first: 2
+    score:
+      # Lower values here make guild score climb faster from stockpile/treasury activity.
+      stockpile-units-per-score: 16
+      stockpile-max-score: 120
+      treasury-money-per-score: 100
+      treasury-max-score: 160
+    levels:
+      thresholds: [0, 90, 220, 420, 700, 1050, 1480, 1980, 2550, 3200]

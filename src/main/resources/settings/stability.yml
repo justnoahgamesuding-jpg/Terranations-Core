@@ -1,6 +1,17 @@
 # Structural stability and cave-in rules.
 # This system is tuned to push players toward realistic support,
 # weight distribution, and sensible building patterns.
+#
+# Recommended launch presets:
+#
+# Small server example:
+#   strictness.percent: 90
+#
+# Medium server example:
+#   strictness.percent: 100
+#
+# If players are getting frustrated, reduce strictness before rewriting span or
+# collapse logic. That keeps the system understandable.
 
 stability:
   enabled: true
@@ -21,6 +32,7 @@ stability:
   player-warning-radius-blocks: 16.0
 
   debug:
+    # Keep this on for admin diagnosis unless you are certain you never need it.
     enabled: true
     interval-ticks: 20
     view-radius-blocks: 6.0
@@ -61,6 +73,7 @@ stability:
   # Global strictness slider.
   # 100 = current baseline.
   # Higher = stricter, lower = more forgiving.
+  # Start here and move in steps of 5 or 10, not giant jumps.
   strictness:
     percent: 100
 
@@ -86,6 +99,7 @@ stability:
 
   rubble:
     enabled: true
+    # Too much rubble turns cave-ins from a warning system into inventory spam.
     chance: 0.22
     max-per-collapse: 12
 
@@ -97,5 +111,6 @@ stability:
 
   # Stability meter fills from qualifying structural break/place actions.
   meter:
+    # Lower values make the meter react faster and teach the system more aggressively.
     actions-per-charge: 20
     debug-duration-ticks: 100

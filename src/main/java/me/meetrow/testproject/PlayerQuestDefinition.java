@@ -2,8 +2,10 @@ package me.meetrow.testproject;
 
 import org.bukkit.Material;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 public final class PlayerQuestDefinition {
@@ -22,7 +24,9 @@ public final class PlayerQuestDefinition {
     private final int rewardProfessionXp;
     private final Profession rewardProfession;
     private final Material rewardItemMaterial;
+    private final String rewardItemContentId;
     private final int rewardItemAmount;
+    private final List<RewardItem> rewardItems;
     private final Material requiredItemMaterial;
 
     public PlayerQuestDefinition(
@@ -41,7 +45,9 @@ public final class PlayerQuestDefinition {
             int rewardProfessionXp,
             Profession rewardProfession,
             Material rewardItemMaterial,
+            String rewardItemContentId,
             int rewardItemAmount,
+            List<RewardItem> rewardItems,
             Material requiredItemMaterial
     ) {
         this.id = id;
@@ -59,7 +65,21 @@ public final class PlayerQuestDefinition {
         this.rewardProfessionXp = rewardProfessionXp;
         this.rewardProfession = rewardProfession;
         this.rewardItemMaterial = rewardItemMaterial;
+        this.rewardItemContentId = rewardItemContentId;
         this.rewardItemAmount = rewardItemAmount;
+        List<RewardItem> normalizedRewardItems = new ArrayList<>();
+        if (rewardItems != null) {
+            for (RewardItem rewardItem : rewardItems) {
+                if (rewardItem == null || (!rewardItem.hasMaterial() && !rewardItem.hasContentId()) || rewardItem.amount() <= 0) {
+                    continue;
+                }
+                normalizedRewardItems.add(rewardItem);
+            }
+        }
+        if (normalizedRewardItems.isEmpty() && rewardItemAmount > 0 && (rewardItemMaterial != null || hasText(rewardItemContentId))) {
+            normalizedRewardItems.add(new RewardItem(rewardItemMaterial, rewardItemContentId, rewardItemAmount));
+        }
+        this.rewardItems = Collections.unmodifiableList(normalizedRewardItems);
         this.requiredItemMaterial = requiredItemMaterial;
     }
 
@@ -123,11 +143,33 @@ public final class PlayerQuestDefinition {
         return rewardItemMaterial;
     }
 
+    public String getRewardItemContentId() {
+        return rewardItemContentId;
+    }
+
     public int getRewardItemAmount() {
         return rewardItemAmount;
     }
 
+    public List<RewardItem> getRewardItems() {
+        return rewardItems;
+    }
+
     public Material getRequiredItemMaterial() {
         return requiredItemMaterial;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    public record RewardItem(Material material, String contentId, int amount) {
+        public boolean hasMaterial() {
+            return material != null;
+        }
+
+        public boolean hasContentId() {
+            return hasText(contentId);
+        }
     }
 }

@@ -1,6 +1,25 @@
 # Terra core settings.
 # Climate, stability, territories, merchant shops, quests, jobs, chat, and messages
 # have their own files under src/main/resources.
+#
+# Recommended launch presets:
+#
+# Small server example:
+#   economy.reward-scale: 0.22
+#   economy.price-scale: 0.20
+#   hunger.speed-multiplier: 0.95
+#   wilderness-regeneration.seconds: 900
+#   wilderness-regeneration.build-decay-seconds: 600
+#
+# Medium server example:
+#   economy.reward-scale: 0.20
+#   economy.price-scale: 0.20
+#   hunger.speed-multiplier: 1.0
+#   wilderness-regeneration.seconds: 600
+#   wilderness-regeneration.build-decay-seconds: 300
+#
+# The live defaults below are meant to feel production-ready, not like a local
+# test world.
 
 # ---------------------------------------------------------------------------
 # Gameplay
@@ -8,6 +27,7 @@
 
 block-delay:
   enabled: false
+  # 30 seconds is a strong anti-spam value if you enable the system.
   seconds: 30
 
 rewards:
@@ -17,10 +37,14 @@ rewards:
 
 economy:
   enabled: true
+  # Global money earned from Terra-controlled activity.
+  # Increase slowly. Even a small bump here changes guild progression speed.
   reward-scale: 0.20
+  # Global sell/buy pricing multiplier used by Terra economy surfaces.
   price-scale: 0.20
 
 hunger:
+  # Higher values make climate and travel pressure show up faster.
   speed-multiplier: 1.0
   climate:
     comfort-min-c: 12.0
@@ -44,6 +68,7 @@ profession-procs:
       max-chance: 0.20
 
 country-home:
+  # One hour is a good default for live survival. Shorter values reduce travel friction a lot.
   cooldown-seconds: 3600
 
 items:
@@ -63,6 +88,7 @@ hostile-mobs:
   spawning-enabled: true
 
 phantoms:
+  # Off by default because they add pressure without teaching Terra's main loops.
   enabled: false
 
 bats:
@@ -70,7 +96,9 @@ bats:
 
 wilderness-regeneration:
   enabled: true
+  # How long player edits in unmanaged wilderness are left alone before regen/cleanup.
   seconds: 600
+  # Faster decay keeps temporary spam builds under control, but can frustrate frontier building.
   build-decay-seconds: 300
 
 ore-vision:
@@ -79,6 +107,7 @@ ore-vision:
 
 traders:
   enabled: true
+  # These windows should feel like events, not permanent background vending.
   spawn-minutes-min: 180
   spawn-minutes-max: 360
   active-minutes: 90
@@ -113,19 +142,19 @@ server-list-motd:
   # %online%, %max_players%, %date%, %server_time%
   frames:
     - lines:
-        - "&#E9FFE2&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &7%online%&8/&7%max_players%"
-        - "&7Countries &8• &7Jobs &8• &7Survival"
+        - "&aTerra Nations &8| &7%online%&8/&7%max_players%"
+        - "&7Countries &8| &7Jobs &8| &7Survival"
     - lines:
-        - "&#BEE3AA&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &f%server_time%"
+        - "&aTerra Nations &8| &f%server_time%"
         - "&aBuild your country. Grow your land."
     - lines:
-        - "&#7DB955&lᴛᴇʀʀᴀɴᴀᴛɪᴏɴѕ &8| &7%date%"
-        - "&2Play &8• &fplay.terranations.net"
+        - "&2Terra Nations &8| &7%date%"
+        - "&7Guild-first survival with real progression."
 
 health-hotbar:
   enabled: true
   include-armor: true
-  format: "&c❤ &f%current%&7/&f%max%"
+  format: "&cHP &f%current%&7/&f%max%"
 
 itemsadder-top-status:
   enabled: true
@@ -146,6 +175,7 @@ itemsadder-top-status:
   # Leave this as "auto" so Terra centers the location text inside the panel.
   format: "auto"
   wilderness-label: "Wilderness"
+  # Very long names look poor in a narrow top-status panel.
   max-location-chars: 7
 
 # ---------------------------------------------------------------------------
@@ -179,6 +209,7 @@ chat-sounds:
 
 terra-tips:
   enabled: true
+  # Raise this if players feel chat is too busy.
   interval-minutes: 8
 
 # ---------------------------------------------------------------------------
@@ -188,6 +219,7 @@ terra-tips:
 lag-reduction:
   ground-item-clear:
     enabled: true
+    # Five minutes keeps clutter under control without deleting drops too aggressively.
     interval-minutes: 5
     warning-seconds: [60, 30, 10]
   mob-stacking:
@@ -197,4 +229,5 @@ lag-reduction:
     name-format: "&e%type% &7x&f%amount%"
   item-merge:
     enabled: true
+    # Larger radii save more entities but can feel less natural around farms.
     radius-blocks: 2.5

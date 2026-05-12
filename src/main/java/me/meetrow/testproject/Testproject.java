@@ -54,6 +54,7 @@ import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Phantom;
 import org.bukkit.entity.Slime;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.entity.Villager;
 import org.bukkit.entity.WanderingTrader;
 import org.bukkit.inventory.ItemStack;
@@ -75,6 +76,7 @@ import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
@@ -98,6 +100,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -118,6 +121,23 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class Testproject extends JavaPlugin {
+    private static final List<String> DEFAULT_GUILD_TAG_COLOR_KEYS = List.of(
+            "BLACK", "DARK_BLUE", "DARK_GREEN", "DARK_AQUA", "DARK_RED", "DARK_PURPLE",
+            "GOLD", "GRAY", "DARK_GRAY", "BLUE", "GREEN", "AQUA", "RED", "LIGHT_PURPLE",
+            "YELLOW", "WHITE"
+    );
+    private static final Set<Material> FREEPORT_BUILDER_MERCHANT_ALLOWED_MATERIALS = EnumSet.of(
+            Material.OAK_LOG,
+            Material.SPRUCE_LOG,
+            Material.BIRCH_LOG,
+            Material.OAK_PLANKS,
+            Material.SPRUCE_PLANKS,
+            Material.BIRCH_PLANKS,
+            Material.COBBLESTONE,
+            Material.STONE,
+            Material.SAND,
+            Material.BRICKS
+    );
     private static final LegacyComponentSerializer AMPERSAND_SERIALIZER = LegacyComponentSerializer.legacyAmpersand();
     private static final LegacyComponentSerializer SECTION_SERIALIZER = LegacyComponentSerializer.legacySection();
     private static final PlainTextComponentSerializer PLAIN_TEXT_SERIALIZER = PlainTextComponentSerializer.plainText();
@@ -259,6 +279,7 @@ public final class Testproject extends JavaPlugin {
     private final Map<String, Integer> merchantSharedStock = new ConcurrentHashMap<>();
     private final Map<String, Integer> merchantDailySoldAmounts = new ConcurrentHashMap<>();
     private final Map<UUID, Long> merchantTradeCooldowns = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> freeportStarterMerchantCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Long> legendaryPickaxeBoostUntil = new ConcurrentHashMap<>();
     private final Map<UUID, JobContract> activeJobContracts = new ConcurrentHashMap<>();
     private final Map<UUID, Long> globalChatCooldowns = new ConcurrentHashMap<>();
@@ -289,6 +310,7 @@ public final class Testproject extends JavaPlugin {
     private BukkitTask onboardingFocusTask;
     private BukkitTask onboardingFancyNpcQuestMarkerTask;
     private BukkitTask persistentActionBarTask;
+    private BukkitTask playerTagRefreshTask;
     private BukkitTask climateBossBarTask;
     private BukkitTask climateFreezeTask;
     private BukkitTask climateDebugParticleTask;
@@ -313,6 +335,7 @@ public final class Testproject extends JavaPlugin {
     private CountryWarpGuiListener countryWarpGuiListener;
     private TraderQuestListener traderQuestListener;
     private MerchantShopListener merchantShopListener;
+    private FreeportStarterMerchantListener freeportStarterMerchantListener;
     private StaffMenuListener staffMenuListener;
     private PlaytestGuiListener playtestGuiListener;
     private StabilityGuiListener stabilityGuiListener;
@@ -332,6 +355,10 @@ public final class Testproject extends JavaPlugin {
     private final Set<UUID> climateLiveDisplayPlayers = ConcurrentHashMap.newKeySet();
     private final Set<UUID> oreVisionPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Map<PlacedBlockKey, UUID>> oreVisionDisplays = new ConcurrentHashMap<>();
+    private final Map<UUID, UUID> immersiveNpcNameplateDisplays = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<UUID>> immersiveNpcNameplateViewers = new ConcurrentHashMap<>();
+    private final Map<String, UUID> onboardingFancyNpcNameplateDisplays = new ConcurrentHashMap<>();
+    private final Map<String, Set<UUID>> onboardingFancyNpcNameplateViewers = new ConcurrentHashMap<>();
     private final Map<UUID, Long> minerOverdriveUntil = new ConcurrentHashMap<>();
     private final Map<UUID, Long> minerOverdriveCooldownUntil = new ConcurrentHashMap<>();
     private final Map<UUID, Long> farmerGrowthBurstUntil = new ConcurrentHashMap<>();
@@ -400,14 +427,17 @@ public final class Testproject extends JavaPlugin {
     private File jobsFile;
     private File chatFile;
     private File messagesFile;
+    private File territoryMessagesFile;
     private File dataFile;
     private File countryDataFile;
     private File guildDataFile;
     private File coreSettingsFile;
+    private File guildSettingsFile;
     private File onboardingSettingsFile;
     private File climateSettingsFile;
     private File stabilitySettingsFile;
     private File merchantSettingsFile;
+    private File freeportMerchantsSettingsFile;
     private File territorySettingsFile;
     private File questsSettingsFile;
     private File scoreboardSettingsFile;
@@ -415,14 +445,17 @@ public final class Testproject extends JavaPlugin {
     private FileConfiguration jobsConfig;
     private FileConfiguration chatConfig;
     private FileConfiguration messagesConfig;
+    private FileConfiguration territoryMessagesConfig;
     private FileConfiguration dataConfig;
     private FileConfiguration countryDataConfig;
     private FileConfiguration guildDataConfig;
     private FileConfiguration coreSettingsConfig;
+    private FileConfiguration guildSettingsConfig;
     private FileConfiguration onboardingSettingsConfig;
     private FileConfiguration climateSettingsConfig;
     private FileConfiguration stabilitySettingsConfig;
     private FileConfiguration merchantSettingsConfig;
+    private FileConfiguration freeportMerchantsSettingsConfig;
     private FileConfiguration territorySettingsConfig;
     private FileConfiguration questsSettingsConfig;
     private FileConfiguration scoreboardSettingsConfig;
@@ -489,6 +522,7 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new CountryTerritoryListener(this), this);
         getServer().getPluginManager().registerEvents(new CountryFarmlandListener(this), this);
         getServer().getPluginManager().registerEvents(new StarterHubBuildListener(this), this);
+        getServer().getPluginManager().registerEvents(new TerritoryProtectionMessageListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionCraftListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionSmeltingListener(this), this);
         getServer().getPluginManager().registerEvents(new ProfessionActionListener(this), this);
@@ -538,6 +572,8 @@ public final class Testproject extends JavaPlugin {
         getServer().getPluginManager().registerEvents(traderQuestListener, this);
         merchantShopListener = new MerchantShopListener(this);
         getServer().getPluginManager().registerEvents(merchantShopListener, this);
+        freeportStarterMerchantListener = new FreeportStarterMerchantListener(this);
+        getServer().getPluginManager().registerEvents(freeportStarterMerchantListener, this);
         staffMenuListener = new StaffMenuListener(this);
         getServer().getPluginManager().registerEvents(staffMenuListener, this);
         getServer().getPluginManager().registerEvents(new FixedOreToolListener(this), this);
@@ -697,6 +733,7 @@ public final class Testproject extends JavaPlugin {
         restartOnboardingFocusRuntime();
         restartOnboardingFancyNpcQuestMarkerRuntime();
         restartOnboardingObjectiveHudRuntime();
+        restartPlayerTagRefreshRuntime();
         restartItemsAdderTopStatusHud();
         restartCustomScoreboard();
         ensurePersistentActionBarTask();
@@ -746,6 +783,7 @@ public final class Testproject extends JavaPlugin {
         stopOnboardingFocusRuntime();
         stopOnboardingFancyNpcQuestMarkerRuntime();
         stopOnboardingObjectiveHudRuntime();
+        stopPlayerTagRefreshRuntime();
         if (terraCraftingManager != null) {
             terraCraftingManager.shutdown();
             terraCraftingManager = null;
@@ -1449,6 +1487,10 @@ public final class Testproject extends JavaPlugin {
         return playerProfessions.get(playerId);
     }
 
+    private Profession sanitizeRetiredProfession(Profession profession) {
+        return profession == Profession.BUILDER ? Profession.BLACKSMITH : profession;
+    }
+
     public boolean hasProfession(UUID playerId) {
         return playerProfessions.containsKey(playerId);
     }
@@ -1596,7 +1638,45 @@ public final class Testproject extends JavaPlugin {
         return onboardingSettingsConfig != null ? onboardingSettingsConfig : getCoreSettings();
     }
 
+    private FileConfiguration getGuildSettings() {
+        return guildSettingsConfig != null ? guildSettingsConfig : getCoreSettings();
+    }
+
+    private double getGuildSettingDouble(String path, String legacyPath, double fallback) {
+        FileConfiguration settings = getGuildSettings();
+        if (settings.contains(path)) {
+            return settings.getDouble(path, fallback);
+        }
+        if (legacyPath != null && settings.contains(legacyPath)) {
+            return settings.getDouble(legacyPath, fallback);
+        }
+        return fallback;
+    }
+
+    private int getGuildSettingInt(String path, String legacyPath, int fallback) {
+        FileConfiguration settings = getGuildSettings();
+        if (settings.contains(path)) {
+            return settings.getInt(path, fallback);
+        }
+        if (legacyPath != null && settings.contains(legacyPath)) {
+            return settings.getInt(legacyPath, fallback);
+        }
+        return fallback;
+    }
+
+    private long getGuildSettingLong(String path, String legacyPath, long fallback) {
+        FileConfiguration settings = getGuildSettings();
+        if (settings.contains(path)) {
+            return settings.getLong(path, fallback);
+        }
+        if (legacyPath != null && settings.contains(legacyPath)) {
+            return settings.getLong(legacyPath, fallback);
+        }
+        return fallback;
+    }
+
     public ProfessionSelectionResult selectProfession(UUID playerId, Profession profession) {
+        profession = sanitizeRetiredProfession(profession);
         Profession primary = getPrimaryProfession(playerId);
         Profession secondary = getSecondaryProfession(playerId);
         Profession active = getProfession(playerId);
@@ -1621,6 +1701,7 @@ public final class Testproject extends JavaPlugin {
             if (player != null) {
                 handleTutorialPrimaryProfessionSelected(player);
             }
+            refreshPlayerTagLater(playerId);
             return ProfessionSelectionResult.PRIMARY_SELECTED;
         }
 
@@ -1631,6 +1712,7 @@ public final class Testproject extends JavaPlugin {
         if (profession.equals(primary) || profession.equals(secondary)) {
             activeProfessions.put(playerId, profession);
             saveProfessionState(playerId);
+            refreshPlayerTagLater(playerId);
             return ProfessionSelectionResult.ACTIVE_SWITCHED;
         }
 
@@ -1649,19 +1731,23 @@ public final class Testproject extends JavaPlugin {
         activeProfessions.put(playerId, profession);
         saveProfessionState(playerId);
         grantProfessionStarterKit(playerId, profession);
+        refreshPlayerTagLater(playerId);
         return ProfessionSelectionResult.SECONDARY_SELECTED;
     }
 
     public boolean switchActiveProfession(UUID playerId, Profession profession) {
+        profession = sanitizeRetiredProfession(profession);
         if (!hasProfession(playerId, profession)) {
             return false;
         }
         activeProfessions.put(playerId, profession);
         saveProfessionState(playerId);
+        refreshPlayerTagLater(playerId);
         return true;
     }
 
     public void noteProfessionAction(UUID playerId, Profession profession) {
+        profession = sanitizeRetiredProfession(profession);
         if (playerId == null || profession == null) {
             return;
         }
@@ -1676,9 +1762,11 @@ public final class Testproject extends JavaPlugin {
         }
         activeProfessions.put(playerId, profession);
         saveProfessionState(playerId);
+        refreshPlayerTagLater(playerId);
     }
 
     public boolean adminSetPrimaryProfession(UUID playerId, Profession profession) {
+        profession = sanitizeRetiredProfession(profession);
         if (!canGrantProfession(playerId, profession)) {
             return false;
         }
@@ -1694,10 +1782,12 @@ public final class Testproject extends JavaPlugin {
         if (newlyGranted) {
             grantProfessionStarterKit(playerId, profession);
         }
+        refreshPlayerTagLater(playerId);
         return true;
     }
 
     public boolean adminSetSecondaryProfession(UUID playerId, Profession profession) {
+        profession = sanitizeRetiredProfession(profession);
         if (!canGrantProfession(playerId, profession)) {
             return false;
         }
@@ -1716,6 +1806,7 @@ public final class Testproject extends JavaPlugin {
         if (newlyGranted) {
             grantProfessionStarterKit(playerId, profession);
         }
+        refreshPlayerTagLater(playerId);
         return true;
     }
 
@@ -3954,11 +4045,13 @@ public final class Testproject extends JavaPlugin {
 
     private void updateAllOnboardingFancyNpcQuestMarkers() {
         if (getServer().getPluginManager().getPlugin("FancyNpcs") == null || onboardingFancyNpcBindings.isEmpty()) {
+            cleanupOnboardingFancyNpcNameplates();
             return;
         }
         try {
             de.oliver.fancynpcs.api.NpcManager npcManager = de.oliver.fancynpcs.api.FancyNpcsPlugin.get().getNpcManager();
             if (npcManager == null || !npcManager.isLoaded()) {
+                cleanupOnboardingFancyNpcNameplates();
                 return;
             }
             for (OnboardingFancyNpcBinding binding : onboardingFancyNpcBindings.values()) {
@@ -3972,13 +4065,18 @@ public final class Testproject extends JavaPlugin {
                 boolean marked = shouldShowOnboardingFancyNpcQuestMarker(binding.questKey());
                 String expectedDisplayName = buildOnboardingFancyNpcRenderedName(binding, marked);
                 String currentDisplayName = npc.getData().getDisplayName();
-                if (expectedDisplayName.equals(currentDisplayName)) {
-                    continue;
+                String hiddenDisplayName = "";
+                int expectedVisibilityDistance = getFancyNpcBodyVisibilityDistanceBlocks();
+                boolean visibilityChanged = npc.getData().getVisibilityDistance() != expectedVisibilityDistance;
+                if (!hiddenDisplayName.equals(currentDisplayName) || visibilityChanged) {
+                    npc.getData().setDisplayName(hiddenDisplayName);
+                    npc.getData().setVisibilityDistance(expectedVisibilityDistance);
+                    npc.getData().setDirty(true);
+                    npc.updateForAll();
                 }
-                npc.getData().setDisplayName(expectedDisplayName);
-                npc.getData().setDirty(true);
-                npc.updateForAll();
+                updateOnboardingFancyNpcNameplateVisibility(npc, binding, expectedDisplayName);
             }
+            cleanupOnboardingFancyNpcNameplates();
         } catch (Throwable throwable) {
             getLogger().fine("Failed to refresh onboarding FancyNpcs quest markers: " + throwable.getMessage());
         }
@@ -7587,6 +7685,10 @@ public final class Testproject extends JavaPlugin {
         return terraCraftingManager == null ? null : terraCraftingManager.createContentItem(contentId, amount);
     }
 
+    public boolean isStarterHubAllowedTerraWorkbenchInteraction(Block block) {
+        return terraCraftingManager != null && terraCraftingManager.isInteractiveTerraBench(block);
+    }
+
     public String getTerraCraftingContentId(ItemStack itemStack) {
         return terraCraftingManager == null ? null : terraCraftingManager.getContentId(itemStack);
     }
@@ -8650,19 +8752,34 @@ public final class Testproject extends JavaPlugin {
         return Math.max(3, baseCooldown - reduction);
     }
 
+    private int getDefaultActionCooldownSeconds() {
+        return Math.max(0, getBlockDelaySeconds());
+    }
+
+    private Profession resolveCooldownProfession(UUID playerId, Profession actionProfession) {
+        if (playerId == null || actionProfession == null || !hasProfession(playerId, actionProfession)) {
+            return null;
+        }
+        return sanitizeRetiredProfession(actionProfession);
+    }
+
     public int getSharedActionCooldownSeconds(UUID playerId) {
+        if (playerId == null || getProfession(playerId) == null) {
+            return getDefaultActionCooldownSeconds();
+        }
         return Math.max(0, Math.min(getMinerBreakCooldownSeconds(playerId), getBuilderPlaceCooldownSeconds(playerId)));
     }
 
     public int getActionCooldownSeconds(UUID playerId, Profession actionProfession) {
-        if (actionProfession == null || playerId == null || !hasProfession(playerId, actionProfession)) {
-            return Math.max(0, getBlockDelaySeconds());
+        Profession cooldownProfession = resolveCooldownProfession(playerId, actionProfession);
+        if (cooldownProfession == null) {
+            return getDefaultActionCooldownSeconds();
         }
-        return switch (actionProfession) {
+        return switch (cooldownProfession) {
             case MINER -> getMinerBreakCooldownSeconds(playerId);
             case BUILDER -> getBuilderPlaceCooldownSeconds(playerId);
             case BLACKSMITH -> getBlacksmithActionCooldownSeconds(playerId);
-            default -> Math.max(0, getBlockDelaySeconds());
+            default -> getDefaultActionCooldownSeconds();
         };
     }
 
@@ -9297,6 +9414,9 @@ public final class Testproject extends JavaPlugin {
     }
 
     public boolean isProfessionEnabled(Profession profession) {
+        if (profession == Profession.BUILDER) {
+            return false;
+        }
         return getProfessionConfig(profession).getBoolean("enabled", true);
     }
 
@@ -9354,6 +9474,7 @@ public final class Testproject extends JavaPlugin {
         restartOnboardingFocusRuntime();
         restartOnboardingFancyNpcQuestMarkerRuntime();
         restartOnboardingObjectiveHudRuntime();
+        restartPlayerTagRefreshRuntime();
         restartItemsAdderTopStatusHud();
         restartCustomScoreboard();
         restartClimateRuntime();
@@ -10756,7 +10877,7 @@ public final class Testproject extends JavaPlugin {
             return false;
         }
 
-        List<UUID> members = new ArrayList<>(country.getMembers());
+        List<UUID> members = new ArrayList<>(getCountryEffectiveParticipantIds(country));
         if (members.isEmpty()) {
             return false;
         }
@@ -10874,7 +10995,7 @@ public final class Testproject extends JavaPlugin {
 
         int tier = getTraderDifficultyTier(playerId, profession);
         int professionLevel = Math.max(1, getProfessionLevel(playerId, profession));
-        List<Material> pool = getTraderQuestMaterialsForLevel(profession, tier, professionLevel);
+        List<TraderCommodity> pool = getTraderQuestCommoditiesForLevel(profession, tier, professionLevel);
         if (pool.isEmpty()) {
             return null;
         }
@@ -10885,12 +11006,12 @@ public final class Testproject extends JavaPlugin {
                 ^ playerId.getLeastSignificantBits()
                 ^ ((long) profession.ordinal() << 32);
         Random random = new Random(seed);
-        Material material = pool.get(random.nextInt(pool.size()));
+        TraderCommodity commodity = pool.get(random.nextInt(pool.size()));
 
         int baseAmount = getTraderQuestBaseAmount(profession);
         int amountStep = getTraderQuestAmountStep(profession);
         int amount = Math.max(1, baseAmount + ((tier - 1) * amountStep) + random.nextInt(Math.max(2, amountStep + 1)));
-        double rewardMoney = scaleRewardMoney((amount * getTraderUnitMoney(material)) * (1.0D + ((tier - 1) * 0.18D)));
+        double rewardMoney = scaleRewardMoney((amount * commodity.unitMoney()) * (1.0D + ((tier - 1) * 0.18D)));
         int rewardXp = Math.max(4, amount * Math.max(1, tier));
         double rewardReputation = 0.10D + ((tier - 1) * 0.02D);
         if (profession == traderState.getSpecialtyProfession()) {
@@ -10905,7 +11026,7 @@ public final class Testproject extends JavaPlugin {
             rewardXp = Math.max(1, (int) Math.round(rewardXp * multiplier));
             rewardReputation = sanitizeTraderReputationReward(rewardReputation * multiplier);
         }
-        return new TraderQuestOffer(profession, material, amount, rewardMoney, rewardXp, sanitizeTraderReputationReward(rewardReputation), tier);
+        return new TraderQuestOffer(profession, commodity.displayMaterial(), commodity.contentId(), amount, rewardMoney, rewardXp, sanitizeTraderReputationReward(rewardReputation), tier);
     }
 
     public TraderPlayerQuest acceptTraderQuest(UUID playerId, Profession profession) {
@@ -10928,6 +11049,7 @@ public final class Testproject extends JavaPlugin {
                 traderState.getTraderId(),
                 offer.getProfession(),
                 offer.getRequestedMaterial(),
+                offer.getRequestedContentId(),
                 offer.getRequestedAmount(),
                 offer.getRewardMoney(),
                 offer.getRewardXp(),
@@ -10981,11 +11103,11 @@ public final class Testproject extends JavaPlugin {
             return false;
         }
 
-        if (!removeItems(player, quest.getRequestedMaterial(), quest.getRequestedAmount())) {
+        if (!removeRequestedItems(player, quest.getRequestedMaterial(), quest.getRequestedContentId(), quest.getRequestedAmount())) {
             return false;
         }
 
-        Country country = getPlayerCountry(player.getUniqueId());
+        Country country = getTraderAccessCountry(player.getUniqueId(), traderState);
         double rewardMoney = roundMoney(quest.getRewardMoney() * getCountryTraderRewardMultiplier(country));
         double rewardReputation = sanitizeTraderReputationReward(quest.getRewardReputation() * getCountryTraderRewardMultiplier(country));
         depositBalance(player.getUniqueId(), rewardMoney);
@@ -11006,7 +11128,7 @@ public final class Testproject extends JavaPlugin {
         if (playerId == null || traderState == null) {
             return null;
         }
-        Country country = getPlayerCountry(playerId);
+        Country country = getTraderAccessCountry(playerId, traderState);
         if (country == null || !canUseTrader(playerId, traderState)) {
             return null;
         }
@@ -11021,7 +11143,7 @@ public final class Testproject extends JavaPlugin {
         if (player == null || traderState == null) {
             return false;
         }
-        Country country = getPlayerCountry(player.getUniqueId());
+        Country country = getTraderAccessCountry(player.getUniqueId(), traderState);
         if (country == null) {
             player.sendMessage(getMessage("country.not-in-country"));
             return false;
@@ -11043,7 +11165,7 @@ public final class Testproject extends JavaPlugin {
 
         int contributed = 0;
         for (TraderBigOrderEntry entry : bigOrder.getEntries()) {
-            int removed = removeItemsUpTo(player, entry.getRequestedMaterial(), entry.getRemainingAmount());
+            int removed = removeRequestedItemsUpTo(player, entry.getRequestedMaterial(), entry.getRequestedContentId(), entry.getRemainingAmount());
             if (removed <= 0) {
                 continue;
             }
@@ -11058,7 +11180,7 @@ public final class Testproject extends JavaPlugin {
             return false;
         }
 
-        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_YES, 0.9F, 1.05F);
+        playTradeSellSuccessEffect(player);
         player.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, player.getLocation().add(0.0D, 1.0D, 0.0D), 16, 0.45D, 0.55D, 0.45D, 0.02D);
 
         if (bigOrder.isComplete()) {
@@ -11086,10 +11208,26 @@ public final class Testproject extends JavaPlugin {
         if (player == null) {
             return;
         }
+        playTradeSellSuccessEffect(player);
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.85F, 1.0F);
-        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.9F, 1.25F);
         player.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, player.getLocation().add(0.0D, 1.0D, 0.0D), 20, 0.45D, 0.55D, 0.45D, 0.02D);
         player.getWorld().spawnParticle(Particle.END_ROD, player.getLocation().add(0.0D, 1.0D, 0.0D), 16, 0.35D, 0.45D, 0.35D, 0.02D);
+    }
+
+    private void playTradeBuySuccessEffect(Player player) {
+        if (player == null) {
+            return;
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_WANDERING_TRADER_YES, 0.9F, 1.05F);
+        player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.55F, 1.3F);
+    }
+
+    private void playTradeSellSuccessEffect(Player player) {
+        if (player == null) {
+            return;
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_WANDERING_TRADER_YES, 0.9F, 0.95F);
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.25F);
     }
 
     private TraderBigOrder getOrCreateTraderBigOrder(DynamicTraderState traderState, Country country) {
@@ -11120,16 +11258,16 @@ public final class Testproject extends JavaPlugin {
         Map<Profession, TraderBigOrderEntry> entries = new LinkedHashMap<>();
         double totalValue = 0.0D;
         for (Profession profession : Profession.values()) {
-            List<Material> pool = getTraderQuestMaterialsForLevel(profession, tier, effectiveLevel);
+            List<TraderCommodity> pool = getTraderQuestCommoditiesForLevel(profession, tier, effectiveLevel);
             if (pool.isEmpty()) {
                 continue;
             }
-            Material material = pool.get(random.nextInt(pool.size()));
+            TraderCommodity commodity = pool.get(random.nextInt(pool.size()));
             int baseAmount = getTraderQuestBaseAmount(profession) + getTraderQuestAmountStep(profession);
             int amount = Math.max(1, baseAmount + ((tier - 1) * getTraderQuestAmountStep(profession)) + random.nextInt(Math.max(2, getTraderQuestAmountStep(profession) + 1)));
-            TraderBigOrderEntry entry = new TraderBigOrderEntry(profession, material, amount, 0);
+            TraderBigOrderEntry entry = new TraderBigOrderEntry(profession, commodity.displayMaterial(), commodity.contentId(), amount, 0);
             entries.put(profession, entry);
-            totalValue += amount * getTraderUnitMoney(material);
+            totalValue += amount * commodity.unitMoney();
         }
 
         long now = System.currentTimeMillis();
@@ -11159,11 +11297,11 @@ public final class Testproject extends JavaPlugin {
                 "country", country.getName(),
                 "profession", getProfessionPlainDisplayName(entry.getProfession()),
                 "amount", String.valueOf(amount),
-                "item", formatMaterialName(entry.getRequestedMaterial()),
+                "item", formatTradeRequestName(entry.getRequestedMaterial(), entry.getRequestedContentId()),
                 "current", String.valueOf(entry.getDeliveredAmount()),
                 "required", String.valueOf(entry.getRequestedAmount())
         ));
-        for (UUID memberId : country.getMembers()) {
+        for (UUID memberId : getCountryEffectiveParticipantIds(country)) {
             Player member = getServer().getPlayer(memberId);
             if (member != null) {
                 member.sendMessage(message);
@@ -11204,7 +11342,7 @@ public final class Testproject extends JavaPlugin {
         if (country == null) {
             return players;
         }
-        for (UUID memberId : country.getMembers()) {
+        for (UUID memberId : getCountryEffectiveParticipantIds(country)) {
             Player player = getServer().getPlayer(memberId);
             if (player != null) {
                 players.add(player);
@@ -11223,7 +11361,7 @@ public final class Testproject extends JavaPlugin {
         }
         int totalLevels = 0;
         int countedLevels = 0;
-        for (UUID memberId : country.getMembers()) {
+        for (UUID memberId : getCountryEffectiveParticipantIds(country)) {
             for (Profession profession : Profession.values()) {
                 if (!hasProfession(memberId, profession)) {
                     continue;
@@ -11269,7 +11407,7 @@ public final class Testproject extends JavaPlugin {
         if (country == null) {
             return 0;
         }
-        return (int) Math.round(Math.min(8.0D, country.getMembers().size() * 1.6D));
+        return (int) Math.round(Math.min(8.0D, getCountryEffectiveParticipantIds(country).size() * 1.6D));
     }
 
     public int getCountryMemberLevelScore(Country country) {
@@ -11305,7 +11443,7 @@ public final class Testproject extends JavaPlugin {
             return 0.0D;
         }
         double total = 0.0D;
-        for (UUID memberId : country.getMembers()) {
+        for (UUID memberId : getCountryEffectiveParticipantIds(country)) {
             total += getTraderReputation(memberId);
         }
         return total;
@@ -11316,7 +11454,7 @@ public final class Testproject extends JavaPlugin {
             return 0;
         }
         int total = 0;
-        for (UUID memberId : country.getMembers()) {
+        for (UUID memberId : getCountryEffectiveParticipantIds(country)) {
             total += getPlayerMilestonePoints(memberId);
         }
         return total;
@@ -11411,6 +11549,10 @@ public final class Testproject extends JavaPlugin {
         return members;
     }
 
+    public Set<UUID> getCountryEffectiveParticipantIds(Country country) {
+        return new LinkedHashSet<>(getCountryTerritoryMemberIds(country));
+    }
+
     public Guild getOwningGuild(Country country) {
         if (country == null) {
             return null;
@@ -11438,6 +11580,40 @@ public final class Testproject extends JavaPlugin {
         return false;
     }
 
+    private int getGuildTagMinLength() {
+        return Math.max(1, getGuildSettings().getInt("guilds.creation.tag.min-length", 2));
+    }
+
+    private int getGuildTagMaxLength() {
+        return Math.max(getGuildTagMinLength(), getGuildSettings().getInt("guilds.creation.tag.max-length", 5));
+    }
+
+    private String getDefaultGuildTagColorKey() {
+        String configured = getGuildSettings().getString("guilds.creation.tag.default-color", "WHITE");
+        String normalized = normalizeGuildTagColorKey(configured);
+        return normalized != null ? normalized : "WHITE";
+    }
+
+    private List<String> getAllowedGuildTagColors() {
+        List<String> configured = getGuildSettings().getStringList("guilds.creation.tag.allowed-colors");
+        List<String> normalized = new ArrayList<>();
+        for (String value : configured) {
+            String normalizedValue = normalizeGuildTagColorKey(value);
+            if (normalizedValue != null && !normalized.contains(normalizedValue)) {
+                normalized.add(normalizedValue);
+            }
+        }
+        if (normalized.isEmpty()) {
+            normalized.addAll(DEFAULT_GUILD_TAG_COLOR_KEYS);
+        }
+        return normalized;
+    }
+
+    private String normalizeGuildTagColorKey(String colorKey) {
+        String normalized = colorKey == null ? "" : colorKey.trim().toUpperCase(Locale.ROOT);
+        return DEFAULT_GUILD_TAG_COLOR_KEYS.contains(normalized) ? normalized : null;
+    }
+
     public String createGuild(Player creator, String name, String tag) {
         if (creator == null) {
             return "Only players can create guilds.";
@@ -11450,8 +11626,9 @@ public final class Testproject extends JavaPlugin {
         if (normalizedName == null || normalizedName.length() < 3 || normalizedName.length() > 24) {
             return "Guild names must be between 3 and 24 characters.";
         }
-        if (normalizedTag == null || !GUILD_TAG_PATTERN.matcher(normalizedTag).matches()) {
-            return "Guild tags must be 2 to 5 letters.";
+        if (normalizedTag == null || !GUILD_TAG_PATTERN.matcher(normalizedTag).matches()
+                || normalizedTag.length() < getGuildTagMinLength() || normalizedTag.length() > getGuildTagMaxLength()) {
+            return "Guild tags must be " + getGuildTagMinLength() + " to " + getGuildTagMaxLength() + " letters.";
         }
         if (isGuildTagBlocked(normalizedTag)) {
             return "That guild tag is not allowed.";
@@ -11462,7 +11639,7 @@ public final class Testproject extends JavaPlugin {
         if (guildIdsByTag.containsKey(normalizedTag)) {
             return "A guild with that tag already exists.";
         }
-        double createCost = roundMoney(getConfig().getDouble("guilds.create-cost", DEFAULT_GUILD_CREATE_COST));
+        double createCost = roundMoney(getGuildSettingDouble("guilds.creation.create-cost", "guilds.create-cost", DEFAULT_GUILD_CREATE_COST));
         if (getBalance(creator.getUniqueId()) + 0.0001D < createCost) {
             return "You need ⛃" + formatMoney(createCost) + " to create a guild.";
         }
@@ -11483,6 +11660,7 @@ public final class Testproject extends JavaPlugin {
                 Map.of(),
                 Map.of()
         );
+        guild.setTagColorKey(getDefaultGuildTagColorKey());
         guild.setCreatedAtMillis(System.currentTimeMillis());
         guild.setRecruitingOpen(true);
         guild.setMotd("Welcome to " + guild.getName() + ".");
@@ -11491,7 +11669,7 @@ public final class Testproject extends JavaPlugin {
         guildIdsByName.put(normalizedName, guildId);
         guildIdsByTag.put(normalizedTag, guildId);
         playerGuilds.put(creator.getUniqueId(), guildId);
-        grantGuildXp(guild, 25, "Founded the guild");
+        grantGuildXp(guild, Math.max(0, getGuildSettings().getInt("guilds.progression.guild-xp.create", 25)), "Founded the guild");
         recalculateGuildProgress(guild);
         saveGuild(guild);
         return null;
@@ -11536,7 +11714,7 @@ public final class Testproject extends JavaPlugin {
         appendGuildLog(guild, "&a" + safeOfflineName(player.getUniqueId()) + " joined the guild.");
         notifyGuildInviteManagers(guild, "&a" + safeOfflineName(player.getUniqueId()) + "&7 accepted "
                 + formatGuildInviteSource(inviterId) + "&7 and joined.");
-        grantGuildXp(guild, 10, "Member joined");
+        grantGuildXp(guild, Math.max(0, getGuildSettings().getInt("guilds.progression.guild-xp.member-join", 10)), "Member joined");
         recalculateGuildProgress(guild);
         saveGuild(guild);
         syncGuildCountries(guild);
@@ -11823,7 +12001,10 @@ public final class Testproject extends JavaPlugin {
         takeBalance(player.getUniqueId(), rounded);
         guild.setBalance(roundSignedMoney(guild.getBalance() + rounded));
         appendGuildLog(guild, "&6Treasury deposit: &f⛃" + formatMoney(rounded) + "&6 by &f" + safeOfflineName(player.getUniqueId()) + "&6.");
-        grantGuildXp(guild, Math.max(1, (int) Math.floor(rounded / 25.0D)), "Treasury deposit");
+        int depositPerChunk = Math.max(1, getGuildSettings().getInt("guilds.progression.guild-xp.deposit-per-250-money", 1));
+        int depositChunkSize = 250;
+        int minimumDepositAward = Math.max(0, getGuildSettings().getInt("guilds.progression.guild-xp.minimum-deposit-award", 1));
+        grantGuildXp(guild, Math.max(minimumDepositAward, (int) Math.floor(rounded / (double) depositChunkSize) * depositPerChunk), "Treasury deposit");
         saveGuild(guild);
         return null;
     }
@@ -11855,15 +12036,18 @@ public final class Testproject extends JavaPlugin {
         if (itemStack == null || itemStack.getType().isAir()) {
             return "Hold the material you want to deposit in your main hand.";
         }
-        int removed = removeItems(player.getInventory(), itemStack.getType(), amount);
+        String contentId = getTerraCraftingContentId(itemStack);
+        int removed = removeRequestedItemsUpTo(player, itemStack.getType(), contentId, amount);
         if (removed <= 0) {
             return "You do not have that many items to deposit.";
         }
-        String materialKey = itemStack.getType().name().toLowerCase(Locale.ROOT);
-        guild.addStockpile(materialKey, removed);
-        appendGuildLog(guild, "&bStockpile deposit: &f" + removed + "x " + formatMaterialName(itemStack.getType())
+        String stockpileKey = normalizeStockpileKey(itemStack.getType(), contentId);
+        guild.addStockpile(stockpileKey, removed);
+        appendGuildLog(guild, "&bStockpile deposit: &f" + removed + "x " + formatTradeRequestName(itemStack.getType(), contentId)
                 + "&b by &f" + safeOfflineName(player.getUniqueId()) + "&b.");
-        grantGuildXp(guild, Math.max(1, removed / 8), "Stockpile contribution");
+        int stockpileChunk = Math.max(1, getGuildSettingInt("guilds.progression.guild-xp.stockpile-per-8-items", null, 1));
+        int weightedUnits = getMaterialEconomyWeight(itemStack.getType(), contentId) * removed;
+        grantGuildXp(guild, Math.max(1, (weightedUnits / 8) * stockpileChunk), "Stockpile contribution");
         saveGuild(guild);
         return null;
     }
@@ -11912,7 +12096,9 @@ public final class Testproject extends JavaPlugin {
             guild.setCapitalCountryKey(countryKey);
         }
         appendGuildLog(guild, "&aClaimed country &f" + country.getName() + "&a for &f⛃" + formatMoney(claimCost) + "&a.");
-        grantGuildXp(guild, 40 + Math.max(5, country.getLevel() * 5), "Country claimed");
+        int claimBaseXp = Math.max(0, getGuildSettingInt("guilds.progression.guild-xp.claim-base", null, 40));
+        int claimPerCountryLevel = Math.max(0, getGuildSettingInt("guilds.progression.guild-xp.claim-per-country-level", null, 5));
+        grantGuildXp(guild, claimBaseXp + Math.max(claimPerCountryLevel, country.getLevel() * claimPerCountryLevel), "Country claimed");
         recalculateGuildProgress(guild);
         saveGuild(guild);
         saveCountry(country);
@@ -11921,11 +12107,13 @@ public final class Testproject extends JavaPlugin {
     }
 
     public int getGuildCountryClaimCap(Guild guild) {
-        return Math.max(1, 1 + ((Math.max(1, getGuildLevel(guild)) - 1) / 2));
+        int base = Math.max(1, getGuildSettingInt("guilds.progression.claim-cap.base", null, 1));
+        int interval = Math.max(1, getGuildSettingInt("guilds.progression.claim-cap.extra-slot-every-levels-after-first", null, 2));
+        return Math.max(1, base + ((Math.max(1, getGuildLevel(guild)) - 1) / interval));
     }
 
     public double getGuildCountryClaimCost(Country country) {
-        double baseCost = roundMoney(getConfig().getDouble("guilds.country-claim-base-cost", DEFAULT_GUILD_CLAIM_BASE_COST));
+        double baseCost = roundMoney(getGuildSettingDouble("guilds.claims.country-claim-base-cost", "guilds.country-claim-base-cost", DEFAULT_GUILD_CLAIM_BASE_COST));
         return roundMoney(baseCost + (getCountryTerritoryArea(country) / 500.0D));
     }
 
@@ -11961,7 +12149,9 @@ public final class Testproject extends JavaPlugin {
     }
 
     public int getGuildMemberCap(Guild guild) {
-        return Math.max(10, 10 + (getGuildLevel(guild) * 5));
+        int base = Math.max(1, getGuildSettingInt("guilds.progression.member-cap.base", null, 10));
+        int perLevel = Math.max(0, getGuildSettingInt("guilds.progression.member-cap.per-level", null, 5));
+        return Math.max(base, base + (getGuildLevel(guild) * perLevel));
     }
 
     public int getGuildTotalBestProfessionLevels(Guild guild) {
@@ -11984,13 +12174,81 @@ public final class Testproject extends JavaPlugin {
         return guild != null ? guild.getRole(playerId) : null;
     }
 
+    public String getGuildTagColorCode(String colorKey) {
+        String normalized = colorKey == null ? "WHITE" : colorKey.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "BLACK" -> "&0";
+            case "DARK_BLUE" -> "&1";
+            case "DARK_GREEN" -> "&2";
+            case "DARK_AQUA" -> "&3";
+            case "DARK_RED" -> "&4";
+            case "DARK_PURPLE" -> "&5";
+            case "GOLD" -> "&6";
+            case "GRAY" -> "&7";
+            case "DARK_GRAY" -> "&8";
+            case "BLUE" -> "&9";
+            case "GREEN" -> "&a";
+            case "AQUA" -> "&b";
+            case "RED" -> "&c";
+            case "LIGHT_PURPLE" -> "&d";
+            case "YELLOW" -> "&e";
+            default -> "&f";
+        };
+    }
+
+    public String formatGuildTag(Guild guild) {
+        if (guild == null || guild.getTag() == null || guild.getTag().isBlank()) {
+            return "none";
+        }
+        return getGuildTagColorCode(guild.getTagColorKey()) + guild.getTag() + "&r";
+    }
+
+    public String getGuildTagColorDisplayName(String colorKey) {
+        String normalized = colorKey == null ? "WHITE" : colorKey.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "DARK_BLUE" -> "Dark Blue";
+            case "DARK_GREEN" -> "Dark Green";
+            case "DARK_AQUA" -> "Dark Aqua";
+            case "DARK_RED" -> "Dark Red";
+            case "DARK_PURPLE" -> "Dark Purple";
+            case "DARK_GRAY" -> "Dark Gray";
+            case "LIGHT_PURPLE" -> "Light Purple";
+            default -> normalized.charAt(0) + normalized.substring(1).toLowerCase(Locale.ROOT).replace('_', ' ');
+        };
+    }
+
+    public boolean isValidGuildTagColorKey(String colorKey) {
+        String normalized = normalizeGuildTagColorKey(colorKey);
+        return normalized != null && getAllowedGuildTagColors().contains(normalized);
+    }
+
+    public String setGuildTagColor(Guild guild, UUID actorId, String colorKey) {
+        if (guild == null || actorId == null) {
+            return "Invalid guild tag color update.";
+        }
+        if (guild.getLeaderId() == null || !guild.getLeaderId().equals(actorId)) {
+            return "Only the guild leader can change the guild tag color.";
+        }
+        String normalized = colorKey == null ? null : colorKey.trim().toUpperCase(Locale.ROOT);
+        if (!isValidGuildTagColorKey(normalized)) {
+            return "That guild tag color is not available.";
+        }
+        guild.setTagColorKey(normalized);
+        appendGuildLog(guild, "&7Guild tag color changed to &f" + getGuildTagColorDisplayName(normalized) + "&7.");
+        saveGuild(guild);
+        return null;
+    }
+
     private void recalculateGuildProgress(Guild guild) {
         if (guild == null) {
             return;
         }
         int score = getGuildScoreRaw(guild);
         int totalProgress = score + guild.getGuildXp();
-        int[] thresholds = {0, 90, 220, 420, 700, 1050, 1480, 1980, 2550, 3200};
+        List<Integer> configuredThresholds = getGuildSettings().getIntegerList("guilds.progression.levels.thresholds");
+        int[] thresholds = configuredThresholds.isEmpty()
+                ? new int[]{0, 90, 220, 420, 700, 1050, 1480, 1980, 2550, 3200}
+                : configuredThresholds.stream().mapToInt(Integer::intValue).toArray();
         int level = 1;
         for (int index = 1; index < thresholds.length; index++) {
             if (totalProgress >= thresholds[index]) {
@@ -12017,9 +12275,27 @@ public final class Testproject extends JavaPlugin {
         score += totalBestLevels * 2;
         score += advancedMembers * 10;
         score += guild.getClaimedCountryKeys().size() * 40;
-        score += Math.min(120, guild.getStockpile().values().stream().mapToInt(Integer::intValue).sum() / 16);
-        score += Math.min(160, (int) Math.floor(Math.max(0.0D, guild.getBalance()) / 100.0D));
+        int stockpileUnitsPerScore = Math.max(1, getGuildSettings().getInt("guilds.progression.score.stockpile-units-per-score", 16));
+        int stockpileMaxScore = Math.max(0, getGuildSettings().getInt("guilds.progression.score.stockpile-max-score", 120));
+        int treasuryMoneyPerScore = Math.max(1, getGuildSettings().getInt("guilds.progression.score.treasury-money-per-score", 100));
+        int treasuryMaxScore = Math.max(0, getGuildSettings().getInt("guilds.progression.score.treasury-max-score", 160));
+        score += Math.min(stockpileMaxScore, getGuildWeightedStockpileUnits(guild) / stockpileUnitsPerScore);
+        score += Math.min(treasuryMaxScore, (int) Math.floor(Math.max(0.0D, guild.getBalance()) / treasuryMoneyPerScore));
         return Math.max(0, score);
+    }
+
+    private int getGuildWeightedStockpileUnits(Guild guild) {
+        if (guild == null) {
+            return 0;
+        }
+        int total = 0;
+        for (Map.Entry<String, Integer> entry : guild.getStockpile().entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null || entry.getValue() <= 0) {
+                continue;
+            }
+            total += Math.max(0, entry.getValue()) * getMaterialEconomyWeightFromStockpileKey(entry.getKey());
+        }
+        return Math.max(0, total);
     }
 
     public double getGuildWithdrawLimit(Guild guild, UUID playerId) {
@@ -12034,23 +12310,25 @@ public final class Testproject extends JavaPlugin {
             return Math.max(0.0D, guild.getBalance());
         }
         double base = switch (role) {
-            case OFFICER -> 300.0D + (getGuildLevel(guild) * 75.0D);
-            case ADMIRAL -> 75.0D + (getGuildLevel(guild) * 25.0D);
+            case OFFICER -> getGuildSettingDouble("guilds.treasury.officer-base-withdraw-limit", null, 300.0D)
+                    + (getGuildLevel(guild) * getGuildSettingDouble("guilds.treasury.officer-per-level-withdraw-limit", null, 75.0D));
+            case ADMIRAL -> getGuildSettingDouble("guilds.treasury.admiral-base-withdraw-limit", null, 75.0D)
+                    + (getGuildLevel(guild) * getGuildSettingDouble("guilds.treasury.admiral-per-level-withdraw-limit", null, 25.0D));
             default -> 0.0D;
         };
         return roundMoney(Math.min(Math.max(0.0D, guild.getBalance()), base));
     }
 
     public long getGuildInviteDurationMillis() {
-        return Math.max(60_000L, getConfig().getLong("guilds.invite-duration-hours", DEFAULT_GUILD_INVITE_DURATION_MILLIS / 3_600_000L) * 3_600_000L);
+        return Math.max(60_000L, getGuildSettingLong("guilds.invites.duration-hours", "guilds.invite-duration-hours", DEFAULT_GUILD_INVITE_DURATION_MILLIS / 3_600_000L) * 3_600_000L);
     }
 
     public int getMinimumGuildClaimMembers() {
-        return Math.max(1, getConfig().getInt("guilds.minimum-claim-members", DEFAULT_GUILD_MIN_CLAIM_MEMBERS));
+        return Math.max(1, getGuildSettingInt("guilds.claims.minimum-claim-members", "guilds.minimum-claim-members", DEFAULT_GUILD_MIN_CLAIM_MEMBERS));
     }
 
     public int getMinimumGuildClaimTotalLevels() {
-        return Math.max(0, getConfig().getInt("guilds.minimum-claim-total-levels", DEFAULT_GUILD_MIN_CLAIM_TOTAL_LEVELS));
+        return Math.max(0, getGuildSettingInt("guilds.claims.minimum-claim-total-levels", "guilds.minimum-claim-total-levels", DEFAULT_GUILD_MIN_CLAIM_TOTAL_LEVELS));
     }
 
     public void setGuildDescription(Guild guild, String description) {
@@ -12340,7 +12618,7 @@ public final class Testproject extends JavaPlugin {
         if (country == null || profession == null) {
             return false;
         }
-        for (UUID memberId : country.getMembers()) {
+        for (UUID memberId : getCountryEffectiveParticipantIds(country)) {
             if (hasProfession(memberId, profession) && getProfessionLevel(memberId, profession) >= level) {
                 return true;
             }
@@ -12467,11 +12745,13 @@ public final class Testproject extends JavaPlugin {
             return false;
         }
         int requested = amount > 0 ? amount : mainHand.getAmount();
-        int removed = removeItemsUpTo(player, mainHand.getType(), Math.min(requested, mainHand.getAmount()));
+        String contentId = getTerraCraftingContentId(mainHand);
+        int removed = removeRequestedItemsUpTo(player, mainHand.getType(), contentId, Math.min(requested, mainHand.getAmount()));
         if (removed <= 0) {
             return false;
         }
-        country.setResourceStockpile(Math.max(0, country.getResourceStockpile() + removed));
+        int weightedUnits = getMaterialEconomyWeight(mainHand.getType(), contentId) * removed;
+        country.setResourceStockpile(Math.max(0, country.getResourceStockpile() + weightedUnits));
         saveCountry(country);
         return true;
     }
@@ -12916,19 +13196,60 @@ public final class Testproject extends JavaPlugin {
     }
 
     public boolean canUseTrader(UUID playerId, DynamicTraderState traderState) {
+        return getTraderAccessCountry(playerId, traderState) != null;
+    }
+
+    public Country getTraderAccessCountry(UUID playerId, DynamicTraderState traderState) {
         if (playerId == null || traderState == null) {
+            return null;
+        }
+
+        Country directCountry = getPlayerCountry(playerId);
+        if (canCountryUseTraderRoute(directCountry, traderState)) {
+            return directCountry;
+        }
+
+        Guild guild = getPlayerGuild(playerId);
+        if (guild == null) {
+            return null;
+        }
+
+        Country hostCountry = getTraderHostCountry(traderState);
+        if (hostCountry != null) {
+            String hostCountryKey = normalizeCountryKey(hostCountry.getName());
+            if (hostCountryKey != null && guild.getClaimedCountryKeys().contains(hostCountryKey)) {
+                return hostCountry;
+            }
+
+            for (String allowedCountryKey : hostCountry.getAllowedTradeCountries()) {
+                String normalizedAllowedKey = normalizeCountryKey(allowedCountryKey);
+                if (normalizedAllowedKey == null || !guild.getClaimedCountryKeys().contains(normalizedAllowedKey)) {
+                    continue;
+                }
+                Country allowedCountry = getCountryByKey(normalizedAllowedKey);
+                if (allowedCountry != null) {
+                    return allowedCountry;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private boolean canCountryUseTraderRoute(Country country, DynamicTraderState traderState) {
+        if (country == null || traderState == null) {
             return false;
         }
-        Country playerCountry = getPlayerCountry(playerId);
-        if (playerCountry == null) {
+        String countryKey = normalizeCountryKey(country.getName());
+        String hostCountryKey = normalizeCountryKey(traderState.getHostCountryKey());
+        if (countryKey == null || hostCountryKey == null) {
             return false;
         }
-        String playerCountryKey = normalizeCountryKey(playerCountry.getName());
-        if (playerCountryKey.equalsIgnoreCase(traderState.getHostCountryKey())) {
+        if (countryKey.equalsIgnoreCase(hostCountryKey)) {
             return true;
         }
-        Country hostCountry = getCountryByKey(traderState.getHostCountryKey());
-        return hostCountry != null && hostCountry.getAllowedTradeCountries().contains(playerCountryKey);
+        Country hostCountry = getCountryByKey(hostCountryKey);
+        return hostCountry != null && hostCountry.getAllowedTradeCountries().contains(countryKey);
     }
 
     public Country getActiveTraderHostCountry() {
@@ -13341,9 +13662,6 @@ public final class Testproject extends JavaPlugin {
 
     private void restartNpcHeadTrackingRuntime() {
         stopNpcHeadTrackingRuntime();
-        if (!getConfig().getBoolean("npc-head-tracking.enabled", true)) {
-            return;
-        }
         long intervalTicks = Math.max(1L, getConfig().getLong("npc-head-tracking.interval-ticks", 4L));
         npcHeadTrackingTask = getServer().getScheduler().runTaskTimer(this, this::tickNpcHeadTracking, intervalTicks, intervalTicks);
     }
@@ -13451,7 +13769,7 @@ public final class Testproject extends JavaPlugin {
             guild.setBalance(roundSignedMoney(guild.getBalance() - totalDue));
             country.setUnpaidUpkeepDebt(0.0D);
             country.setNextUpkeepAtMillis(System.currentTimeMillis() + GUILD_COUNTRY_UPKEEP_INTERVAL_MILLIS);
-            grantGuildXp(guild, 10, "Recovered upkeep debt");
+            grantGuildXp(guild, Math.max(0, getGuildSettings().getInt("guilds.progression.guild-xp.upkeep-payment", 5)), "Recovered upkeep debt");
             saveGuild(guild);
             saveCountry(country);
             notifyGuild(guild, "&eGuild upkeep paid for &f" + country.getName() + "&e. Total paid: &f⛃" + formatMoney(totalDue));
@@ -13460,7 +13778,7 @@ public final class Testproject extends JavaPlugin {
         if (guild.getBalance() + 0.0001D >= currentCost) {
             guild.setBalance(roundSignedMoney(guild.getBalance() - currentCost));
             country.setNextUpkeepAtMillis(System.currentTimeMillis() + GUILD_COUNTRY_UPKEEP_INTERVAL_MILLIS);
-            grantGuildXp(guild, 6, "Weekly upkeep paid");
+            grantGuildXp(guild, Math.max(0, getGuildSettings().getInt("guilds.progression.guild-xp.upkeep-payment", 5)), "Weekly upkeep paid");
             saveGuild(guild);
             saveCountry(country);
             notifyGuild(guild, "&7Guild upkeep paid for &f" + country.getName() + "&7: &f⛃" + formatMoney(currentCost));
@@ -13507,14 +13825,21 @@ public final class Testproject extends JavaPlugin {
         double cost = 75.0D + (area / 300.0D) + (country.getLevel() * 18.0D);
         Guild guild = getOwningGuild(country);
         if (guild != null) {
-            double reduction = Math.min(0.20D, Math.max(0, getGuildLevel(guild) - 1) * 0.02D);
+            double maxReductionPercent = Math.max(0.0D,
+                    getGuildSettingDouble("guilds.upkeep.max-level-upkeep-reduction-percent", null, 20.0D));
+            double reductionPerLevelPercent = Math.max(0.0D,
+                    getGuildSettingDouble("guilds.upkeep.reduction-per-level-after-one-percent", null, 2.0D));
+            double reduction = Math.min(maxReductionPercent / 100.0D,
+                    Math.max(0, getGuildLevel(guild) - 1) * (reductionPerLevelPercent / 100.0D));
             cost *= (1.0D - reduction);
         }
         return roundMoney(Math.max(25.0D, cost));
     }
 
     public long getGuildReclaimCooldownMillis() {
-        return Math.max(60_000L, getConfig().getLong("guilds.reclaim-cooldown-days", DEFAULT_GUILD_RECLAIM_COOLDOWN_MILLIS / 86_400_000L) * 86_400_000L);
+        return Math.max(60_000L,
+                getGuildSettingLong("guilds.claims.reclaim-cooldown-days", "guilds.reclaim-cooldown-days",
+                        DEFAULT_GUILD_RECLAIM_COOLDOWN_MILLIS / 86_400_000L) * 86_400_000L);
     }
 
     private void processGuildHousekeeping() {
@@ -13528,7 +13853,9 @@ public final class Testproject extends JavaPlugin {
         if (guild == null || guild.getLeaderId() == null) {
             return;
         }
-        int inactivityDays = Math.max(1, getConfig().getInt("guilds.leader-inactivity-days", DEFAULT_GUILD_LEADER_INACTIVITY_DAYS));
+        int inactivityDays = Math.max(1,
+                getGuildSettingInt("guilds.upkeep.leader-inactivity-days", "guilds.leader-inactivity-days",
+                        DEFAULT_GUILD_LEADER_INACTIVITY_DAYS));
         long inactivityMillis = inactivityDays * 86_400_000L;
         OfflinePlayer leader = getServer().getOfflinePlayer(guild.getLeaderId());
         if (leader.isOnline() || leader.getLastPlayed() <= 0L || (System.currentTimeMillis() - leader.getLastPlayed()) < inactivityMillis) {
@@ -13610,7 +13937,7 @@ public final class Testproject extends JavaPlugin {
         long hours = Math.max(1L, getGuildInviteDurationMillis() / 3_600_000L);
         target.sendMessage(colorize("&6Guild Invitation"));
         target.sendMessage(colorize("&7" + inviterName + " &e" + (resent ? "refreshed" : "sent")
-                + " an invite to &f" + guildName + "&e [&f" + guild.getTag() + "&e]."));
+                + " an invite to &f" + guildName + "&e [&r" + formatGuildTag(guild) + "&e]."));
         target.sendMessage(colorize("&7Expires in &f" + hours + "h&7. Click an option below."));
         Component acceptButton = legacyComponent("&a&lACCEPT")
                 .clickEvent(ClickEvent.runCommand("/guild accept " + guildName))
@@ -13659,14 +13986,19 @@ public final class Testproject extends JavaPlugin {
     }
 
     private void tickNpcHeadTracking() {
+        boolean headTrackingEnabled = getConfig().getBoolean("npc-head-tracking.enabled", true);
         double range = Math.max(1.5D, getConfig().getDouble("npc-head-tracking.range-blocks", 5.0D));
+        double nameplateRange = getNpcNameplateVisibilityRangeBlocks();
         for (DynamicTraderState traderState : activeTraderStates.values()) {
             if (traderState == null) {
                 continue;
             }
             Entity entity = getServer().getEntity(traderState.getEntityId());
             if (entity instanceof Villager villager && villager.isValid()) {
-                updateNpcHeadTracking(villager, traderState.getYaw(), traderState.getPitch(), range);
+                if (headTrackingEnabled) {
+                    updateNpcHeadTracking(villager, traderState.getYaw(), traderState.getPitch(), range);
+                }
+                updateImmersiveNpcNameplateVisibility(villager, nameplateRange);
             }
         }
         for (MerchantShopState merchantState : activeMerchantStates.values()) {
@@ -13675,9 +14007,22 @@ public final class Testproject extends JavaPlugin {
             }
             Entity entity = getServer().getEntity(merchantState.getEntityId());
             if (entity instanceof WanderingTrader trader && trader.isValid()) {
-                updateNpcHeadTracking(trader, merchantState.getYaw(), merchantState.getPitch(), range);
+                if (headTrackingEnabled) {
+                    updateNpcHeadTracking(trader, merchantState.getYaw(), merchantState.getPitch(), range);
+                }
+                updateImmersiveNpcNameplateVisibility(trader, nameplateRange);
             }
         }
+        for (OnboardingCustomNpc npc : onboardingCustomNpcs.values()) {
+            if (npc == null || npc.entityId() == null) {
+                continue;
+            }
+            Entity entity = getServer().getEntity(npc.entityId());
+            if (entity instanceof LivingEntity livingEntity && livingEntity.isValid()) {
+                updateImmersiveNpcNameplateVisibility(livingEntity, nameplateRange);
+            }
+        }
+        cleanupImmersiveNpcNameplates();
     }
 
     private void updateNpcHeadTracking(LivingEntity entity, float idleYaw, float idlePitch, double range) {
@@ -13725,6 +14070,256 @@ public final class Testproject extends JavaPlugin {
             nearestDistanceSquared = distanceSquared;
         }
         return nearest;
+    }
+
+    private double getNpcNameplateVisibilityRangeBlocks() {
+        return Math.max(1.0D, getConfig().getDouble("npc-nameplates.visibility-range-blocks", 15.0D));
+    }
+
+    private int getNpcNameplateVisibilityDistanceBlocks() {
+        return Math.max(1, (int) Math.round(getNpcNameplateVisibilityRangeBlocks()));
+    }
+
+    private int getFancyNpcBodyVisibilityDistanceBlocks() {
+        return Math.max(32, getConfig().getInt("npc-nameplates.fancy-body-visibility-range-blocks", 48));
+    }
+
+    private void updateImmersiveNpcNameplateVisibility(LivingEntity entity, double rangeBlocks) {
+        if (!shouldUseImmersiveNpcNameplate(entity)) {
+            removeImmersiveNpcNameplate(entity != null ? entity.getUniqueId() : null);
+            return;
+        }
+        UUID displayId = ensureImmersiveNpcNameplate(entity);
+        if (displayId == null) {
+            return;
+        }
+        Entity displayEntity = getServer().getEntity(displayId);
+        if (!(displayEntity instanceof TextDisplay display) || !display.isValid()) {
+            removeImmersiveNpcNameplate(entity.getUniqueId());
+            return;
+        }
+
+        display.text(entity.customName());
+        display.teleport(getImmersiveNpcNameplateLocation(entity));
+        Location origin = entity.getLocation();
+        double rangeSquared = rangeBlocks * rangeBlocks;
+        Set<UUID> shownViewers = immersiveNpcNameplateViewers.computeIfAbsent(entity.getUniqueId(), ignored -> ConcurrentHashMap.newKeySet());
+        Set<UUID> currentWorldPlayers = new HashSet<>();
+        for (Player player : origin.getWorld().getPlayers()) {
+            currentWorldPlayers.add(player.getUniqueId());
+            if (player == null || !player.isOnline() || player.isDead()) {
+                shownViewers.remove(player != null ? player.getUniqueId() : null);
+                continue;
+            }
+            boolean shouldSee = player.getLocation().distanceSquared(origin) <= rangeSquared;
+            if (shouldSee) {
+                if (shownViewers.add(player.getUniqueId())) {
+                    player.showEntity(this, display);
+                }
+            } else if (shownViewers.remove(player.getUniqueId())) {
+                player.hideEntity(this, display);
+            }
+        }
+        for (UUID viewerId : new HashSet<>(shownViewers)) {
+            if (currentWorldPlayers.contains(viewerId)) {
+                continue;
+            }
+            Player viewer = getServer().getPlayer(viewerId);
+            if (viewer != null) {
+                viewer.hideEntity(this, display);
+            }
+            shownViewers.remove(viewerId);
+        }
+    }
+
+    private boolean shouldUseImmersiveNpcNameplate(Entity entity) {
+        return entity instanceof LivingEntity
+                && entity.isValid()
+                && entity.customName() != null
+                && (isMarkedMerchantNpc(entity)
+                || isTraderNpc(entity)
+                || getOnboardingNpcId(entity) != null);
+    }
+
+    private UUID ensureImmersiveNpcNameplate(LivingEntity entity) {
+        if (entity == null || entity.customName() == null || entity.getWorld() == null) {
+            return null;
+        }
+        UUID existingId = immersiveNpcNameplateDisplays.get(entity.getUniqueId());
+        Entity existingEntity = existingId != null ? getServer().getEntity(existingId) : null;
+        if (existingEntity instanceof TextDisplay display && display.isValid()) {
+            return existingId;
+        }
+        TextDisplay display = entity.getWorld().spawn(getImmersiveNpcNameplateLocation(entity), TextDisplay.class, spawned -> {
+            spawned.text(entity.customName());
+            spawned.setBillboard(Display.Billboard.CENTER);
+            spawned.setSeeThrough(true);
+            spawned.setShadowed(false);
+            spawned.setDefaultBackground(false);
+            spawned.setGravity(false);
+            spawned.setInvulnerable(true);
+            spawned.setPersistent(false);
+            spawned.setVisibleByDefault(false);
+            spawned.setViewRange(Math.max(18.0F, (float) getNpcNameplateVisibilityRangeBlocks() + 6.0F));
+        });
+        immersiveNpcNameplateDisplays.put(entity.getUniqueId(), display.getUniqueId());
+        immersiveNpcNameplateViewers.remove(entity.getUniqueId());
+        return display.getUniqueId();
+    }
+
+    private Location getImmersiveNpcNameplateLocation(LivingEntity entity) {
+        return entity.getLocation().clone().add(0.0D, entity.getHeight() + 0.45D, 0.0D);
+    }
+
+    private void removeImmersiveNpcNameplate(UUID entityId) {
+        if (entityId == null) {
+            return;
+        }
+        UUID displayId = immersiveNpcNameplateDisplays.remove(entityId);
+        immersiveNpcNameplateViewers.remove(entityId);
+        if (displayId == null) {
+            return;
+        }
+        Entity displayEntity = getServer().getEntity(displayId);
+        if (displayEntity != null) {
+            displayEntity.remove();
+        }
+    }
+
+    private void cleanupImmersiveNpcNameplates() {
+        for (Map.Entry<UUID, UUID> entry : new ArrayList<>(immersiveNpcNameplateDisplays.entrySet())) {
+            Entity npc = getServer().getEntity(entry.getKey());
+            Entity display = getServer().getEntity(entry.getValue());
+            if (shouldUseImmersiveNpcNameplate(npc) && display instanceof TextDisplay textDisplay && textDisplay.isValid()) {
+                continue;
+            }
+            removeImmersiveNpcNameplate(entry.getKey());
+        }
+    }
+
+    private void updateOnboardingFancyNpcNameplateVisibility(de.oliver.fancynpcs.api.Npc npc,
+                                                              OnboardingFancyNpcBinding binding,
+                                                              String displayName) {
+        if (npc == null || npc.getData() == null || binding == null) {
+            return;
+        }
+        Location origin = npc.getData().getLocation();
+        if (origin == null || origin.getWorld() == null) {
+            removeOnboardingFancyNpcNameplate(binding.fancyNpcId());
+            return;
+        }
+        UUID displayId = ensureOnboardingFancyNpcNameplate(binding.fancyNpcId(), origin, displayName);
+        if (displayId == null) {
+            return;
+        }
+        Entity displayEntity = getServer().getEntity(displayId);
+        if (!(displayEntity instanceof TextDisplay display) || !display.isValid()) {
+            removeOnboardingFancyNpcNameplate(binding.fancyNpcId());
+            return;
+        }
+
+        display.text(legacyComponent(displayName));
+        display.teleport(getOnboardingFancyNpcNameplateLocation(origin));
+        double rangeSquared = getNpcNameplateVisibilityRangeBlocks() * getNpcNameplateVisibilityRangeBlocks();
+        String key = binding.fancyNpcId().toLowerCase(Locale.ROOT);
+        Set<UUID> shownViewers = onboardingFancyNpcNameplateViewers.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet());
+        Set<UUID> currentWorldPlayers = new HashSet<>();
+        for (Player player : origin.getWorld().getPlayers()) {
+            currentWorldPlayers.add(player.getUniqueId());
+            if (!player.isOnline() || player.isDead()) {
+                shownViewers.remove(player.getUniqueId());
+                continue;
+            }
+            boolean shouldSee = player.getLocation().distanceSquared(origin) <= rangeSquared;
+            if (shouldSee) {
+                if (shownViewers.add(player.getUniqueId())) {
+                    player.showEntity(this, display);
+                }
+            } else if (shownViewers.remove(player.getUniqueId())) {
+                player.hideEntity(this, display);
+            }
+        }
+        for (UUID viewerId : new HashSet<>(shownViewers)) {
+            if (currentWorldPlayers.contains(viewerId)) {
+                continue;
+            }
+            Player viewer = getServer().getPlayer(viewerId);
+            if (viewer != null) {
+                viewer.hideEntity(this, display);
+            }
+            shownViewers.remove(viewerId);
+        }
+    }
+
+    private UUID ensureOnboardingFancyNpcNameplate(String fancyNpcId, Location npcLocation, String displayName) {
+        if (fancyNpcId == null || npcLocation == null || npcLocation.getWorld() == null) {
+            return null;
+        }
+        String key = fancyNpcId.toLowerCase(Locale.ROOT);
+        UUID existingId = onboardingFancyNpcNameplateDisplays.get(key);
+        Entity existingEntity = existingId != null ? getServer().getEntity(existingId) : null;
+        if (existingEntity instanceof TextDisplay display && display.isValid()) {
+            return existingId;
+        }
+        TextDisplay display = npcLocation.getWorld().spawn(getOnboardingFancyNpcNameplateLocation(npcLocation), TextDisplay.class, spawned -> {
+            spawned.text(legacyComponent(displayName));
+            spawned.setBillboard(Display.Billboard.CENTER);
+            spawned.setSeeThrough(true);
+            spawned.setShadowed(false);
+            spawned.setDefaultBackground(false);
+            spawned.setGravity(false);
+            spawned.setInvulnerable(true);
+            spawned.setPersistent(false);
+            spawned.setVisibleByDefault(false);
+            spawned.setViewRange(Math.max(18.0F, (float) getNpcNameplateVisibilityRangeBlocks() + 6.0F));
+        });
+        onboardingFancyNpcNameplateDisplays.put(key, display.getUniqueId());
+        onboardingFancyNpcNameplateViewers.remove(key);
+        return display.getUniqueId();
+    }
+
+    private Location getOnboardingFancyNpcNameplateLocation(Location npcLocation) {
+        return npcLocation.clone().add(0.0D, 2.15D, 0.0D);
+    }
+
+    private void removeOnboardingFancyNpcNameplate(String fancyNpcId) {
+        if (fancyNpcId == null) {
+            return;
+        }
+        String key = fancyNpcId.toLowerCase(Locale.ROOT);
+        UUID displayId = onboardingFancyNpcNameplateDisplays.remove(key);
+        onboardingFancyNpcNameplateViewers.remove(key);
+        if (displayId == null) {
+            return;
+        }
+        Entity displayEntity = getServer().getEntity(displayId);
+        if (displayEntity != null) {
+            displayEntity.remove();
+        }
+    }
+
+    private void cleanupOnboardingFancyNpcNameplates() {
+        if (getServer().getPluginManager().getPlugin("FancyNpcs") == null) {
+            for (String key : new ArrayList<>(onboardingFancyNpcNameplateDisplays.keySet())) {
+                removeOnboardingFancyNpcNameplate(key);
+            }
+            return;
+        }
+        try {
+            de.oliver.fancynpcs.api.NpcManager npcManager = de.oliver.fancynpcs.api.FancyNpcsPlugin.get().getNpcManager();
+            if (npcManager == null || !npcManager.isLoaded()) {
+                return;
+            }
+            for (Map.Entry<String, UUID> entry : new ArrayList<>(onboardingFancyNpcNameplateDisplays.entrySet())) {
+                de.oliver.fancynpcs.api.Npc npc = npcManager.getNpcById(entry.getKey());
+                Entity display = getServer().getEntity(entry.getValue());
+                if (npc != null && npc.getData() != null && npc.getData().getLocation() != null && display instanceof TextDisplay textDisplay && textDisplay.isValid()) {
+                    continue;
+                }
+                removeOnboardingFancyNpcNameplate(entry.getKey());
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private void tickMerchantRuntime() {
@@ -13866,7 +14461,7 @@ public final class Testproject extends JavaPlugin {
         trader.setBreed(false);
         trader.setSilent(false);
         trader.customName(legacyComponent(getMessage("merchant.npc-name")));
-        trader.setCustomNameVisible(true);
+        trader.setCustomNameVisible(false);
         trader.getPersistentDataContainer().set(merchantNpcKey, PersistentDataType.BYTE, (byte) 1);
         activeMerchantStates.put(normalizeCountryKey(country.getName()), new MerchantShopState(
                 UUID.randomUUID(),
@@ -13898,7 +14493,7 @@ public final class Testproject extends JavaPlugin {
         trader.setBreed(false);
         trader.setSilent(false);
         trader.customName(legacyComponent(getMessage("merchant.npc-name")));
-        trader.setCustomNameVisible(true);
+        trader.setCustomNameVisible(false);
         trader.getPersistentDataContainer().set(merchantNpcKey, PersistentDataType.BYTE, (byte) 1);
     }
 
@@ -13917,6 +14512,7 @@ public final class Testproject extends JavaPlugin {
                 if (activeIds.contains(trader.getUniqueId())) {
                     continue;
                 }
+                removeImmersiveNpcNameplate(trader.getUniqueId());
                 trader.remove();
             }
         }
@@ -13959,6 +14555,7 @@ public final class Testproject extends JavaPlugin {
         for (MerchantShopState state : new ArrayList<>(activeMerchantStates.values())) {
             Entity entity = getServer().getEntity(state.getEntityId());
             if (entity != null) {
+                removeImmersiveNpcNameplate(entity.getUniqueId());
                 entity.remove();
             }
         }
@@ -13973,6 +14570,24 @@ public final class Testproject extends JavaPlugin {
         for (int rotation = 0; rotation < getMerchantRotationCount(); rotation++) {
             for (MerchantShopOffer offer : createMerchantBuyOffers(rotation)) {
                 merchantSharedStock.put(offer.getKey(), offer.getStock());
+            }
+        }
+        initializeFreeportStarterMerchantSharedStock();
+    }
+
+    private void initializeFreeportStarterMerchantSharedStock() {
+        ConfigurationSection merchantsSection = getFreeportMerchantsSettings().getConfigurationSection("freeport-merchants.merchants");
+        if (merchantsSection == null) {
+            return;
+        }
+        for (String merchantKey : merchantsSection.getKeys(false)) {
+            List<MerchantShopOffer> offers = getFreeportStarterMerchantOffers(merchantKey);
+            for (int offerIndex = 0; offerIndex < offers.size(); offerIndex++) {
+                MerchantShopOffer offer = offers.get(offerIndex);
+                if (offer == null) {
+                    continue;
+                }
+                merchantSharedStock.putIfAbsent(offer.getKey(), getFreeportStarterMerchantInitialStock(merchantKey, offerIndex));
             }
         }
     }
@@ -14183,17 +14798,23 @@ public final class Testproject extends JavaPlugin {
         if (section == null || type == null) {
             return null;
         }
+        String contentId = normalizeQuestKey(section.getString("content-id"));
         Material material = Material.matchMaterial(section.getString("material", ""));
+        ItemStack contentItem = contentId != null ? createTerraCraftingItem(contentId, 1) : null;
+        if (contentItem != null && !contentItem.getType().isAir()) {
+            material = contentItem.getType();
+        }
         if (material == null || material.isAir() || !material.isItem()) {
             return null;
         }
         int amount = Math.max(1, section.getInt("amount", 1));
         double price = roundMoney(Math.max(0.0D, section.getDouble("price", 0.0D)));
         int stock = type == MerchantShopOffer.Type.BUY ? Math.max(1, section.getInt("stock", 1)) : 0;
+        String stockKey = contentId != null ? contentId : material.name().toLowerCase(Locale.ROOT);
         String key = type == MerchantShopOffer.Type.BUY
-                ? "buy:" + material.name().toLowerCase(Locale.ROOT) + ":" + fallbackKey
-                : "sell:" + material.name().toLowerCase(Locale.ROOT);
-        return new MerchantShopOffer(key, type, material, amount, price, stock);
+                ? "buy:" + stockKey + ":" + fallbackKey
+                : "sell:" + stockKey + ":" + fallbackKey;
+        return new MerchantShopOffer(key, type, material, contentId, amount, price, stock);
     }
 
     private List<List<MerchantShopOffer>> getDefaultMerchantBuyOfferLayouts() {
@@ -14431,6 +15052,7 @@ public final class Testproject extends JavaPlugin {
             }
         }
 
+        removeImmersiveNpcNameplate(entity.getUniqueId());
         entity.remove();
         if (changed) {
             saveMerchantData();
@@ -14480,7 +15102,7 @@ public final class Testproject extends JavaPlugin {
                 "item", formatMaterialName(offer.getMaterial()),
                 "money", formatMoney(price)
         )));
-        player.playSound(player.getLocation(), Sound.ENTITY_WANDERING_TRADER_YES, 0.9F, 1.05F);
+        playTradeBuySuccessEffect(player);
     }
 
     public void handleMerchantSell(Player player, int offerIndex) {
@@ -14516,7 +15138,7 @@ public final class Testproject extends JavaPlugin {
                 "item", formatMaterialName(offer.getMaterial()),
                 "money", formatMoney(total)
         )));
-        player.playSound(player.getLocation(), Sound.ENTITY_WANDERING_TRADER_YES, 0.9F, 1.05F);
+        playTradeSellSuccessEffect(player);
     }
 
     private boolean isMerchantTradeCoolingDown(UUID playerId) {
@@ -14529,6 +15151,370 @@ public final class Testproject extends JavaPlugin {
 
     public long getMerchantTradeCooldownRemainingMillisPublic(UUID playerId) {
         return getMerchantTradeCooldownRemainingMillis(playerId);
+    }
+
+    private FileConfiguration getFreeportMerchantsSettings() {
+        return freeportMerchantsSettingsConfig;
+    }
+
+    public boolean isFreeportStarterMerchantKey(String merchantKey) {
+        String normalizedKey = normalizeQuestKey(merchantKey);
+        if (normalizedKey == null) {
+            return false;
+        }
+        return getFreeportMerchantsSettings().getConfigurationSection("freeport-merchants.merchants." + normalizedKey) != null;
+    }
+
+    public String resolveFreeportStarterMerchantKey(String merchantType) {
+        String normalizedType = normalizeQuestKey(merchantType);
+        if (normalizedType == null) {
+            return null;
+        }
+        return switch (normalizedType) {
+            case "miner", "miner_merchant" -> "freeport_miner_merchant";
+            case "builder", "builder_merchant" -> "freeport_builder_merchant";
+            case "farmer", "farmer_merchant" -> "freeport_farmer_merchant";
+            default -> null;
+        };
+    }
+
+    public List<String> getFreeportStarterMerchantTypes() {
+        return List.of("miner", "builder", "farmer");
+    }
+
+    public String getFreeportStarterMerchantTitle(String merchantKey) {
+        String normalizedKey = normalizeQuestKey(merchantKey);
+        String fallback = "&8Starter Merchant";
+        if (normalizedKey == null) {
+            return fallback;
+        }
+        return colorize(getFreeportMerchantsSettings().getString(
+                "freeport-merchants.merchants." + normalizedKey + ".title",
+                fallback
+        ));
+    }
+
+    public String getFreeportStarterMerchantDisplayName(String merchantKey) {
+        String normalizedKey = normalizeQuestKey(merchantKey);
+        if (normalizedKey == null) {
+            return "Starter Merchant";
+        }
+        return ChatColor.stripColor(colorize(getFreeportMerchantsSettings().getString(
+                "freeport-merchants.merchants." + normalizedKey + ".display-name",
+                "&6Starter Merchant"
+        )));
+    }
+
+    public Material getFreeportStarterMerchantIcon(String merchantKey) {
+        String normalizedKey = normalizeQuestKey(merchantKey);
+        Material fallback = Material.EMERALD;
+        if (normalizedKey == null) {
+            return fallback;
+        }
+        Material parsed = Material.matchMaterial(getFreeportMerchantsSettings().getString(
+                "freeport-merchants.merchants." + normalizedKey + ".icon",
+                fallback.name()
+        ));
+        return parsed != null && parsed.isItem() ? parsed : fallback;
+    }
+
+    public List<MerchantShopOffer> getFreeportStarterMerchantOffers(String merchantKey) {
+        String normalizedKey = normalizeQuestKey(merchantKey);
+        if (normalizedKey == null) {
+            return List.of();
+        }
+        ConfigurationSection offersSection = getFreeportMerchantsSettings().getConfigurationSection(
+                "freeport-merchants.merchants." + normalizedKey + ".offers"
+        );
+        List<MerchantShopOffer> offers = new ArrayList<>();
+        if (offersSection != null) {
+            for (String key : offersSection.getKeys(false).stream().sorted().toList()) {
+                ConfigurationSection offerSection = offersSection.getConfigurationSection(key);
+                MerchantShopOffer offer = readMerchantOfferConfig(
+                        offerSection,
+                        MerchantShopOffer.Type.SELL,
+                        normalizedKey + ":" + key
+                );
+                if (offer != null) {
+                    offers.add(offer);
+                }
+            }
+        }
+        if ("freeport_builder_merchant".equalsIgnoreCase(normalizedKey)) {
+            offers.removeIf(offer -> offer == null || (offer.getContentId() == null && !FREEPORT_BUILDER_MERCHANT_ALLOWED_MATERIALS.contains(offer.getMaterial())));
+        }
+        return offers;
+    }
+
+    private ConfigurationSection getFreeportStarterMerchantOfferSection(String merchantKey, int offerIndex) {
+        String normalizedKey = normalizeQuestKey(merchantKey);
+        if (normalizedKey == null || offerIndex < 0) {
+            return null;
+        }
+        ConfigurationSection offersSection = getFreeportMerchantsSettings().getConfigurationSection(
+                "freeport-merchants.merchants." + normalizedKey + ".offers"
+        );
+        if (offersSection == null) {
+            return null;
+        }
+        List<String> keys = offersSection.getKeys(false).stream().sorted().toList();
+        if (offerIndex >= keys.size()) {
+            return null;
+        }
+        return offersSection.getConfigurationSection(keys.get(offerIndex));
+    }
+
+    public double getFreeportStarterMerchantSellPrice(String merchantKey, int offerIndex) {
+        ConfigurationSection section = getFreeportStarterMerchantOfferSection(merchantKey, offerIndex);
+        if (section == null) {
+            return 0.0D;
+        }
+        double fallback = roundMoney(Math.max(0.0D, section.getDouble("price", 0.0D)));
+        return roundMoney(Math.max(0.0D, section.getDouble("sell-price", fallback)));
+    }
+
+    public double getFreeportStarterMerchantBuyPrice(String merchantKey, int offerIndex) {
+        double sellPrice = getFreeportStarterMerchantSellPrice(merchantKey, offerIndex);
+        ConfigurationSection section = getFreeportStarterMerchantOfferSection(merchantKey, offerIndex);
+        MerchantShopOffer offer = getFreeportStarterMerchantOffer(merchantKey, offerIndex);
+        int bundleAmount = offer != null ? Math.max(1, offer.getAmount()) : 1;
+        double minimumBundlePrice = roundMoney(Math.max(0.01D, sellPrice * bundleAmount * 1.15D));
+        if (section == null) {
+            return minimumBundlePrice;
+        }
+        double configured = roundMoney(Math.max(0.0D, section.getDouble("buy-price", minimumBundlePrice)));
+        return roundMoney(Math.max(minimumBundlePrice, configured));
+    }
+
+    public int getFreeportStarterMerchantInitialStock(String merchantKey, int offerIndex) {
+        ConfigurationSection section = getFreeportStarterMerchantOfferSection(merchantKey, offerIndex);
+        if (section == null) {
+            return 0;
+        }
+        return Math.max(0, section.getInt("initial-stock", 0));
+    }
+
+    public int getFreeportStarterMerchantMaxStock(String merchantKey, int offerIndex) {
+        ConfigurationSection section = getFreeportStarterMerchantOfferSection(merchantKey, offerIndex);
+        if (section == null) {
+            return Integer.MAX_VALUE;
+        }
+        return Math.max(0, section.getInt("max-stock", Integer.MAX_VALUE));
+    }
+
+    public int getFreeportStarterMerchantRemainingStock(String merchantKey, int offerIndex) {
+        List<MerchantShopOffer> offers = getFreeportStarterMerchantOffers(merchantKey);
+        if (offerIndex < 0 || offerIndex >= offers.size()) {
+            return 0;
+        }
+        MerchantShopOffer offer = offers.get(offerIndex);
+        return Math.max(0, merchantSharedStock.getOrDefault(offer.getKey(), getFreeportStarterMerchantInitialStock(merchantKey, offerIndex)));
+    }
+
+    private MerchantShopOffer getFreeportStarterMerchantOffer(String merchantKey, int offerIndex) {
+        List<MerchantShopOffer> offers = getFreeportStarterMerchantOffers(merchantKey);
+        return offerIndex >= 0 && offerIndex < offers.size() ? offers.get(offerIndex) : null;
+    }
+
+    public long getFreeportStarterMerchantCooldownRemainingMillis(UUID playerId) {
+        if (playerId == null) {
+            return 0L;
+        }
+        return Math.max(0L, freeportStarterMerchantCooldowns.getOrDefault(playerId, 0L) - System.currentTimeMillis());
+    }
+
+    private long getFreeportStarterMerchantCooldownMillis() {
+        return Math.max(0, getFreeportMerchantsSettings().getInt("freeport-merchants.cooldown-seconds", 2)) * 1000L;
+    }
+
+    public void handleFreeportStarterMerchantSell(Player player, String merchantKey, int offerIndex, boolean sellAll) {
+        if (player == null) {
+            return;
+        }
+        if (getFreeportStarterMerchantCooldownRemainingMillis(player.getUniqueId()) > 0L) {
+            player.sendMessage(colorize("&cMerchant cooldown: &f"
+                    + formatLongDurationWords(getFreeportStarterMerchantCooldownRemainingMillis(player.getUniqueId()))));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
+            return;
+        }
+
+        List<MerchantShopOffer> offers = getFreeportStarterMerchantOffers(merchantKey);
+        if (offerIndex < 0 || offerIndex >= offers.size()) {
+            return;
+        }
+
+        MerchantShopOffer offer = offers.get(offerIndex);
+        String offerName = formatTradeRequestName(offer.getMaterial(), offer.getContentId());
+        int currentStock = getFreeportStarterMerchantRemainingStock(merchantKey, offerIndex);
+        int maxStock = getFreeportStarterMerchantMaxStock(merchantKey, offerIndex);
+        if (maxStock > 0 && currentStock >= maxStock) {
+            player.sendMessage(colorize("&cThis merchant is already fully stocked on &f" + offerName + "&c."));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
+            return;
+        }
+
+        int targetAmount = offer.getAmount();
+        if (sellAll) {
+            targetAmount = Math.min(countPlayerItems(player, offer.getMaterial(), offer.getContentId()), Math.max(0, maxStock - currentStock));
+        } else if (maxStock > 0) {
+            targetAmount = Math.min(targetAmount, Math.max(0, maxStock - currentStock));
+        }
+        if (targetAmount <= 0) {
+            player.sendMessage(colorize("&cThis merchant cannot take more &f" + offerName + "&c right now."));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
+            return;
+        }
+
+        double qualityMultiplier = getMerchantQualityPriceMultiplier(player, offer.getMaterial(), offer.getContentId(), targetAmount);
+        int removed = removeRequestedItemsUpTo(player, offer.getMaterial(), offer.getContentId(), targetAmount);
+        if (removed <= 0) {
+            player.sendMessage(colorize("&cYou do not have any &f" + offerName + "&c to sell."));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
+            return;
+        }
+
+        double total = roundMoney(getFreeportStarterMerchantSellPrice(merchantKey, offerIndex) * removed * qualityMultiplier);
+        depositBalance(player.getUniqueId(), total);
+        merchantSharedStock.put(offer.getKey(), Math.max(0, currentStock + removed));
+        freeportStarterMerchantCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + getFreeportStarterMerchantCooldownMillis());
+        saveMerchantData();
+        player.sendMessage(colorize("&6[" + getFreeportStarterMerchantDisplayName(merchantKey) + "&6] &aSold &f"
+                + removed + "x " + offerName + " &afor &f⛃" + formatMoney(total) + "&a."));
+        playTradeSellSuccessEffect(player);
+    }
+
+    public void handleFreeportStarterMerchantBuy(Player player, String merchantKey, int offerIndex) {
+        if (player == null) {
+            return;
+        }
+        if (getFreeportStarterMerchantCooldownRemainingMillis(player.getUniqueId()) > 0L) {
+            player.sendMessage(colorize("&cMerchant cooldown: &f"
+                    + formatLongDurationWords(getFreeportStarterMerchantCooldownRemainingMillis(player.getUniqueId()))));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
+            return;
+        }
+
+        List<MerchantShopOffer> offers = getFreeportStarterMerchantOffers(merchantKey);
+        if (offerIndex < 0 || offerIndex >= offers.size()) {
+            return;
+        }
+
+        MerchantShopOffer offer = offers.get(offerIndex);
+        String offerName = formatTradeRequestName(offer.getMaterial(), offer.getContentId());
+        int amount = Math.max(1, offer.getAmount());
+        int stock = getFreeportStarterMerchantRemainingStock(merchantKey, offerIndex);
+        if (stock < amount) {
+            player.sendMessage(colorize("&cThis merchant does not have enough &f" + offerName + "&c in stock."));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
+            return;
+        }
+
+        ItemStack purchase = createMerchantOfferItemStack(offer, amount);
+        if (!canPlayerReceiveItem(player, purchase)) {
+            player.sendMessage(colorize("&cYou need more inventory space before buying &f" + amount + "x " + offerName + "&c."));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
+            return;
+        }
+
+        double total = getFreeportStarterMerchantBuyPrice(merchantKey, offerIndex);
+        if (getBalance(player.getUniqueId()) + 0.0001D < total) {
+            player.sendMessage(colorize("&cYou need &f⛃" + formatMoney(total) + " &cto buy that bundle."));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
+            return;
+        }
+
+        withdrawBalance(player.getUniqueId(), total);
+        player.getInventory().addItem(purchase);
+        merchantSharedStock.put(offer.getKey(), Math.max(0, stock - amount));
+        freeportStarterMerchantCooldowns.put(player.getUniqueId(), System.currentTimeMillis() + getFreeportStarterMerchantCooldownMillis());
+        saveMerchantData();
+        player.sendMessage(colorize("&6[" + getFreeportStarterMerchantDisplayName(merchantKey) + "&6] &aBought &f"
+                + amount + "x " + offerName + " &afor &f⛃" + formatMoney(total) + "&a."));
+        playTradeBuySuccessEffect(player);
+    }
+
+    private int countPlayerItems(Player player, Material material) {
+        return countPlayerItems(player, material, null);
+    }
+
+    private int countPlayerItems(Player player, Material material, String contentId) {
+        if (player == null || material == null) {
+            return 0;
+        }
+        int total = 0;
+        for (ItemStack itemStack : player.getInventory().getContents()) {
+            if (itemStack == null || itemStack.getType() != material) {
+                continue;
+            }
+            if (!matchesRequestedItem(itemStack, material, contentId)) {
+                continue;
+            }
+            total += Math.max(0, itemStack.getAmount());
+        }
+        return total;
+    }
+
+    public ItemStack createMerchantOfferItemStack(MerchantShopOffer offer, int amount) {
+        if (offer == null) {
+            return null;
+        }
+        if (offer.getContentId() != null) {
+            ItemStack custom = createTerraCraftingItem(offer.getContentId(), amount);
+            if (custom != null && !custom.getType().isAir()) {
+                return custom;
+            }
+        }
+        return new ItemStack(offer.getMaterial(), Math.max(1, amount));
+    }
+
+    private double getMerchantQualityPriceMultiplier(Player player, Material material, String contentId, int amountToSell) {
+        if (player == null || contentId == null || terraCraftingManager == null || amountToSell <= 0) {
+            return 1.0D;
+        }
+        int remaining = amountToSell;
+        double weightedAmount = 0.0D;
+        for (ItemStack itemStack : player.getInventory().getContents()) {
+            if (remaining <= 0) {
+                break;
+            }
+            if (!matchesRequestedItem(itemStack, material, contentId)) {
+                continue;
+            }
+            int counted = Math.min(remaining, Math.max(0, itemStack.getAmount()));
+            remaining -= counted;
+            TerraCraftingManager.TerraItemQuality quality = terraCraftingManager.getItemQuality(itemStack);
+            weightedAmount += counted * switch (quality) {
+                case CRUDE -> 0.85D;
+                case FINE -> 1.15D;
+                case EXCEPTIONAL -> 1.35D;
+                default -> 1.0D;
+            };
+        }
+        if (weightedAmount <= 0.0D) {
+            return 1.0D;
+        }
+        return weightedAmount / amountToSell;
+    }
+
+    private boolean canPlayerReceiveItem(Player player, ItemStack itemStack) {
+        if (player == null || itemStack == null || itemStack.getType().isAir() || itemStack.getAmount() <= 0) {
+            return false;
+        }
+        int remaining = itemStack.getAmount();
+        for (ItemStack current : player.getInventory().getStorageContents()) {
+            if (remaining <= 0) {
+                return true;
+            }
+            if (current == null || current.getType().isAir()) {
+                remaining -= itemStack.getType().getMaxStackSize();
+                continue;
+            }
+            if (!current.isSimilar(itemStack)) {
+                continue;
+            }
+            remaining -= Math.max(0, current.getMaxStackSize() - current.getAmount());
+        }
+        return remaining <= 0;
     }
 
     private void resetMerchantDailySalesIfNeeded(long now) {
@@ -15236,7 +16222,10 @@ public final class Testproject extends JavaPlugin {
         if (player == null) {
             return legacyComponent(styleCodes + "Unknown");
         }
-        return legacyComponent(styleCodes + player.getName())
+        StringBuilder display = new StringBuilder();
+        display.append(getPlayerTagPrefix(player));
+        display.append(styleCodes).append(player.getName());
+        return legacyComponent(display.toString())
                 .hoverEvent(HoverEvent.showText(buildChatPlayerHover(player)));
     }
 
@@ -15571,13 +16560,6 @@ public final class Testproject extends JavaPlugin {
         getConfig().addDefault("stability.soft-rock-min-collapse-size", 4);
         getConfig().addDefault("stability.fragile-min-collapse-size", 4);
         getConfig().addDefault("country-home.cooldown-seconds", 3600);
-        getConfig().addDefault("guilds.create-cost", DEFAULT_GUILD_CREATE_COST);
-        getConfig().addDefault("guilds.country-claim-base-cost", DEFAULT_GUILD_CLAIM_BASE_COST);
-        getConfig().addDefault("guilds.invite-duration-hours", DEFAULT_GUILD_INVITE_DURATION_MILLIS / 3_600_000L);
-        getConfig().addDefault("guilds.reclaim-cooldown-days", DEFAULT_GUILD_RECLAIM_COOLDOWN_MILLIS / 86_400_000L);
-        getConfig().addDefault("guilds.minimum-claim-members", DEFAULT_GUILD_MIN_CLAIM_MEMBERS);
-        getConfig().addDefault("guilds.minimum-claim-total-levels", DEFAULT_GUILD_MIN_CLAIM_TOTAL_LEVELS);
-        getConfig().addDefault("guilds.leader-inactivity-days", DEFAULT_GUILD_LEADER_INACTIVITY_DAYS);
         getConfig().addDefault("items.ender-pearls-enabled", true);
         getConfig().addDefault("items.shulker-boxes-enabled", true);
         getConfig().addDefault("territories.enabled", true);
@@ -16107,6 +17089,7 @@ public final class Testproject extends JavaPlugin {
                     id,
                     name,
                     tag,
+                    guildDataConfig.getString(path + ".profile.tag-color", "WHITE"),
                     leaderId,
                     roundSignedMoney(guildDataConfig.getDouble(path + ".balance", 0.0D)),
                     Math.max(1, guildDataConfig.getInt(path + ".progress.level", 1)),
@@ -16159,7 +17142,7 @@ public final class Testproject extends JavaPlugin {
 
             String path = "professions." + key;
             if (dataConfig.isString(path)) {
-                Profession profession = Profession.fromKey(dataConfig.getString(path));
+                Profession profession = sanitizeRetiredProfession(Profession.fromKey(dataConfig.getString(path)));
                 if (profession != null) {
                     playerProfessions.put(playerId, profession);
                     activeProfessions.put(playerId, profession);
@@ -16167,9 +17150,9 @@ public final class Testproject extends JavaPlugin {
                 continue;
             }
 
-            Profession primary = Profession.fromKey(dataConfig.getString(path + ".primary"));
-            Profession secondary = Profession.fromKey(dataConfig.getString(path + ".secondary"));
-            Profession active = Profession.fromKey(dataConfig.getString(path + ".active"));
+            Profession primary = sanitizeRetiredProfession(Profession.fromKey(dataConfig.getString(path + ".primary")));
+            Profession secondary = sanitizeRetiredProfession(Profession.fromKey(dataConfig.getString(path + ".secondary")));
+            Profession active = sanitizeRetiredProfession(Profession.fromKey(dataConfig.getString(path + ".active")));
 
             if (primary != null) {
                 playerProfessions.put(playerId, primary);
@@ -16187,7 +17170,7 @@ public final class Testproject extends JavaPlugin {
                 secondaryProfessionUnlockOverrides.put(playerId, dataConfig.getBoolean(path + ".second-slot-override"));
             }
 
-            Profession developmentProfession = Profession.fromKey(dataConfig.getString(path + ".development-mode"));
+            Profession developmentProfession = sanitizeRetiredProfession(Profession.fromKey(dataConfig.getString(path + ".development-mode")));
             if (developmentProfession != null) {
                 developmentModeProfessions.put(playerId, developmentProfession);
             }
@@ -16217,7 +17200,7 @@ public final class Testproject extends JavaPlugin {
 
             Map<Profession, ProfessionProgress> progressByProfession = new EnumMap<>(Profession.class);
             for (String professionKey : playerSection.getKeys(false)) {
-                Profession profession = Profession.fromKey(professionKey);
+                Profession profession = sanitizeRetiredProfession(Profession.fromKey(professionKey));
                 if (profession == null) {
                     continue;
                 }
@@ -16273,7 +17256,7 @@ public final class Testproject extends JavaPlugin {
 
             Map<Profession, Integer> bonusesByProfession = new EnumMap<>(Profession.class);
             for (String professionKey : playerSection.getKeys(false)) {
-                Profession profession = Profession.fromKey(professionKey);
+                Profession profession = sanitizeRetiredProfession(Profession.fromKey(professionKey));
                 if (profession == null) {
                     continue;
                 }
@@ -16312,7 +17295,7 @@ public final class Testproject extends JavaPlugin {
 
             Map<Profession, Set<String>> unlockedByProfession = new EnumMap<>(Profession.class);
             for (String professionKey : playerSection.getKeys(false)) {
-                Profession profession = Profession.fromKey(professionKey);
+                Profession profession = sanitizeRetiredProfession(Profession.fromKey(professionKey));
                 if (profession == null) {
                     continue;
                 }
@@ -16351,7 +17334,7 @@ public final class Testproject extends JavaPlugin {
 
             Set<Profession> queued = new LinkedHashSet<>();
             for (String professionKey : section.getStringList(playerKey)) {
-                Profession profession = Profession.fromKey(professionKey);
+                Profession profession = sanitizeRetiredProfession(Profession.fromKey(professionKey));
                 if (profession != null) {
                     queued.add(profession);
                 }
@@ -16450,7 +17433,9 @@ public final class Testproject extends JavaPlugin {
                     Math.max(0, questSection.getInt("rewards.profession-xp", 0)),
                     Profession.fromKey(questSection.getString("rewards.profession")),
                     Material.matchMaterial(questSection.getString("rewards.item.material", "")),
+                    normalizeQuestKey(questSection.getString("rewards.item.content-id")),
                     Math.max(0, questSection.getInt("rewards.item.amount", 0)),
+                    readQuestRewardItems(questSection),
                     Material.matchMaterial(questSection.getString("required-item.material", ""))
             ));
         }
@@ -16458,6 +17443,31 @@ public final class Testproject extends JavaPlugin {
         target.sort(Comparator
                 .comparingInt(PlayerQuestDefinition::getOrder)
                 .thenComparing(PlayerQuestDefinition::getId));
+    }
+
+    private List<PlayerQuestDefinition.RewardItem> readQuestRewardItems(ConfigurationSection questSection) {
+        List<PlayerQuestDefinition.RewardItem> rewardItems = new ArrayList<>();
+        if (questSection == null) {
+            return rewardItems;
+        }
+        ConfigurationSection rewardsItemsSection = questSection.getConfigurationSection("rewards.items");
+        if (rewardsItemsSection == null) {
+            return rewardItems;
+        }
+        for (String itemKey : rewardsItemsSection.getKeys(false)) {
+            ConfigurationSection itemSection = rewardsItemsSection.getConfigurationSection(itemKey);
+            if (itemSection == null) {
+                continue;
+            }
+            Material material = Material.matchMaterial(itemSection.getString("material", ""));
+            String contentId = normalizeQuestKey(itemSection.getString("content-id"));
+            int amount = Math.max(0, itemSection.getInt("amount", 0));
+            if ((material == null && contentId == null) || amount <= 0) {
+                continue;
+            }
+            rewardItems.add(new PlayerQuestDefinition.RewardItem(material, contentId, amount));
+        }
+        return rewardItems;
     }
 
     private void reloadTutorialStages() {
@@ -17031,7 +18041,6 @@ public final class Testproject extends JavaPlugin {
                 Profession.MINER,
                 Profession.LUMBERJACK,
                 Profession.FARMER,
-                Profession.BUILDER,
                 Profession.BLACKSMITH,
                 Profession.TRADER
         );
@@ -17045,10 +18054,9 @@ public final class Testproject extends JavaPlugin {
             case MINER -> Math.max(1, getOnboardingSettings().getInt("onboarding.trial-thresholds.miner", 8));
             case LUMBERJACK -> Math.max(1, getOnboardingSettings().getInt("onboarding.trial-thresholds.lumberjack", 6));
             case FARMER -> Math.max(1, getOnboardingSettings().getInt("onboarding.trial-thresholds.farmer", 6));
-            case BUILDER -> Math.max(1, getOnboardingSettings().getInt("onboarding.trial-thresholds.builder", 12));
             case BLACKSMITH -> Math.max(1, getOnboardingSettings().getInt("onboarding.trial-thresholds.blacksmith", 3));
             case TRADER -> Math.max(1, getOnboardingSettings().getInt("onboarding.trial-thresholds.trader", 3));
-            case SOLDIER -> Integer.MAX_VALUE;
+            case BUILDER, SOLDIER -> Integer.MAX_VALUE;
         };
     }
 
@@ -17075,10 +18083,9 @@ public final class Testproject extends JavaPlugin {
             case MINER -> "Break stone or ore in the starter dig site.";
             case LUMBERJACK -> "Chop logs in the starter grove.";
             case FARMER -> "Plant, harvest, or work crop plots.";
-            case BUILDER -> "Place building blocks in the practice yard.";
             case BLACKSMITH -> "Use the crafting or forge stations.";
             case TRADER -> "Use trade, storage, or logistics stations in the hub.";
-            case SOLDIER -> "Soldier unlocks later.";
+            case BUILDER, SOLDIER -> "Soldier unlocks later.";
         };
     }
 
@@ -17134,9 +18141,6 @@ public final class Testproject extends JavaPlugin {
         }
         addOnboardingObjectiveProgress(player.getUniqueId(), "any_block_place", 1, false);
         boolean updated = true;
-        if (material.isBlock() && material.isSolid() && !isFarmerCrop(material)) {
-            updated |= incrementOnboardingTrialProgress(player, Profession.BUILDER);
-        }
         if (isFarmerCrop(material) || material == Material.FARMLAND) {
             updated |= incrementOnboardingTrialProgress(player, Profession.FARMER);
         }
@@ -17175,6 +18179,90 @@ public final class Testproject extends JavaPlugin {
             updateTutorialChecklist(player);
             syncTutorialQuestHud(player, false);
         }
+    }
+
+    public void handleTerraWorkbenchInteraction(Player player, String benchId, String benchDisplayName, Location focusLocation, Runnable completionAction) {
+        if (player == null || benchId == null || benchId.isBlank()) {
+            if (completionAction != null && player != null && player.isOnline()) {
+                completionAction.run();
+            }
+            return;
+        }
+
+        String normalizedBenchId = normalizeQuestKey(benchId);
+        if (normalizedBenchId == null) {
+            if (completionAction != null && player.isOnline()) {
+                completionAction.run();
+            }
+            return;
+        }
+
+        UUID playerId = player.getUniqueId();
+        String anyKey = "terra_workbench_any";
+        String interactionKey = "terra_workbench_" + normalizedBenchId;
+        String introKey = "terra_workbench_intro_" + normalizedBenchId;
+        Runnable finalAction = () -> {
+            addOnboardingObjectiveProgress(playerId, anyKey, 1, false);
+            addOnboardingObjectiveProgress(playerId, interactionKey, 1, true);
+            if (isOnboardingActive(playerId)) {
+                refreshTutorialQuestFlow(player, true);
+                updateTutorialChecklist(player);
+                syncTutorialQuestHud(player, false);
+            }
+            refreshAssignedQuestFlow(player, true);
+            if (completionAction != null && player.isOnline()) {
+                completionAction.run();
+            }
+        };
+
+        if (getOnboardingObjectiveProgress(playerId, introKey) > 0) {
+            finalAction.run();
+            return;
+        }
+
+        List<String> dialogueLines = getTerraWorkbenchDialogueLines(normalizedBenchId);
+        if (!isOnboardingNpcFocusEnabled() || dialogueLines.isEmpty()) {
+            setOnboardingObjectiveProgress(playerId, introKey, 1, true);
+            finalAction.run();
+            return;
+        }
+
+        String speakerName = (benchDisplayName == null || benchDisplayName.isBlank())
+                ? "Workbench"
+                : ChatColor.stripColor(colorize(benchDisplayName));
+        startOnboardingFocus(
+                player,
+                null,
+                focusLocation != null ? focusLocation.clone() : player.getLocation(),
+                introKey,
+                speakerName,
+                dialogueLines,
+                () -> {
+                    setOnboardingObjectiveProgress(playerId, introKey, 1, true);
+                    finalAction.run();
+                }
+        );
+    }
+
+    public void recordTerraWorkbenchCollection(Player player, String benchId) {
+        if (player == null || benchId == null || benchId.isBlank()) {
+            return;
+        }
+
+        String normalizedBenchId = normalizeQuestKey(benchId);
+        if (normalizedBenchId == null) {
+            return;
+        }
+
+        UUID playerId = player.getUniqueId();
+        addOnboardingObjectiveProgress(playerId, "terra_workbench_collect_any", 1, false);
+        addOnboardingObjectiveProgress(playerId, "terra_workbench_collect_" + normalizedBenchId, 1, true);
+        if (isOnboardingActive(playerId)) {
+            refreshTutorialQuestFlow(player, true);
+            updateTutorialChecklist(player);
+            syncTutorialQuestHud(player, false);
+        }
+        refreshAssignedQuestFlow(player, true);
     }
 
     private boolean incrementOnboardingTrialProgress(Player player, Profession profession) {
@@ -17595,6 +18683,14 @@ public final class Testproject extends JavaPlugin {
         return new ArrayList<>(keys);
     }
 
+    public List<String> getTerraWorkbenchQuestKeys() {
+        return terraCraftingManager != null ? terraCraftingManager.getWorkbenchQuestKeys() : List.of("terra_workbench_any");
+    }
+
+    public List<String> getTerraWorkbenchCollectionQuestKeys() {
+        return terraCraftingManager != null ? terraCraftingManager.getWorkbenchCollectionQuestKeys() : List.of("terra_workbench_collect_any");
+    }
+
     private void reloadOnboardingCustomNpcs() {
         onboardingCustomNpcs.clear();
         ConfigurationSection section = dataConfig.getConfigurationSection("tutorial-markers.custom-npcs");
@@ -17788,13 +18884,13 @@ public final class Testproject extends JavaPlugin {
                     location.clone()
             );
             String effectiveDisplayName = displayName == null || displayName.isBlank() ? fancyNpcId : displayName;
-            npcData.setDisplayName(formatOnboardingFancyNpcDisplayName(effectiveDisplayName));
+            npcData.setDisplayName("");
             if (creator.getName() != null && !creator.getName().isBlank()) {
                 npcData.setSkin(creator.getName());
             }
             npcData.setTurnToPlayer(true);
             npcData.setInteractionCooldown(0.25F);
-            npcData.setVisibilityDistance(32);
+            npcData.setVisibilityDistance(getFancyNpcBodyVisibilityDistanceBlocks());
             de.oliver.fancynpcs.api.Npc npc = de.oliver.fancynpcs.api.FancyNpcsPlugin.get().getNpcAdapter().apply(npcData);
             if (npc == null) {
                 return false;
@@ -18089,7 +19185,8 @@ public final class Testproject extends JavaPlugin {
             if (npc == null || npc.getData() == null) {
                 return existingBinding != null;
             }
-            npc.getData().setDisplayName(formatOnboardingFancyNpcDisplayName(displayName.trim()));
+            npc.getData().setDisplayName("");
+            npc.getData().setVisibilityDistance(getFancyNpcBodyVisibilityDistanceBlocks());
             npc.getData().setDirty(true);
             npc.updateForAll();
             npcManager.saveNpcs(false);
@@ -18139,6 +19236,7 @@ public final class Testproject extends JavaPlugin {
         if (removed == null) {
             return false;
         }
+        removeOnboardingFancyNpcNameplate(removed.fancyNpcId());
         saveOnboardingFancyNpcBindings();
         return true;
     }
@@ -18150,6 +19248,7 @@ public final class Testproject extends JavaPlugin {
         }
 
         onboardingFancyNpcBindings.remove(resolvedFancyNpcId.toLowerCase(Locale.ROOT));
+        removeOnboardingFancyNpcNameplate(resolvedFancyNpcId);
         saveOnboardingFancyNpcBindings();
 
         if (getServer().getPluginManager().getPlugin("FancyNpcs") == null) {
@@ -18333,6 +19432,7 @@ public final class Testproject extends JavaPlugin {
                     recordOnboardingNpcInteraction(player, binding.questKey());
                 }
             };
+            wrappedCompletion = wrapSpecialOnboardingNpcCompletionAction(player, binding.questKey(), wrappedCompletion);
             return beginOnboardingFancyNpcInteraction(
                     player,
                     binding.fancyNpcId(),
@@ -18345,6 +19445,30 @@ public final class Testproject extends JavaPlugin {
         }
 
         List<String> repeatLines = getOnboardingFancyNpcDialogueEditorLines(binding.fancyNpcId(), true);
+        if (isFreeportStarterMerchantKey(binding.questKey()) && !repeatLines.isEmpty()) {
+            return beginOnboardingFancyNpcInteractionWithLines(
+                    player,
+                    binding.fancyNpcId(),
+                    binding.questKey(),
+                    displayName,
+                    focusLocation,
+                    selectRandomRepeatDialogueLines(repeatLines),
+                    wrapSpecialOnboardingNpcCompletionAction(player, binding.questKey(), completionAction)
+            );
+        }
+
+        if (isFreeportStarterMerchantKey(binding.questKey())) {
+            return beginOnboardingFancyNpcInteraction(
+                    player,
+                    binding.fancyNpcId(),
+                    binding.questKey(),
+                    binding.dialogueKey(),
+                    displayName,
+                    focusLocation,
+                    wrapSpecialOnboardingNpcCompletionAction(player, binding.questKey(), completionAction)
+            );
+        }
+
         if (!repeatLines.isEmpty()) {
             return beginOnboardingFancyNpcInteractionWithLines(
                     player,
@@ -18353,12 +19477,12 @@ public final class Testproject extends JavaPlugin {
                     displayName,
                     focusLocation,
                     selectRandomRepeatDialogueLines(repeatLines),
-                    completionAction
+                    wrapSpecialOnboardingNpcCompletionAction(player, binding.questKey(), completionAction)
             );
         }
 
         if (completionAction != null) {
-            completionAction.run();
+            wrapSpecialOnboardingNpcCompletionAction(player, binding.questKey(), completionAction).run();
             return true;
         }
 
@@ -18369,8 +19493,24 @@ public final class Testproject extends JavaPlugin {
                 binding.dialogueKey(),
                 displayName,
                 focusLocation,
-                null
+                wrapSpecialOnboardingNpcCompletionAction(player, binding.questKey(), null)
         );
+    }
+
+    private Runnable wrapSpecialOnboardingNpcCompletionAction(Player player, String npcKey, Runnable completionAction) {
+        String normalizedKey = normalizeQuestKey(npcKey);
+        boolean opensFreeportMerchant = isFreeportStarterMerchantKey(normalizedKey);
+        if (!opensFreeportMerchant && completionAction == null) {
+            return null;
+        }
+        return () -> {
+            if (completionAction != null) {
+                completionAction.run();
+            }
+            if (opensFreeportMerchant && freeportStarterMerchantListener != null && player != null && player.isOnline()) {
+                freeportStarterMerchantListener.openMerchantMenu(player, normalizedKey);
+            }
+        };
     }
 
     private String resolveAvailableFancyNpcId(String fancyNpcId) {
@@ -18493,6 +19633,7 @@ public final class Testproject extends JavaPlugin {
         }
         Entity entity = getServer().getEntity(existing.entityId());
         if (entity != null) {
+            removeImmersiveNpcNameplate(entity.getUniqueId());
             entity.remove();
         }
     }
@@ -18508,6 +19649,7 @@ public final class Testproject extends JavaPlugin {
         }
         Entity entity = removed.entityId() != null ? getServer().getEntity(removed.entityId()) : null;
         if (entity != null) {
+            removeImmersiveNpcNameplate(entity.getUniqueId());
             entity.remove();
         }
         saveOnboardingCustomNpcs();
@@ -18563,7 +19705,7 @@ public final class Testproject extends JavaPlugin {
             livingEntity.setCanPickupItems(false);
             if (npc.displayName() != null && !npc.displayName().isBlank()) {
                 livingEntity.customName(legacyComponent("&6" + npc.displayName()));
-                livingEntity.setCustomNameVisible(true);
+                livingEntity.setCustomNameVisible(false);
             }
         }
     }
@@ -18622,6 +19764,14 @@ public final class Testproject extends JavaPlugin {
         refreshTutorialQuestFlow(player, true);
         updateTutorialChecklist(player);
         syncTutorialQuestHud(player, false);
+    }
+
+    public boolean hasRecordedOnboardingNpcInteraction(UUID playerId, String npcKey) {
+        if (playerId == null) {
+            return false;
+        }
+        String normalizedKey = normalizeQuestKey(npcKey);
+        return normalizedKey != null && getOnboardingObjectiveProgress(playerId, normalizedKey) > 0;
     }
 
     public boolean handleOnboardingNpcInteraction(Player player, Entity entity) {
@@ -18704,7 +19854,10 @@ public final class Testproject extends JavaPlugin {
 
     private void restartOnboardingObjectiveHudRuntime() {
         stopOnboardingObjectiveHudRuntime();
-        onboardingObjectiveHudTask = getServer().getScheduler().runTaskTimer(this, () -> updateOnboardingObjectiveHud(), 0L, 20L);
+        if (!isOnboardingObjectiveHudEnabled()) {
+            return;
+        }
+        onboardingObjectiveHudTask = getServer().getScheduler().runTaskTimer(this, (Runnable) this::updateOnboardingObjectiveHud, 0L, 20L);
     }
 
     private void stopOnboardingObjectiveHudRuntime() {
@@ -18769,7 +19922,7 @@ public final class Testproject extends JavaPlugin {
             bossBar.addPlayer(player);
         }
         bossBar.setTitle(colorize(buildOnboardingObjectiveHudTitle(player.getUniqueId(), quest)));
-        bossBar.setProgress(getOnboardingObjectiveHudProgress(player.getUniqueId(), quest));
+        bossBar.setProgress(getRenderedOnboardingObjectiveHudProgress(player.getUniqueId(), quest));
         bossBar.setColor(getOnboardingObjectiveHudColor(player.getUniqueId(), quest));
         bossBar.setVisible(true);
     }
@@ -19104,6 +20257,23 @@ public final class Testproject extends JavaPlugin {
                 .collect(Collectors.toList());
     }
 
+    private List<String> getTerraWorkbenchDialogueLines(String benchId) {
+        if (onboardingSettingsConfig == null) {
+            return List.of();
+        }
+        String normalizedBenchId = normalizeQuestKey(benchId);
+        if (normalizedBenchId == null) {
+            return List.of();
+        }
+        List<String> lines = onboardingSettingsConfig.getStringList("onboarding.npc-dialogue.terra_workbench_" + normalizedBenchId);
+        if (lines.isEmpty()) {
+            lines = onboardingSettingsConfig.getStringList("onboarding.npc-dialogue.terra_workbench");
+        }
+        return lines.stream()
+                .filter(line -> line != null && !line.isBlank())
+                .collect(Collectors.toList());
+    }
+
     private List<String> selectRandomRepeatDialogueLines(List<String> lines) {
         if (lines == null || lines.isEmpty()) {
             return List.of();
@@ -19234,6 +20404,45 @@ public final class Testproject extends JavaPlugin {
             getLogger().warning("Failed to spawn ItemsAdder onboarding NPC '" + itemsAdderEntityId + "': " + exception.getMessage());
             return null;
         }
+    }
+
+    public ItemStack createItemsAdderCustomItem(String itemsAdderItemId) {
+        if (itemsAdderItemId == null || itemsAdderItemId.isBlank()) {
+            return null;
+        }
+        if (getServer().getPluginManager().getPlugin("ItemsAdder") == null) {
+            return null;
+        }
+        try {
+            Class<?> customStackClass = Class.forName("dev.lone.itemsadder.api.CustomStack");
+            Object customStack = null;
+            for (String factoryMethod : List.of("getInstance", "byName")) {
+                try {
+                    Method method = customStackClass.getMethod(factoryMethod, String.class);
+                    customStack = method.invoke(null, itemsAdderItemId);
+                    if (customStack != null) {
+                        break;
+                    }
+                } catch (NoSuchMethodException ignored) {
+                }
+            }
+            if (customStack == null) {
+                return null;
+            }
+            for (String itemMethod : List.of("getItemStack", "getItemStackClone")) {
+                try {
+                    Method method = customStack.getClass().getMethod(itemMethod);
+                    Object result = method.invoke(customStack);
+                    if (result instanceof ItemStack itemStack) {
+                        return itemStack.clone();
+                    }
+                } catch (NoSuchMethodException ignored) {
+                }
+            }
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            getLogger().warning("Failed to create ItemsAdder item '" + itemsAdderItemId + "': " + exception.getMessage());
+        }
+        return null;
     }
 
     private Entity extractItemsAdderEntity(Object customEntityHandle) {
@@ -20108,6 +21317,7 @@ public final class Testproject extends JavaPlugin {
             return false;
         }
         onboardingSettingsConfig.set("quests.starter.list." + normalizedQuestId, null);
+        clearDeletedOnboardingQuestState(normalizedQuestId);
         saveOnboardingSettings();
         return true;
     }
@@ -20141,8 +21351,37 @@ public final class Testproject extends JavaPlugin {
                 saveAssignedQuestState(playerId);
             }
         }
+        generalQuestDefinitions.removeIf(definition -> definition.getId().equalsIgnoreCase(normalizedQuestId));
         saveQuestsSettings();
         return true;
+    }
+
+    private void clearDeletedOnboardingQuestState(String questId) {
+        if (questId == null || questId.isBlank()) {
+            return;
+        }
+        for (UUID playerId : new ArrayList<>(completedTutorialQuestIds.keySet())) {
+            Set<String> completed = completedTutorialQuestIds.get(playerId);
+            if (completed != null) {
+                completed.remove(questId);
+                if (completed.isEmpty()) {
+                    completedTutorialQuestIds.remove(playerId);
+                }
+            }
+            Map<String, Integer> progress = tutorialQuestProgress.get(playerId);
+            if (progress != null) {
+                progress.remove(questId);
+                if (progress.isEmpty()) {
+                    tutorialQuestProgress.remove(playerId);
+                }
+            }
+            saveTutorialStage(playerId);
+            Player onlinePlayer = getServer().getPlayer(playerId);
+            if (onlinePlayer != null && onlinePlayer.isOnline()) {
+                clearOnboardingObjectiveHud(onlinePlayer);
+            }
+        }
+        tutorialQuestDefinitions.removeIf(definition -> definition.getId().equalsIgnoreCase(questId));
     }
 
     public boolean setGeneralQuestEnabled(String questId, boolean enabled) {
@@ -20257,6 +21496,22 @@ public final class Testproject extends JavaPlugin {
         return setOnboardingQuestConfigValue(questId, "rewards.item.material", material != null ? material.name() : null);
     }
 
+    public boolean setGeneralQuestRewardItemContentId(String questId, String contentId) {
+        return setQuestConfigValue("quests.general.list", questId, "rewards.item.content-id", normalizeQuestKey(contentId));
+    }
+
+    public boolean setOnboardingQuestRewardItemContentId(String questId, String contentId) {
+        return setOnboardingQuestConfigValue(questId, "rewards.item.content-id", normalizeQuestKey(contentId));
+    }
+
+    public boolean setGeneralQuestRewardItems(String questId, List<PlayerQuestDefinition.RewardItem> rewardItems) {
+        return setQuestRewardItems("quests.general.list", questId, rewardItems);
+    }
+
+    public boolean setOnboardingQuestRewardItems(String questId, List<PlayerQuestDefinition.RewardItem> rewardItems) {
+        return setOnboardingQuestRewardItemsInternal(questId, rewardItems);
+    }
+
     public boolean setGeneralQuestRewardItemAmount(String questId, int amount) {
         return setQuestConfigValue("quests.general.list", questId, "rewards.item.amount", Math.max(0, amount));
     }
@@ -20271,6 +21526,57 @@ public final class Testproject extends JavaPlugin {
 
     public boolean setOnboardingQuestRequiredItemMaterial(String questId, Material material) {
         return setOnboardingQuestConfigValue(questId, "required-item.material", material != null ? material.name() : null);
+    }
+
+    private boolean setQuestRewardItems(String listPath, String questId, List<PlayerQuestDefinition.RewardItem> rewardItems) {
+        if (questsSettingsConfig == null || questsSettingsFile == null || questId == null || questId.isBlank()) {
+            return false;
+        }
+        String normalizedQuestId = questId.toLowerCase(Locale.ROOT);
+        String path = listPath + "." + normalizedQuestId;
+        if (!questsSettingsConfig.contains(path)) {
+            return false;
+        }
+        writeQuestRewardItems(questsSettingsConfig, path, rewardItems);
+        saveQuestsSettings();
+        return true;
+    }
+
+    private boolean setOnboardingQuestRewardItemsInternal(String questId, List<PlayerQuestDefinition.RewardItem> rewardItems) {
+        if (onboardingSettingsConfig == null || onboardingSettingsFile == null || questId == null || questId.isBlank()) {
+            return false;
+        }
+        String normalizedQuestId = questId.toLowerCase(Locale.ROOT);
+        String path = "quests.starter.list." + normalizedQuestId;
+        if (!onboardingSettingsConfig.contains(path)) {
+            return false;
+        }
+        writeQuestRewardItems(onboardingSettingsConfig, path, rewardItems);
+        saveOnboardingSettings();
+        return true;
+    }
+
+    private void writeQuestRewardItems(FileConfiguration config, String path, List<PlayerQuestDefinition.RewardItem> rewardItems) {
+        if (config == null || path == null || path.isBlank()) {
+            return;
+        }
+        config.set(path + ".rewards.item.material", null);
+        config.set(path + ".rewards.item.content-id", null);
+        config.set(path + ".rewards.item.amount", null);
+        config.set(path + ".rewards.items", null);
+        if (rewardItems == null || rewardItems.isEmpty()) {
+            return;
+        }
+        int index = 1;
+        for (PlayerQuestDefinition.RewardItem rewardItem : rewardItems) {
+            if (rewardItem == null || rewardItem.amount() <= 0 || (!rewardItem.hasMaterial() && !rewardItem.hasContentId())) {
+                continue;
+            }
+            String itemPath = path + ".rewards.items.slot" + index++;
+            config.set(itemPath + ".material", rewardItem.hasMaterial() ? rewardItem.material().name() : null);
+            config.set(itemPath + ".content-id", rewardItem.hasContentId() ? normalizeQuestKey(rewardItem.contentId()) : null);
+            config.set(itemPath + ".amount", rewardItem.amount());
+        }
     }
 
     private boolean setOnboardingQuestConfigValue(String questId, String suffix, Object value) {
@@ -20317,7 +21623,7 @@ public final class Testproject extends JavaPlugin {
 
     private void saveOnboardingSettings() {
         saveYaml(onboardingSettingsConfig, onboardingSettingsFile);
-        onboardingSettingsConfig = loadCustomConfig(onboardingSettingsFile, "settings/onboarding.yml");
+        onboardingSettingsConfig = loadQuestEditableConfig(onboardingSettingsFile, "settings/onboarding.yml");
         reloadTutorialQuestDefinitions();
         for (Player onlinePlayer : getServer().getOnlinePlayers()) {
             refreshAssignedQuestFlow(onlinePlayer, false);
@@ -20330,7 +21636,7 @@ public final class Testproject extends JavaPlugin {
 
     private void saveQuestsSettings() {
         saveYaml(questsSettingsConfig, questsSettingsFile);
-        questsSettingsConfig = loadCustomConfig(questsSettingsFile, "settings/quests.yml");
+        questsSettingsConfig = loadQuestEditableConfig(questsSettingsFile, "settings/quests.yml");
         reloadTutorialQuestDefinitions();
         for (Player onlinePlayer : getServer().getOnlinePlayers()) {
             refreshAssignedQuestFlow(onlinePlayer, false);
@@ -20645,13 +21951,19 @@ public final class Testproject extends JavaPlugin {
             }
         }
 
-        if (quest.getRewardItemMaterial() != null && quest.getRewardItemAmount() > 0) {
-            ItemStack rewardItem = new ItemStack(quest.getRewardItemMaterial(), quest.getRewardItemAmount());
-            Map<Integer, ItemStack> overflow = player.getInventory().addItem(rewardItem);
+        for (PlayerQuestDefinition.RewardItem rewardItem : quest.getRewardItems()) {
+            if (rewardItem == null || rewardItem.amount() <= 0) {
+                continue;
+            }
+            ItemStack rewardStack = createQuestRewardItemStack(rewardItem);
+            if (rewardStack == null || rewardStack.getType().isAir()) {
+                continue;
+            }
+            Map<Integer, ItemStack> overflow = player.getInventory().addItem(rewardStack);
             for (ItemStack overflowItem : overflow.values()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), overflowItem);
             }
-            rewardSummary.add(quest.getRewardItemAmount() + "x " + formatMaterialName(quest.getRewardItemMaterial()));
+            rewardSummary.add(rewardItem.amount() + "x " + formatItemDisplayName(rewardStack));
         }
 
         if (!rewardSummary.isEmpty()) {
@@ -20675,6 +21987,22 @@ public final class Testproject extends JavaPlugin {
             return active;
         }
         return getPrimaryProfession(playerId);
+    }
+
+    private ItemStack createQuestRewardItemStack(PlayerQuestDefinition.RewardItem rewardItem) {
+        if (rewardItem == null || rewardItem.amount() <= 0) {
+            return null;
+        }
+        if (rewardItem.hasContentId()) {
+            ItemStack terraItem = createTerraCraftingItem(rewardItem.contentId(), rewardItem.amount());
+            if (terraItem != null && !terraItem.getType().isAir()) {
+                return terraItem;
+            }
+        }
+        if (rewardItem.hasMaterial()) {
+            return new ItemStack(rewardItem.material(), rewardItem.amount());
+        }
+        return null;
     }
 
     private PlayerQuestDefinition getActiveDisplayedQuest(UUID playerId) {
@@ -20877,14 +22205,17 @@ public final class Testproject extends JavaPlugin {
         if (player == null || !player.isOnline() || isTutorialIntroActive(player.getUniqueId())) {
             return false;
         }
-        if (!isOnboardingObjectiveHudEnabled()) {
+        if (isPlayerInOnboardingFocus(player.getUniqueId())) {
             return false;
         }
-        return getActiveDisplayedQuest(player.getUniqueId()) != null;
+        return requiresProfessionSelection(player) || getActiveDisplayedQuest(player.getUniqueId()) != null;
     }
 
     private boolean isOnboardingObjectiveHudEnabled() {
-        return onboardingSettingsConfig == null || onboardingSettingsConfig.getBoolean("onboarding.objective-hud.enabled", true);
+        if (onboardingSettingsConfig == null) {
+            return true;
+        }
+        return onboardingSettingsConfig.getBoolean("onboarding.objective-hud.enabled", true);
     }
 
     private String getOnboardingObjectiveHudLabel() {
@@ -20918,6 +22249,20 @@ public final class Testproject extends JavaPlugin {
         int target = Math.max(1, quest.getTarget());
         int current = Math.max(0, Math.min(target, getQuestCurrentProgress(playerId, quest, quest == getActiveAssignedQuest(playerId))));
         return Math.max(0.0D, Math.min(1.0D, current / (double) target));
+    }
+
+    private double getRenderedOnboardingObjectiveHudProgress(UUID playerId, PlayerQuestDefinition quest) {
+        if (isOnboardingObjectiveHudProgressVisible()) {
+            return getOnboardingObjectiveHudProgress(playerId, quest);
+        }
+        return 0.0D;
+    }
+
+    private boolean isOnboardingObjectiveHudProgressVisible() {
+        if (onboardingSettingsConfig == null) {
+            return false;
+        }
+        return onboardingSettingsConfig.getBoolean("onboarding.objective-hud.show-progress", false);
     }
 
     private BarColor getOnboardingObjectiveHudColor(UUID playerId, PlayerQuestDefinition quest) {
@@ -21519,6 +22864,193 @@ public final class Testproject extends JavaPlugin {
         };
     }
 
+    private TraderCommodity vanillaCommodity(Material material, double unitMoney, int suggestedLevel) {
+        return new TraderCommodity(material, null, unitMoney, suggestedLevel);
+    }
+
+    private TraderCommodity contentCommodity(String contentId, Material displayMaterial, double unitMoney, int suggestedLevel) {
+        return new TraderCommodity(displayMaterial, normalizeQuestKey(contentId), unitMoney, suggestedLevel);
+    }
+
+    private List<TraderCommodity> getTraderQuestCommodities(Profession profession, int tier) {
+        return switch (profession) {
+            case MINER -> switch (tier) {
+                case 1 -> List.of(
+                        contentCommodity("refined_coal", Material.CHARCOAL, 6.0D, 1),
+                        contentCommodity("refined_copper", Material.COPPER_INGOT, 7.0D, 2),
+                        contentCommodity("stone_aggregate", Material.GRAVEL, 5.0D, 1),
+                        vanillaCommodity(Material.FLINT, 4.0D, 1)
+                );
+                case 2 -> List.of(
+                        contentCommodity("refined_iron", Material.IRON_NUGGET, 9.0D, 3),
+                        contentCommodity("refined_redstone", Material.GLOWSTONE_DUST, 8.0D, 3),
+                        contentCommodity("refined_lapis", Material.BLUE_DYE, 8.0D, 3),
+                        contentCommodity("washed_sand", Material.SAND, 6.0D, 2)
+                );
+                case 3 -> List.of(
+                        contentCommodity("refined_gold", Material.GOLD_NUGGET, 11.0D, 5),
+                        contentCommodity("refined_quartz", Material.QUARTZ_BLOCK, 9.0D, 5),
+                        contentCommodity("mineral_resin", Material.PRISMARINE_SHARD, 12.0D, 5),
+                        contentCommodity("ancient_fossil", Material.BONE, 11.0D, 4)
+                );
+                default -> List.of(
+                        contentCommodity("refined_diamond", Material.PRISMARINE_CRYSTALS, 18.0D, 7),
+                        contentCommodity("refined_emerald", Material.SLIME_BALL, 18.0D, 7),
+                        contentCommodity("vein_shard", Material.AMETHYST_SHARD, 20.0D, 7),
+                        contentCommodity("glimmer_dust", Material.GLOWSTONE_DUST, 18.0D, 6)
+                );
+            };
+            case LUMBERJACK -> switch (tier) {
+                case 1 -> List.of(
+                        contentCommodity("timber_bundle", Material.OAK_PLANKS, 5.0D, 1),
+                        contentCommodity("bark_fiber", Material.STRING, 4.0D, 1),
+                        vanillaCommodity(Material.OAK_LOG, 4.0D, 1),
+                        vanillaCommodity(Material.SPRUCE_LOG, 4.0D, 1)
+                );
+                case 2 -> List.of(
+                        contentCommodity("support_beam", Material.OAK_LOG, 8.0D, 3),
+                        contentCommodity("timber_bundle", Material.SPRUCE_PLANKS, 6.0D, 2),
+                        vanillaCommodity(Material.STRIPPED_OAK_LOG, 5.0D, 2),
+                        vanillaCommodity(Material.STRIPPED_SPRUCE_LOG, 5.0D, 2)
+                );
+                default -> List.of(
+                        contentCommodity("joinery_kit", Material.ITEM_FRAME, 12.0D, 5),
+                        contentCommodity("support_beam", Material.DARK_OAK_LOG, 9.0D, 4),
+                        contentCommodity("bark_fiber", Material.STRING, 6.0D, 3),
+                        vanillaCommodity(Material.CHERRY_WOOD, 7.0D, 4)
+                );
+            };
+            case FARMER -> switch (tier) {
+                case 1 -> List.of(
+                        contentCommodity("flour_sack", Material.WHEAT, 6.0D, 1),
+                        contentCommodity("root_bundle", Material.PAPER, 7.0D, 1),
+                        vanillaCommodity(Material.WHEAT, 3.0D, 1),
+                        vanillaCommodity(Material.CARROT, 3.0D, 1)
+                );
+                case 2 -> List.of(
+                        contentCommodity("grain_ration", Material.PAPER, 9.0D, 3),
+                        contentCommodity("pickled_roots", Material.HONEY_BOTTLE, 9.0D, 3),
+                        contentCommodity("grain_loaf", Material.BREAD, 8.0D, 2),
+                        vanillaCommodity(Material.HONEY_BOTTLE, 8.0D, 3)
+                );
+                default -> List.of(
+                        contentCommodity("farmers_pack", Material.BUNDLE, 15.0D, 5),
+                        contentCommodity("workers_hotpot", Material.RABBIT_STEW, 12.0D, 5),
+                        contentCommodity("stuffed_flatbread", Material.BREAD, 10.0D, 4),
+                        vanillaCommodity(Material.CAKE, 18.0D, 6)
+                );
+            };
+            case BUILDER -> switch (tier) {
+                case 1 -> List.of(
+                        contentCommodity("stone_aggregate", Material.GRAVEL, 5.0D, 1),
+                        contentCommodity("washed_sand", Material.SAND, 5.0D, 1),
+                        contentCommodity("timber_bundle", Material.OAK_PLANKS, 5.0D, 1),
+                        vanillaCommodity(Material.GLASS, 3.0D, 1)
+                );
+                case 2 -> List.of(
+                        contentCommodity("mortar_mix", Material.CLAY_BALL, 8.0D, 3),
+                        contentCommodity("support_beam", Material.OAK_LOG, 8.0D, 3),
+                        vanillaCommodity(Material.STONE_BRICKS, 3.0D, 2),
+                        vanillaCommodity(Material.BRICKS, 3.0D, 2)
+                );
+                default -> List.of(
+                        contentCommodity("joinery_kit", Material.ITEM_FRAME, 12.0D, 5),
+                        contentCommodity("mortar_mix", Material.CLAY_BALL, 10.0D, 4),
+                        vanillaCommodity(Material.TARGET, 18.0D, 6),
+                        vanillaCommodity(Material.TUFF_BRICKS, 4.0D, 4)
+                );
+            };
+            case BLACKSMITH -> switch (tier) {
+                case 1 -> List.of(
+                        contentCommodity("refined_iron", Material.IRON_NUGGET, 9.0D, 2),
+                        contentCommodity("refined_copper", Material.COPPER_INGOT, 7.0D, 2),
+                        vanillaCommodity(Material.BUCKET, 15.0D, 2),
+                        vanillaCommodity(Material.SHEARS, 15.0D, 2)
+                );
+                case 2 -> List.of(
+                        contentCommodity("refined_gold", Material.GOLD_NUGGET, 11.0D, 4),
+                        contentCommodity("refined_tin", Material.IRON_NUGGET, 9.0D, 4),
+                        vanillaCommodity(Material.IRON_PICKAXE, 15.0D, 4),
+                        vanillaCommodity(Material.SHIELD, 15.0D, 4)
+                );
+                default -> List.of(
+                        contentCommodity("vein_shard", Material.AMETHYST_SHARD, 20.0D, 6),
+                        contentCommodity("glimmer_dust", Material.GLOWSTONE_DUST, 18.0D, 6),
+                        vanillaCommodity(Material.DIAMOND_SWORD, 24.0D, 6),
+                        vanillaCommodity(Material.BLAST_FURNACE, 18.0D, 5)
+                );
+            };
+            case TRADER -> switch (tier) {
+                case 1 -> List.of(
+                        contentCommodity("ancient_fossil", Material.BONE, 11.0D, 1),
+                        contentCommodity("mineral_resin", Material.PRISMARINE_SHARD, 12.0D, 2),
+                        vanillaCommodity(Material.PAPER, 5.0D, 1),
+                        vanillaCommodity(Material.BOOK, 5.0D, 1)
+                );
+                case 2 -> List.of(
+                        contentCommodity("grain_ration", Material.PAPER, 9.0D, 3),
+                        contentCommodity("support_beam", Material.OAK_LOG, 8.0D, 3),
+                        contentCommodity("washed_clay", Material.CLAY_BALL, 7.0D, 3),
+                        vanillaCommodity(Material.GOLD_INGOT, 8.0D, 3)
+                );
+                default -> List.of(
+                        contentCommodity("farmers_pack", Material.BUNDLE, 15.0D, 5),
+                        contentCommodity("joinery_kit", Material.ITEM_FRAME, 12.0D, 5),
+                        contentCommodity("glimmer_dust", Material.GLOWSTONE_DUST, 18.0D, 5),
+                        contentCommodity("vein_shard", Material.AMETHYST_SHARD, 20.0D, 6)
+                );
+            };
+            case SOLDIER -> switch (tier) {
+                case 1 -> List.of(
+                        contentCommodity("grain_ration", Material.PAPER, 9.0D, 1),
+                        vanillaCommodity(Material.ARROW, 4.0D, 1),
+                        vanillaCommodity(Material.SHIELD, 15.0D, 2),
+                        vanillaCommodity(Material.COOKED_BEEF, 8.0D, 1)
+                );
+                default -> List.of(
+                        contentCommodity("farmers_pack", Material.BUNDLE, 15.0D, 4),
+                        vanillaCommodity(Material.CROSSBOW, 15.0D, 4),
+                        vanillaCommodity(Material.GOLDEN_APPLE, 18.0D, 5),
+                        vanillaCommodity(Material.IRON_CHESTPLATE, 15.0D, 4)
+                );
+            };
+        };
+    }
+
+    private List<TraderCommodity> getTraderQuestCommoditiesForLevel(Profession profession, int tier, int professionLevel) {
+        List<TraderCommodity> pool = new ArrayList<>(getTraderQuestCommodities(profession, tier));
+        if (pool.isEmpty()) {
+            return pool;
+        }
+
+        int safeLevel = Math.max(1, professionLevel);
+        List<TraderCommodity> unlocked = new ArrayList<>();
+        List<TraderCommodity> stretch = new ArrayList<>();
+        for (TraderCommodity commodity : pool) {
+            int requiredLevel = commodity.suggestedLevel();
+            if (requiredLevel <= safeLevel) {
+                unlocked.add(commodity);
+            } else if (requiredLevel <= safeLevel + 1) {
+                stretch.add(commodity);
+            }
+        }
+
+        if (!unlocked.isEmpty()) {
+            if (!stretch.isEmpty() && safeLevel >= 3 && ThreadLocalRandom.current().nextDouble() < 0.15D) {
+                List<TraderCommodity> combined = new ArrayList<>(unlocked);
+                combined.addAll(stretch);
+                return combined;
+            }
+            return unlocked;
+        }
+
+        if (!stretch.isEmpty()) {
+            return stretch;
+        }
+
+        return pool;
+    }
+
     private List<Material> getTraderQuestMaterials(Profession profession, int tier) {
         return switch (profession) {
             case MINER -> switch (tier) {
@@ -21694,7 +23226,7 @@ public final class Testproject extends JavaPlugin {
                 .replace("%name%", traderState.getTraderName())
                 .replace("%profession%", getProfessionPlainDisplayName(traderState.getSpecialtyProfession()));
         villager.customName(legacyComponent(displayName));
-        villager.setCustomNameVisible(true);
+        villager.setCustomNameVisible(false);
         villager.setAI(false);
         villager.setInvulnerable(true);
         villager.setSilent(false);
@@ -21801,6 +23333,7 @@ public final class Testproject extends JavaPlugin {
         }
         Entity entity = getServer().getEntity(traderState.getEntityId());
         if (entity != null) {
+            removeImmersiveNpcNameplate(entity.getUniqueId());
             entity.remove();
         }
     }
@@ -21823,6 +23356,7 @@ public final class Testproject extends JavaPlugin {
                 if (activeEntityIds.contains(villager.getUniqueId())) {
                     continue;
                 }
+                removeImmersiveNpcNameplate(villager.getUniqueId());
                 villager.remove();
             }
         }
@@ -21857,6 +23391,13 @@ public final class Testproject extends JavaPlugin {
         return remaining <= 0;
     }
 
+    private boolean removeRequestedItems(Player player, Material material, String contentId, int amount) {
+        if (contentId == null || contentId.isBlank()) {
+            return removeItems(player, material, amount);
+        }
+        return removeRequestedItemsUpTo(player, material, contentId, amount) >= amount;
+    }
+
     private int removeItemsUpTo(Player player, Material material, int maxAmount) {
         if (player == null || material == null || maxAmount <= 0) {
             return 0;
@@ -21885,6 +23426,107 @@ public final class Testproject extends JavaPlugin {
             player.updateInventory();
         }
         return removedTotal;
+    }
+
+    private int removeRequestedItemsUpTo(Player player, Material material, String contentId, int maxAmount) {
+        if (contentId == null || contentId.isBlank()) {
+            return removeItemsUpTo(player, material, maxAmount);
+        }
+        if (player == null || material == null || maxAmount <= 0) {
+            return 0;
+        }
+
+        int remaining = maxAmount;
+        int removedTotal = 0;
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length && remaining > 0; i++) {
+            ItemStack item = contents[i];
+            if (!matchesRequestedItem(item, material, contentId)) {
+                continue;
+            }
+
+            int removed = Math.min(remaining, item.getAmount());
+            item.setAmount(item.getAmount() - removed);
+            if (item.getAmount() <= 0) {
+                contents[i] = null;
+            }
+            remaining -= removed;
+            removedTotal += removed;
+        }
+
+        if (removedTotal > 0) {
+            player.getInventory().setContents(contents);
+            player.updateInventory();
+        }
+        return removedTotal;
+    }
+
+    private boolean matchesRequestedItem(ItemStack itemStack, Material material, String contentId) {
+        if (itemStack == null || itemStack.getType() != material) {
+            return false;
+        }
+        String itemContentId = getTerraCraftingContentId(itemStack);
+        if (contentId == null || contentId.isBlank()) {
+            return itemContentId == null || itemContentId.isBlank();
+        }
+        return contentId.equalsIgnoreCase(itemContentId);
+    }
+
+    private String normalizeStockpileKey(Material material, String contentId) {
+        if (contentId != null && !contentId.isBlank()) {
+            return normalizeQuestKey(contentId);
+        }
+        return material != null ? material.name().toLowerCase(Locale.ROOT) : "unknown";
+    }
+
+    private int getMaterialEconomyWeightFromStockpileKey(String stockpileKey) {
+        String normalized = normalizeQuestKey(stockpileKey);
+        if (normalized == null) {
+            return 1;
+        }
+        return switch (normalized) {
+            case "refined_coal", "refined_copper", "refined_iron", "refined_gold", "refined_redstone",
+                    "refined_lapis", "refined_quartz", "refined_tin", "timber_bundle", "stone_aggregate",
+                    "flour_sack", "washed_clay", "washed_sand" -> 3;
+            case "refined_diamond", "refined_emerald", "support_beam", "mortar_mix", "grain_ration",
+                    "root_bundle", "pickled_roots", "bark_fiber" -> 4;
+            case "joinery_kit", "farmers_pack", "vein_shard", "mineral_resin", "ancient_fossil",
+                    "glimmer_dust" -> 5;
+            default -> 1;
+        };
+    }
+
+    private int getMaterialEconomyWeight(Material material, String contentId) {
+        if (contentId != null && !contentId.isBlank()) {
+            return getMaterialEconomyWeightFromStockpileKey(contentId);
+        }
+        if (material == null) {
+            return 1;
+        }
+        return switch (material) {
+            case BRICKS, STONE_BRICKS, GLASS, COOKED_BEEF, COOKED_CHICKEN, BREAD, HONEY_BOTTLE -> 2;
+            default -> 1;
+        };
+    }
+
+    public String formatTradeRequestName(Material material, String contentId) {
+        if (contentId != null && !contentId.isBlank()) {
+            ItemStack contentItem = createTerraCraftingItem(contentId, 1);
+            if (contentItem != null && !contentItem.getType().isAir()) {
+                return formatItemDisplayName(contentItem);
+            }
+        }
+        return formatMaterialName(material);
+    }
+
+    public ItemStack createTradeRequestIcon(Material material, String contentId) {
+        if (contentId != null && !contentId.isBlank()) {
+            ItemStack contentItem = createTerraCraftingItem(contentId, 1);
+            if (contentItem != null && !contentItem.getType().isAir()) {
+                return contentItem;
+            }
+        }
+        return material == null ? null : new ItemStack(material);
     }
 
     public ItemStack createFixedOreToolItem() {
@@ -22002,6 +23644,7 @@ public final class Testproject extends JavaPlugin {
         guildDataConfig.set(path + ".progress.xp", guild.getGuildXp());
         guildDataConfig.set(path + ".profile.description", guild.getDescription());
         guildDataConfig.set(path + ".profile.motd", guild.getMotd());
+        guildDataConfig.set(path + ".profile.tag-color", guild.getTagColorKey());
         guildDataConfig.set(path + ".profile.recruiting-open", guild.isRecruitingOpen());
         guildDataConfig.set(path + ".profile.created-at", guild.getCreatedAtMillis() > 0L ? guild.getCreatedAtMillis() : null);
         guildDataConfig.set(path + ".capital-country", guild.getCapitalCountryKey());
@@ -22212,10 +23855,12 @@ public final class Testproject extends JavaPlugin {
         saveResourceIfMissing("economy/block-values.yml");
         saveResourceIfMissing("jobs/config.yml");
         saveResourceIfMissing("settings/core.yml");
+        saveResourceIfMissing("settings/guilds.yml");
         saveResourceIfMissing("settings/onboarding.yml");
         saveResourceIfMissing("settings/climate.yml");
         saveResourceIfMissing("settings/stability.yml");
         saveResourceIfMissing("settings/merchant.yml");
+        saveResourceIfMissing("settings/freeport-merchants.yml");
         saveResourceIfMissing("settings/territories.yml");
         saveResourceIfMissing("settings/quests.yml");
         saveResourceIfMissing("scoreboard/config.yml");
@@ -22224,6 +23869,7 @@ public final class Testproject extends JavaPlugin {
         }
         saveResourceIfMissing("chat/config.yml");
         saveResourceIfMissing("messages/messages.yml");
+        saveResourceIfMissing("messages/territories.yml");
         saveResourceIfMissing("data.yml");
         saveResourceIfMissing("countries/data.yml");
         saveResourceIfMissing("guilds/data.yml");
@@ -22235,26 +23881,31 @@ public final class Testproject extends JavaPlugin {
         jobsFile = new File(getDataFolder(), "jobs/config.yml");
         chatFile = new File(getDataFolder(), "chat/config.yml");
         messagesFile = new File(getDataFolder(), "messages/messages.yml");
+        territoryMessagesFile = new File(getDataFolder(), "messages/territories.yml");
         dataFile = new File(getDataFolder(), "data.yml");
         countryDataFile = new File(getDataFolder(), "countries/data.yml");
         guildDataFile = new File(getDataFolder(), "guilds/data.yml");
         coreSettingsFile = new File(getDataFolder(), "settings/core.yml");
+        guildSettingsFile = new File(getDataFolder(), "settings/guilds.yml");
         onboardingSettingsFile = new File(getDataFolder(), "settings/onboarding.yml");
         climateSettingsFile = new File(getDataFolder(), "settings/climate.yml");
         stabilitySettingsFile = new File(getDataFolder(), "settings/stability.yml");
         merchantSettingsFile = new File(getDataFolder(), "settings/merchant.yml");
+        freeportMerchantsSettingsFile = new File(getDataFolder(), "settings/freeport-merchants.yml");
         territorySettingsFile = new File(getDataFolder(), "settings/territories.yml");
         questsSettingsFile = new File(getDataFolder(), "settings/quests.yml");
         scoreboardSettingsFile = new File(getDataFolder(), "scoreboard/config.yml");
         blockValuesConfig = loadCustomConfig(blockValuesFile, "economy/block-values.yml");
         jobsConfig = loadCustomConfig(jobsFile, "jobs/config.yml");
         coreSettingsConfig = loadCustomConfig(coreSettingsFile, "settings/core.yml");
-        onboardingSettingsConfig = loadCustomConfig(onboardingSettingsFile, "settings/onboarding.yml");
+        guildSettingsConfig = loadCustomConfig(guildSettingsFile, "settings/guilds.yml");
+        onboardingSettingsConfig = loadQuestEditableConfig(onboardingSettingsFile, "settings/onboarding.yml");
         climateSettingsConfig = loadCustomConfig(climateSettingsFile, "settings/climate.yml");
         stabilitySettingsConfig = loadCustomConfig(stabilitySettingsFile, "settings/stability.yml");
         merchantSettingsConfig = loadCustomConfig(merchantSettingsFile, "settings/merchant.yml");
+        freeportMerchantsSettingsConfig = loadCustomConfig(freeportMerchantsSettingsFile, "settings/freeport-merchants.yml");
         territorySettingsConfig = loadCustomConfig(territorySettingsFile, "settings/territories.yml");
-        questsSettingsConfig = loadCustomConfig(questsSettingsFile, "settings/quests.yml");
+        questsSettingsConfig = loadQuestEditableConfig(questsSettingsFile, "settings/quests.yml");
         scoreboardSettingsConfig = loadCustomConfig(scoreboardSettingsFile, "scoreboard/config.yml");
         migrateScoreboardConfig();
         professionFiles.clear();
@@ -22267,12 +23918,17 @@ public final class Testproject extends JavaPlugin {
         }
         chatConfig = loadCustomConfig(chatFile, "chat/config.yml");
         messagesConfig = loadCustomConfig(messagesFile, "messages/messages.yml");
+        territoryMessagesConfig = loadCustomConfig(territoryMessagesFile, "messages/territories.yml");
         dataConfig = loadCustomConfig(dataFile, "data.yml");
         countryDataConfig = loadCustomConfig(countryDataFile, "countries/data.yml");
         guildDataConfig = loadCustomConfig(guildDataFile, "guilds/data.yml");
         loadMaintenanceSettings();
         migrateLegacyCountryData();
         migrateLegacyOnboardingConfig();
+        migrateLegacyGuildConfig();
+        migrateLegacyTerritoryMessagesConfig();
+        migrateStarterHubBuildBlockedMessage();
+        mergeMessageConfig(territoryMessagesConfig);
         migrateLegacyMainConfigSections();
     }
 
@@ -22322,14 +23978,24 @@ public final class Testproject extends JavaPlugin {
     }
 
     private FileConfiguration loadCustomConfig(File file, String resourcePath) {
+        return loadCustomConfig(file, resourcePath, true);
+    }
+
+    private FileConfiguration loadQuestEditableConfig(File file, String resourcePath) {
+        return loadCustomConfig(file, resourcePath, false);
+    }
+
+    private FileConfiguration loadCustomConfig(File file, String resourcePath, boolean copyDefaultsToFile) {
         YamlConfiguration configuration = YamlConfiguration.loadConfiguration(file);
 
         try (InputStream inputStream = getResource(resourcePath)) {
             if (inputStream != null) {
                 YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
                 configuration.setDefaults(defaults);
-                configuration.options().copyDefaults(true);
-                saveYaml(configuration, file);
+                configuration.options().copyDefaults(copyDefaultsToFile);
+                if (copyDefaultsToFile) {
+                    saveYaml(configuration, file);
+                }
             }
         } catch (IOException exception) {
             getLogger().severe("Failed to load defaults for " + resourcePath + ": " + exception.getMessage());
@@ -22398,10 +24064,69 @@ public final class Testproject extends JavaPlugin {
 
         if (changed) {
             saveYaml(onboardingSettingsConfig, onboardingSettingsFile);
-            onboardingSettingsConfig = loadCustomConfig(onboardingSettingsFile, "settings/onboarding.yml");
-            questsSettingsConfig = loadCustomConfig(questsSettingsFile, "settings/quests.yml");
+            onboardingSettingsConfig = loadQuestEditableConfig(onboardingSettingsFile, "settings/onboarding.yml");
+            questsSettingsConfig = loadQuestEditableConfig(questsSettingsFile, "settings/quests.yml");
             coreSettingsConfig = loadCustomConfig(coreSettingsFile, "settings/core.yml");
         }
+    }
+
+    private void migrateLegacyGuildConfig() {
+        if (guildSettingsConfig == null || guildSettingsFile == null || coreSettingsConfig == null || coreSettingsFile == null) {
+            return;
+        }
+        if (!coreSettingsConfig.contains("guilds")) {
+            return;
+        }
+        ConfigurationSection guildSection = coreSettingsConfig.getConfigurationSection("guilds");
+        if (guildSection == null) {
+            return;
+        }
+        copySectionValues(guildSection, guildSettingsConfig, "guilds");
+        coreSettingsConfig.set("guilds", null);
+        saveYaml(guildSettingsConfig, guildSettingsFile);
+        saveYaml(coreSettingsConfig, coreSettingsFile);
+        guildSettingsConfig = loadCustomConfig(guildSettingsFile, "settings/guilds.yml");
+        coreSettingsConfig = loadCustomConfig(coreSettingsFile, "settings/core.yml");
+    }
+
+    private void migrateLegacyTerritoryMessagesConfig() {
+        if (messagesConfig == null || messagesFile == null || territoryMessagesConfig == null || territoryMessagesFile == null) {
+            return;
+        }
+        ConfigurationSection territorySection = messagesConfig.getConfigurationSection("country.territory");
+        if (territorySection == null) {
+            return;
+        }
+        copySectionValues(territorySection, territoryMessagesConfig, "country.territory");
+        messagesConfig.set("country.territory", null);
+        saveYaml(territoryMessagesConfig, territoryMessagesFile);
+        saveYaml(messagesConfig, messagesFile);
+        messagesConfig = loadCustomConfig(messagesFile, "messages/messages.yml");
+        territoryMessagesConfig = loadCustomConfig(territoryMessagesFile, "messages/territories.yml");
+    }
+
+    private void migrateStarterHubBuildBlockedMessage() {
+        if (messagesConfig == null || messagesFile == null) {
+            return;
+        }
+
+        String path = "tutorial.starter-hub.build-blocked";
+        String current = messagesConfig.getString(path);
+        if (current == null) {
+            return;
+        }
+
+        String oldDefault = "&cYou cannot build in the starter hub. Only crop planting is allowed here.";
+        String oldGeneral = "&cYou cannot build in the starter hub.";
+        String previousFreeport = "&cYou cannot modify blocks in Freeport. Only planting and harvesting crops is allowed here.";
+        String newDefault = "&cYou cannot modify blocks in Freeport. Only fixed ore nodes and crop planting or harvesting are allowed here.";
+        if (!oldDefault.equals(current) && !oldGeneral.equals(current) && !previousFreeport.equals(current)) {
+            return;
+        }
+
+        messagesConfig.set(path, newDefault);
+        saveYaml(messagesConfig, messagesFile);
+        messagesConfig = loadCustomConfig(messagesFile, "messages/messages.yml");
     }
 
     private void migrateLegacyMainConfigSection(String rootPath) {
@@ -22438,6 +24163,7 @@ public final class Testproject extends JavaPlugin {
 
     private void mergeManagedSettingsIntoRuntimeConfig() {
         mergeManagedConfigIntoRuntime(coreSettingsConfig);
+        mergeManagedConfigIntoRuntime(guildSettingsConfig);
         mergeManagedConfigIntoRuntime(onboardingSettingsConfig);
         mergeManagedConfigIntoRuntime(climateSettingsConfig);
         mergeManagedConfigIntoRuntime(stabilitySettingsConfig);
@@ -22458,12 +24184,27 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
+    private void mergeMessageConfig(FileConfiguration source) {
+        if (messagesConfig == null || source == null) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : source.getValues(true).entrySet()) {
+            if (entry.getValue() instanceof ConfigurationSection) {
+                continue;
+            }
+            messagesConfig.set(entry.getKey(), entry.getValue());
+        }
+    }
+
     private FileConfiguration getManagedConfigForPath(String path) {
         if (path == null) {
             return null;
         }
         if (path.startsWith("onboarding.") || path.startsWith("quests.starter.")) {
             return onboardingSettingsConfig;
+        }
+        if (path.startsWith("guilds.")) {
+            return guildSettingsConfig;
         }
         if (path.startsWith("climate.")) {
             return climateSettingsConfig;
@@ -22517,6 +24258,9 @@ public final class Testproject extends JavaPlugin {
         }
         if (path.startsWith("onboarding.") || path.startsWith("quests.starter.")) {
             return onboardingSettingsFile;
+        }
+        if (path.startsWith("guilds.")) {
+            return guildSettingsFile;
         }
         if (path.startsWith("climate.")) {
             return climateSettingsFile;
@@ -22981,6 +24725,18 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
+    private void restartPlayerTagRefreshRuntime() {
+        stopPlayerTagRefreshRuntime();
+        playerTagRefreshTask = getServer().getScheduler().runTaskTimer(this, this::refreshAllCountryTags, 1L, 40L);
+    }
+
+    private void stopPlayerTagRefreshRuntime() {
+        if (playerTagRefreshTask != null) {
+            playerTagRefreshTask.cancel();
+            playerTagRefreshTask = null;
+        }
+    }
+
     public void refreshCountryTags(Country country) {
         for (UUID memberId : country.getMembers()) {
             Player player = getServer().getPlayer(memberId);
@@ -22990,23 +24746,147 @@ public final class Testproject extends JavaPlugin {
         }
     }
 
-    public void updatePlayerCountryTag(Player player) {
-        Country country = getPlayerCountry(player.getUniqueId());
-        if (country == null || !country.hasTag()) {
-            resetPlayerCountryTag(player);
+    private void refreshPlayerTagLater(UUID playerId) {
+        if (playerId == null) {
             return;
         }
+        Player player = getServer().getPlayer(playerId);
+        if (player != null) {
+            updatePlayerCountryTag(player);
+        }
+    }
 
-        String nameWithTag = player.getName() + " " + country.getTag();
-        Component decoratedName = legacyComponent(nameWithTag);
+    public void updatePlayerCountryTag(Player player) {
+        Component decoratedName = buildPlayerDisplayNameComponent(player);
         player.displayName(decoratedName);
         player.playerListName(decoratedName);
+        applyPlayerNameplateTag(player);
     }
 
     public void resetPlayerCountryTag(Player player) {
         Component playerName = Component.text(player.getName());
         player.displayName(playerName);
         player.playerListName(playerName);
+        applyPlayerNameplateTag(player);
+    }
+
+    public String getPlayerTagPrefix(Player player) {
+        if (player == null) {
+            return "&8[&7---&8] &8[&7None&8. &f0&8] ";
+        }
+
+        Profession profession = getProfession(player.getUniqueId());
+        int professionLevel = profession != null ? getProfessionLevel(player.getUniqueId(), profession) : 0;
+        String levelSegment = profession != null
+                ? "&8[" + getProfessionTagMarker(profession) + "&8. &f" + professionLevel + "&8] "
+                : "&8[&7None&8. &f0&8] ";
+
+        Guild guild = getPlayerGuild(player.getUniqueId());
+        if (guild != null && guild.getTag() != null && !guild.getTag().isBlank()) {
+            return "&8[" + formatGuildTag(guild) + "&8] " + levelSegment;
+        }
+        return "&8[&7---&8] " + levelSegment;
+    }
+
+    private Component buildPlayerDisplayNameComponent(Player player) {
+        String tagPrefix = getPlayerTagPrefix(player);
+        if (!tagPrefix.isBlank()) {
+            return legacyComponent(tagPrefix + "&f" + player.getName() + getPlayerNameSuffix(player));
+        }
+        return Component.text(player.getName());
+    }
+
+    private String getPlayerNameSuffix(Player player) {
+        if (player == null) {
+            return "";
+        }
+        String countryTag = getPlayerCountryTagValue(player.getUniqueId());
+        if (countryTag == null || countryTag.isBlank()) {
+            return "";
+        }
+        return " &8[&f" + countryTag + "&8]";
+    }
+
+    private String getProfessionTagMarker(Profession profession) {
+        if (profession == null) {
+            return "&7-";
+        }
+        return switch (profession) {
+            case MINER -> "&bM";
+            case LUMBERJACK -> "&aL";
+            case FARMER -> "&eF";
+            case BUILDER -> "&6B";
+            case BLACKSMITH -> "&8K";
+            case TRADER -> "&2T";
+            case SOLDIER -> "&cS";
+        };
+    }
+
+    private void applyPlayerNameplateTag(Player target) {
+        if (target == null) {
+            return;
+        }
+
+        ScoreboardManager manager = getServer().getScoreboardManager();
+        if (manager != null) {
+            applyPlayerNameplateTag(manager.getMainScoreboard(), target);
+        }
+
+        for (Player viewer : getServer().getOnlinePlayers()) {
+            applyPlayerNameplateTag(viewer.getScoreboard(), target);
+        }
+    }
+
+    private void applyPlayerNameplateTag(Scoreboard scoreboard, Player target) {
+        if (scoreboard == null || target == null) {
+            return;
+        }
+
+        String teamName = getPlayerNameplateTeamName(target);
+        removePlayerFromManagedNameplateTeams(scoreboard, target.getName(), teamName);
+        Team team = scoreboard.getTeam(teamName);
+        if (team == null) {
+            team = scoreboard.registerNewTeam(teamName);
+        }
+
+        team.setPrefix(colorize(getPlayerTagPrefix(target)));
+        team.setSuffix(colorize(getPlayerNameSuffix(target)));
+        if (!team.hasEntry(target.getName())) {
+            team.addEntry(target.getName());
+        }
+    }
+
+    private void removePlayerFromManagedNameplateTeams(Scoreboard scoreboard, String playerName, String keepTeamName) {
+        for (Team existingTeam : scoreboard.getTeams()) {
+            String existingName = existingTeam.getName();
+            if (!existingName.startsWith("g0") && !existingName.startsWith("g9")) {
+                continue;
+            }
+            if (existingName.equals(keepTeamName)) {
+                continue;
+            }
+            if (existingTeam.hasEntry(playerName)) {
+                existingTeam.removeEntry(playerName);
+            }
+        }
+    }
+
+    public String getPlayerNameplateTeamName(Player player) {
+        if (player == null) {
+            return "g9_unknown";
+        }
+        Guild guild = getPlayerGuild(player.getUniqueId());
+        if (guild != null && guild.getId() != null && !guild.getId().isBlank()) {
+            String compactGuildId = guild.getId().replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
+            if (compactGuildId.isBlank()) {
+                compactGuildId = "guild";
+            }
+            if (compactGuildId.length() > 14) {
+                compactGuildId = compactGuildId.substring(0, 14);
+            }
+            return "g0" + compactGuildId;
+        }
+        return "g9_noguild";
     }
 
     private void resetOnlinePlayerState(Player player) {
@@ -24476,6 +26356,14 @@ public final class Testproject extends JavaPlugin {
         public ItemStack toItemStack() {
             return itemStack == null ? null : itemStack.clone();
         }
+    }
+
+    private record TraderCommodity(
+            Material displayMaterial,
+            String contentId,
+            double unitMoney,
+            int suggestedLevel
+    ) {
     }
 
     private enum PendingOnboardingNpcSelectionType {

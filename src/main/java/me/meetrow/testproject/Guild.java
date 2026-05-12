@@ -16,6 +16,7 @@ public final class Guild {
     private final String id;
     private String name;
     private String tag;
+    private String tagColorKey;
     private UUID leaderId;
     private double balance;
     private int cachedLevel;
@@ -49,7 +50,7 @@ public final class Guild {
                  Map<UUID, GuildRole> memberRoles,
                  Map<GuildRole, Map<GuildPermission, GuildPermissionState>> rolePermissionOverrides,
                  Map<UUID, Map<GuildPermission, GuildPermissionState>> playerPermissionOverrides) {
-        this(id, name, tag, leaderId, balance, cachedLevel, cachedScore, 0, "", "",
+        this(id, name, tag, "WHITE", leaderId, balance, cachedLevel, cachedScore, 0, "", "",
                 true, System.currentTimeMillis(), null, members, convertInvites(invitedPlayers), Map.of(),
                 claimedCountryKeys, memberRoles, rolePermissionOverrides, playerPermissionOverrides,
                 Map.of(), List.of());
@@ -58,6 +59,7 @@ public final class Guild {
     public Guild(String id,
                  String name,
                  String tag,
+                 String tagColorKey,
                  UUID leaderId,
                  double balance,
                  int cachedLevel,
@@ -80,6 +82,7 @@ public final class Guild {
         this.id = id;
         this.name = name;
         this.tag = tag;
+        this.tagColorKey = tagColorKey == null || tagColorKey.isBlank() ? "WHITE" : tagColorKey;
         this.leaderId = leaderId;
         this.balance = balance;
         this.cachedLevel = Math.max(1, cachedLevel);
@@ -215,6 +218,14 @@ public final class Guild {
 
     public void setTag(String tag) {
         this.tag = tag;
+    }
+
+    public String getTagColorKey() {
+        return tagColorKey;
+    }
+
+    public void setTagColorKey(String tagColorKey) {
+        this.tagColorKey = tagColorKey == null || tagColorKey.isBlank() ? "WHITE" : tagColorKey;
     }
 
     public UUID getLeaderId() {

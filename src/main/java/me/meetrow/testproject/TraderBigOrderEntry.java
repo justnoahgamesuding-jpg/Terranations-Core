@@ -5,12 +5,14 @@ import org.bukkit.Material;
 public final class TraderBigOrderEntry {
     private final Profession profession;
     private final Material requestedMaterial;
+    private final String requestedContentId;
     private final int requestedAmount;
     private int deliveredAmount;
 
-    public TraderBigOrderEntry(Profession profession, Material requestedMaterial, int requestedAmount, int deliveredAmount) {
+    public TraderBigOrderEntry(Profession profession, Material requestedMaterial, String requestedContentId, int requestedAmount, int deliveredAmount) {
         this.profession = profession;
         this.requestedMaterial = requestedMaterial;
+        this.requestedContentId = requestedContentId;
         this.requestedAmount = requestedAmount;
         this.deliveredAmount = Math.max(0, Math.min(requestedAmount, deliveredAmount));
     }
@@ -21,6 +23,14 @@ public final class TraderBigOrderEntry {
 
     public Material getRequestedMaterial() {
         return requestedMaterial;
+    }
+
+    public String getRequestedContentId() {
+        return requestedContentId;
+    }
+
+    public boolean hasRequestedContent() {
+        return requestedContentId != null && !requestedContentId.isBlank();
     }
 
     public int getRequestedAmount() {

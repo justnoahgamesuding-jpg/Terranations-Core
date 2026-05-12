@@ -320,7 +320,7 @@ public class CountryGuiListener implements Listener {
         inventory.setItem(PROGRESSION_PAGE_BADGE_SLOT, createCountryPageBadgeItem(country, pageLevel));
         inventory.setItem(PROGRESSION_TREASURY_SLOT, createSimpleItem(Material.GOLD_INGOT, "&6Open Treasury", List.of(
                 "&7Open the country treasury deposit menu.",
-                "&7Current treasury: &fâ›ƒ" + plugin.formatMoney(plugin.getCountryBalance(country))
+                "&7Current treasury: &f⛃" + plugin.formatMoney(plugin.getCountryBalance(country))
         )));
         if (safePage <= 0) {
             inventory.setItem(PROGRESSION_BACK_SLOT, createSimpleItem(Material.ARROW, "&eBack", List.of("&7Return to the country dashboard.")));
@@ -594,7 +594,7 @@ public class CountryGuiListener implements Listener {
         lore.add("&7Your country: &f" + (playerCountry != null ? playerCountry.getName() : "None"));
         lore.add("&7Territory here: &f" + (locationCountry != null ? locationCountry.getName() : "Wilderness"));
         Guild playerGuild = plugin.getPlayerGuild(player.getUniqueId());
-        lore.add("&7Your guild: &f" + (playerGuild != null ? playerGuild.getName() + " [" + playerGuild.getTag() + "]" : "None"));
+        lore.add("&7Your guild: &f" + (playerGuild != null ? playerGuild.getName() + " [&r" + plugin.formatGuildTag(playerGuild) + "&f]" : "None"));
         if (playerCountry != null) {
             CountryRole role = plugin.getCountryRole(playerCountry, player.getUniqueId());
             lore.add("&7Your role: &f" + (role != null ? role.getDisplayName() : "Member"));
@@ -619,7 +619,7 @@ public class CountryGuiListener implements Listener {
         lore.add("&7Members: &f" + country.getMembers().size());
         lore.add("&7Level: &f" + plugin.getCountryLevel(country));
         lore.add("&7Join status: &f" + (country.isOpen() ? "Open" : "Invite only"));
-        lore.add("&7Claiming guild: &f" + (owningGuild != null ? owningGuild.getName() + " [" + owningGuild.getTag() + "]" : "None"));
+        lore.add("&7Claiming guild: &f" + (owningGuild != null ? owningGuild.getName() + " [&r" + plugin.formatGuildTag(owningGuild) + "&f]" : "None"));
         lore.add("&7Treasury: &f⛃" + plugin.formatMoney(plugin.getCountryBalance(country)));
         lore.add("&7Resources: &f" + plugin.getCountryResources(country));
         lore.add("&7Trader reputation: &f" + plugin.formatTraderReputation(plugin.getCountryTotalTraderReputation(country)));
@@ -664,7 +664,7 @@ public class CountryGuiListener implements Listener {
         Guild owningGuild = plugin.getOwningGuild(country);
         return createPlayerItem(Bukkit.getOfflinePlayer(country.getOwnerId()), "&6Country Owner", List.of(
                 "&7Owner: &f" + plugin.safeOfflineName(country.getOwnerId()),
-                "&7Claiming guild: &f" + (owningGuild != null ? owningGuild.getName() + " [" + owningGuild.getTag() + "]" : "None")
+                "&7Claiming guild: &f" + (owningGuild != null ? owningGuild.getName() + " [&r" + plugin.formatGuildTag(owningGuild) + "&f]" : "None")
         ));
     }
 
@@ -1534,7 +1534,7 @@ public class CountryGuiListener implements Listener {
         populateProfessionSection(inventory, country, Profession.MINER, MINER_HEADER_SLOT, MINER_MEMBER_SLOTS);
         populateProfessionSection(inventory, country, Profession.LUMBERJACK, LUMBERJACK_HEADER_SLOT, LUMBERJACK_MEMBER_SLOTS);
         populateProfessionSection(inventory, country, Profession.FARMER, FARMER_HEADER_SLOT, FARMER_MEMBER_SLOTS);
-        populateProfessionSection(inventory, country, Profession.BUILDER, BUILDER_HEADER_SLOT, BUILDER_MEMBER_SLOTS);
+        populateProfessionSection(inventory, country, Profession.TRADER, BUILDER_HEADER_SLOT, BUILDER_MEMBER_SLOTS);
         populateProfessionSection(inventory, country, Profession.BLACKSMITH, BLACKSMITH_HEADER_SLOT, BLACKSMITH_MEMBER_SLOTS);
 
         player.openInventory(inventory);
@@ -1582,7 +1582,7 @@ public class CountryGuiListener implements Listener {
             case MINER -> MINER_MEMBER_SLOTS.length;
             case LUMBERJACK -> LUMBERJACK_MEMBER_SLOTS.length;
             case FARMER -> FARMER_MEMBER_SLOTS.length;
-            case BUILDER -> BUILDER_MEMBER_SLOTS.length;
+            case TRADER -> BUILDER_MEMBER_SLOTS.length;
             case BLACKSMITH -> BLACKSMITH_MEMBER_SLOTS.length;
             default -> 0;
         };

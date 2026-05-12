@@ -1,0 +1,31 @@
+info:
+  namespace: terra_starter_gear
+
+items:
+  settlers_hatchet:
+    display_name: "&eSettler's Hatchet"
+    resource:
+      material: WOODEN_AXE
+      model_id: 41001
+      generate: false
+      model_path: item/settlers_hatchet
+    durability:
+      max_custom_durability: 38
+  copper_pioneer_axe:
+    display_name: "&6Copper Axe"
+    resource:
+      material: IRON_AXE
+      model_id: 41002
+      generate: false
+      model_path: item/copper_pioneer_axe
+    durability:
+      max_custom_durability: 314
+  settlers_pickaxe:
+    display_name: "&eSettler's Pickaxe"
+    resource:
+      material: WOODEN_PICKAXE
+      model_id: 41003
+      generate: false
+      model_path: item/settlers_pickaxe
+    durability:
+      max_custom_durability: 38

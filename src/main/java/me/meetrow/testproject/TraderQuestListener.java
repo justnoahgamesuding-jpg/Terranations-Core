@@ -32,8 +32,8 @@ public class TraderQuestListener implements Listener {
             Profession.MINER,
             Profession.LUMBERJACK,
             Profession.FARMER,
-            Profession.BUILDER,
-            Profession.BLACKSMITH
+            Profession.BLACKSMITH,
+            Profession.TRADER
     };
     private static final int[] CONTRACT_SLOTS = {19, 20, 21, 22, 23};
 
@@ -169,7 +169,7 @@ public class TraderQuestListener implements Listener {
         lore.add("&7Trader: &f" + traderState.getTraderName());
         lore.add("&7Specialty: &f" + plugin.getProfessionPlainDisplayName(traderState.getSpecialtyProfession()));
         lore.add("&7Your route reputation: &e" + plugin.formatTraderReputation(plugin.getTraderReputation(player.getUniqueId())));
-        Country playerCountry = plugin.getPlayerCountry(player.getUniqueId());
+        Country playerCountry = plugin.getTraderAccessCountry(player.getUniqueId(), traderState);
         if (playerCountry != null && playerCountry.getLastTraderSeenAtMillis() > 0L) {
             lore.add("&7Last seen in your country: &f" + plugin.formatTraderLastSeen(playerCountry.getLastTraderSeenAtMillis()));
             if (playerCountry.getLastTraderName() != null) {
@@ -206,11 +206,12 @@ public class TraderQuestListener implements Listener {
         }
 
         if (traderQuest != null && traderQuest.getProfession() == profession) {
-            lore.add("&7Requested: &f" + traderQuest.getRequestedAmount() + " " + plugin.formatMaterialName(traderQuest.getRequestedMaterial()));
+            lore.add("&7Requested: &f" + traderQuest.getRequestedAmount() + " " + plugin.formatTradeRequestName(traderQuest.getRequestedMaterial(), traderQuest.getRequestedContentId()));
             lore.add("&7Reward: &f⛃" + plugin.formatMoney(traderQuest.getRewardMoney()) + "&7, &f" + traderQuest.getRewardXp() + " xp&7, &e+" + plugin.formatTraderReputation(traderQuest.getRewardReputation()));
             lore.add("&aReady for delivery.");
             lore.add("&8Click to deliver the items.");
-            return createSimpleItem(traderQuest.getRequestedMaterial(), "&aDeliver " + plugin.getProfessionPlainDisplayName(profession) + " Contract", lore);
+            ItemStack requestedIcon = plugin.createTradeRequestIcon(traderQuest.getRequestedMaterial(), traderQuest.getRequestedContentId());
+            return createSimpleItem(requestedIcon != null ? requestedIcon.getType() : traderQuest.getRequestedMaterial(), "&aDeliver " + plugin.getProfessionPlainDisplayName(profession) + " Contract", lore);
         }
 
         if (traderQuest != null) {
@@ -233,14 +234,15 @@ public class TraderQuestListener implements Listener {
             return createSimpleItem(Material.BARRIER, "&cUnavailable", lore);
         }
 
-        lore.add("&7Requested: &f" + offer.getRequestedAmount() + " " + plugin.formatMaterialName(offer.getRequestedMaterial()));
+        lore.add("&7Requested: &f" + offer.getRequestedAmount() + " " + plugin.formatTradeRequestName(offer.getRequestedMaterial(), offer.getRequestedContentId()));
         lore.add("&7Reward: &f⛃" + plugin.formatMoney(offer.getRewardMoney()) + "&7, &f" + offer.getRewardXp() + " xp&7, &e+" + plugin.formatTraderReputation(offer.getRewardReputation()));
         lore.add("&7Difficulty tier: &f" + offer.getDifficultyTier());
         if (profession == traderState.getSpecialtyProfession()) {
             lore.add("&6Specialty bonus applied.");
         }
         lore.add("&8Click to accept this contract.");
-        return createSimpleItem(offer.getRequestedMaterial(), professionName, lore);
+        ItemStack offeredIcon = plugin.createTradeRequestIcon(offer.getRequestedMaterial(), offer.getRequestedContentId());
+        return createSimpleItem(offeredIcon != null ? offeredIcon.getType() : offer.getRequestedMaterial(), professionName, lore);
     }
 
     private ItemStack createBigOrderItem(Player player, DynamicTraderState traderState) {
@@ -256,7 +258,7 @@ public class TraderQuestListener implements Listener {
         lore.add("&7Progress: &f" + bigOrder.getTotalDeliveredAmount() + "&7/&f" + bigOrder.getTotalRequestedAmount());
         lore.add("&7Reward: &f⛃" + plugin.formatMoney(bigOrder.getRewardMoney()) + "&7, &f" + bigOrder.getRewardXp() + " xp&7, &e+" + plugin.formatTraderReputation(bigOrder.getRewardReputation()));
         for (TraderBigOrderEntry entry : bigOrder.getEntries()) {
-            lore.add("&8- &f" + entry.getDeliveredAmount() + "&7/&f" + entry.getRequestedAmount() + " " + plugin.formatMaterialName(entry.getRequestedMaterial()));
+            lore.add("&8- &f" + entry.getDeliveredAmount() + "&7/&f" + entry.getRequestedAmount() + " " + plugin.formatTradeRequestName(entry.getRequestedMaterial(), entry.getRequestedContentId()));
         }
         lore.add("&8Click to contribute matching items.");
         return createSimpleItem(Material.CHEST_MINECART, "&6Shared Country Order", lore);
@@ -283,7 +285,7 @@ public class TraderQuestListener implements Listener {
             } else {
                 player.sendMessage(plugin.getMessage("terra.trader.missing-items", plugin.placeholders(
                         "amount", String.valueOf(traderQuest.getRequestedAmount()),
-                        "item", plugin.formatMaterialName(traderQuest.getRequestedMaterial())
+                        "item", plugin.formatTradeRequestName(traderQuest.getRequestedMaterial(), traderQuest.getRequestedContentId())
                 )));
                 player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.8F, 0.9F);
             }
@@ -319,7 +321,7 @@ public class TraderQuestListener implements Listener {
         player.sendMessage(plugin.getMessage("terra.trader.quest-accepted", plugin.placeholders(
                 "profession", plugin.getProfessionPlainDisplayName(accepted.getProfession()),
                 "amount", String.valueOf(accepted.getRequestedAmount()),
-                "item", plugin.formatMaterialName(accepted.getRequestedMaterial()),
+                "item", plugin.formatTradeRequestName(accepted.getRequestedMaterial(), accepted.getRequestedContentId()),
                 "time", "now",
                 "expire", plugin.formatLongDurationWords(Math.max(0L, accepted.getExpiresAtMillis() - System.currentTimeMillis()))
         )));

@@ -30,14 +30,14 @@ public enum CountryUpgrade {
     ),
     BUILDERS_GUILD(
             "builders_guild",
-            "Builder's Guild",
+            "Trade Hall",
             Material.BRICKS,
             "green_fields_i",
             1,
             22.0D,
             20,
-            requirements(Profession.BUILDER, 4),
-            "+5% builder XP in the country."
+            requirements(Profession.TRADER, 4),
+            "+5% trader XP in the country."
     ),
     COIN_VAULT_I(
             "coin_vault_i",
@@ -47,7 +47,7 @@ public enum CountryUpgrade {
             1,
             26.0D,
             24,
-            requirements(Profession.MINER, 4, Profession.BUILDER, 4),
+            requirements(Profession.MINER, 4, Profession.TRADER, 4),
             "+5% block and level-up money rewards."
     ),
     HARVEST_CIRCLE(
@@ -80,7 +80,7 @@ public enum CountryUpgrade {
             2,
             42.0D,
             36,
-            requirements(Profession.BUILDER, 5, Profession.LUMBERJACK, 5),
+            requirements(Profession.TRADER, 5, Profession.LUMBERJACK, 5),
             "-10 minutes from /country home cooldown."
     ),
     FORGE_QUARTERS(
@@ -113,7 +113,7 @@ public enum CountryUpgrade {
             3,
             66.0D,
             54,
-            requirements(Profession.FARMER, 6, Profession.BUILDER, 6),
+            requirements(Profession.FARMER, 6, Profession.TRADER, 6),
             "+5% all job XP in the country."
     ),
     GREEN_FIELDS_II(
@@ -135,7 +135,7 @@ public enum CountryUpgrade {
             4,
             88.0D,
             68,
-            requirements(Profession.BUILDER, 7, Profession.BLACKSMITH, 7),
+            requirements(Profession.TRADER, 7, Profession.BLACKSMITH, 7),
             "-5 seconds from merchant trade cooldown."
     ),
     COIN_VAULT_II(
@@ -168,7 +168,7 @@ public enum CountryUpgrade {
             5,
             138.0D,
             96,
-            requirements(Profession.MINER, 8, Profession.FARMER, 8, Profession.BUILDER, 8, Profession.BLACKSMITH, 8),
+            requirements(Profession.MINER, 8, Profession.FARMER, 8, Profession.TRADER, 8, Profession.BLACKSMITH, 8),
             "+5% all job XP and +10% trader rewards."
     );
 

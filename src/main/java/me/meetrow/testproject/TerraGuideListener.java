@@ -167,7 +167,7 @@ public final class TerraGuideListener implements Listener {
         inventory.setItem(4, createItem(Material.PLAYER_HEAD, "&b" + player.getName(), List.of(
                 "&7Country: &f" + (country != null ? country.getName() : "None"),
                 "&7Guild: &f" + (plugin.getPlayerGuild(playerId) != null ? plugin.getPlayerGuild(playerId).getName() : "None"),
-                "&7Balance: &f$" + plugin.formatMoney(plugin.getBalance(player)),
+                "&7Balance: &f⛃" + plugin.formatMoney(plugin.getBalance(player)),
                 "&7Trader reputation: &f" + plugin.formatTraderReputation(plugin.getTraderReputation(playerId))
         )));
         inventory.setItem(20, createItem(activeProfession != null ? activeProfession.getIcon() : Material.BARRIER, "&aActive Profession", List.of(
@@ -207,7 +207,7 @@ public final class TerraGuideListener implements Listener {
                     "&7Job: &f" + plugin.getProfessionPlainDisplayName(activeContract.profession()),
                     "&7Deliver: &f" + activeContract.requiredAmount() + "x " + plugin.formatMaterialName(activeContract.requestedMaterial()),
                     "&7Progress: &f" + Math.min(currentAmount, activeContract.requiredAmount()) + "&7/&f" + activeContract.requiredAmount(),
-                    "&7Reward: &f$" + plugin.formatMoney(activeContract.rewardMoney()) + " &8+ &f" + activeContract.rewardXp() + " XP",
+                    "&7Reward: &f⛃" + plugin.formatMoney(activeContract.rewardMoney()) + " &8+ &f" + activeContract.rewardXp() + " XP",
                     "",
                     currentAmount >= activeContract.requiredAmount()
                             ? "&eClick to turn in this contract."
@@ -228,7 +228,7 @@ public final class TerraGuideListener implements Listener {
                     "&e" + plugin.getProfessionPlainDisplayName(offer.profession()) + " Contract",
                     List.of(
                             "&7Deliver: &f" + offer.requiredAmount() + "x " + plugin.formatMaterialName(offer.requestedMaterial()),
-                            "&7Reward: &f$" + plugin.formatMoney(offer.rewardMoney()) + " &8+ &f" + offer.rewardXp() + " XP",
+                            "&7Reward: &f⛃" + plugin.formatMoney(offer.rewardMoney()) + " &8+ &f" + offer.rewardXp() + " XP",
                             "",
                             activeContract == null ? "&eClick to accept." : "&7Finish or abandon your active contract first."
                     )));

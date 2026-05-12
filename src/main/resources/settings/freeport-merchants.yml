@@ -1,0 +1,218 @@
+# Fixed starter merchants for Freeport.
+#
+# These merchants act like a shared island exchange:
+# players sell practical early goods into Freeport stock, and other players can
+# buy from that same stock at a higher price.
+#
+# Important rule:
+# - sell-price is per item
+# - buy-price is the total cost for the full bundle
+# - buy-price should stay above the full bundle resale value
+# - initial-stock is the starting shared supply
+# - max-stock is the cap for how much the island will hold for that good
+
+freeport-merchants:
+  cooldown-seconds: 2
+
+  merchants:
+    freeport_miner_merchant:
+      display-name: "&6Miner Merchant"
+      title: "&8Miner Merchant"
+      icon: "IRON_PICKAXE"
+      offers:
+        "0":
+          material: COBBLESTONE
+          amount: 16
+          sell-price: 5.60
+          buy-price: 104.00
+          initial-stock: 128
+          max-stock: 768
+        "1":
+          material: STONE
+          amount: 16
+          sell-price: 7.20
+          buy-price: 133.00
+          initial-stock: 96
+          max-stock: 512
+        "2":
+          material: COAL
+          amount: 4
+          sell-price: 3.40
+          buy-price: 16.20
+          initial-stock: 48
+          max-stock: 256
+        "3":
+          material: COPPER_INGOT
+          amount: 2
+          sell-price: 2.30
+          buy-price: 5.40
+          initial-stock: 24
+          max-stock: 128
+        "4":
+          material: IRON_INGOT
+          amount: 2
+          sell-price: 3.70
+          buy-price: 8.60
+          initial-stock: 16
+          max-stock: 96
+        "5":
+          content-id: refined_copper
+          material: COPPER_INGOT
+          amount: 4
+          sell-price: 1.60
+          buy-price: 7.60
+          initial-stock: 20
+          max-stock: 128
+        "6":
+          content-id: refined_iron
+          material: IRON_NUGGET
+          amount: 6
+          sell-price: 1.50
+          buy-price: 10.60
+          initial-stock: 24
+          max-stock: 160
+        "7":
+          content-id: settlers_pickaxe
+          material: WOODEN_PICKAXE
+          amount: 1
+          sell-price: 1.20
+          buy-price: 4.80
+          initial-stock: 6
+          max-stock: 24
+
+    freeport_builder_merchant:
+      display-name: "&6Builder Merchant"
+      title: "&8Builder Merchant"
+      icon: "BRICKS"
+      offers:
+        "0":
+          material: OAK_LOG
+          amount: 8
+          sell-price: 5.20
+          buy-price: 48.00
+          initial-stock: 64
+          max-stock: 256
+        "1":
+          material: SPRUCE_LOG
+          amount: 8
+          sell-price: 5.60
+          buy-price: 52.00
+          initial-stock: 48
+          max-stock: 256
+        "2":
+          material: BIRCH_LOG
+          amount: 8
+          sell-price: 5.60
+          buy-price: 52.00
+          initial-stock: 48
+          max-stock: 256
+        "3":
+          material: COBBLESTONE
+          amount: 16
+          sell-price: 5.20
+          buy-price: 96.00
+          initial-stock: 96
+          max-stock: 512
+        "4":
+          material: SAND
+          amount: 8
+          sell-price: 4.00
+          buy-price: 37.00
+          initial-stock: 48
+          max-stock: 256
+        "5":
+          material: BRICKS
+          amount: 4
+          sell-price: 5.60
+          buy-price: 26.00
+          initial-stock: 16
+          max-stock: 96
+        "6":
+          content-id: timber_bundle
+          material: OAK_PLANKS
+          amount: 4
+          sell-price: 2.00
+          buy-price: 9.40
+          initial-stock: 24
+          max-stock: 128
+        "7":
+          content-id: support_beam
+          material: OAK_LOG
+          amount: 2
+          sell-price: 2.60
+          buy-price: 6.00
+          initial-stock: 16
+          max-stock: 96
+        "8":
+          content-id: mortar_mix
+          material: BRICK
+          amount: 3
+          sell-price: 2.10
+          buy-price: 7.40
+          initial-stock: 18
+          max-stock: 96
+        "9":
+          content-id: settlers_hatchet
+          material: WOODEN_AXE
+          amount: 1
+          sell-price: 1.20
+          buy-price: 4.80
+          initial-stock: 6
+          max-stock: 24
+
+    freeport_farmer_merchant:
+      display-name: "&6Farmer Merchant"
+      title: "&8Farmer Merchant"
+      icon: "WHEAT"
+      offers:
+        "0":
+          material: WHEAT
+          amount: 8
+          sell-price: 3.60
+          buy-price: 33.50
+          initial-stock: 64
+          max-stock: 256
+        "1":
+          material: CARROT
+          amount: 8
+          sell-price: 3.20
+          buy-price: 29.80
+          initial-stock: 64
+          max-stock: 256
+        "2":
+          material: POTATO
+          amount: 8
+          sell-price: 3.20
+          buy-price: 29.80
+          initial-stock: 64
+          max-stock: 256
+        "3":
+          material: BREAD
+          amount: 4
+          sell-price: 3.60
+          buy-price: 16.80
+          initial-stock: 24
+          max-stock: 128
+        "4":
+          material: PUMPKIN
+          amount: 2
+          sell-price: 2.00
+          buy-price: 4.70
+          initial-stock: 12
+          max-stock: 64
+        "5":
+          content-id: flour_sack
+          material: WHEAT
+          amount: 4
+          sell-price: 1.50
+          buy-price: 7.00
+          initial-stock: 18
+          max-stock: 96
+        "6":
+          content-id: grain_ration
+          material: PAPER
+          amount: 3
+          sell-price: 2.10
+          buy-price: 7.40
+          initial-stock: 16
+          max-stock: 80

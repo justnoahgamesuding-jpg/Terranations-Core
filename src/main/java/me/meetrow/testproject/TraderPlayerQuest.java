@@ -8,6 +8,7 @@ public final class TraderPlayerQuest {
     private final UUID traderId;
     private final Profession profession;
     private final Material requestedMaterial;
+    private final String requestedContentId;
     private final int requestedAmount;
     private final double rewardMoney;
     private final int rewardXp;
@@ -21,6 +22,7 @@ public final class TraderPlayerQuest {
             UUID traderId,
             Profession profession,
             Material requestedMaterial,
+            String requestedContentId,
             int requestedAmount,
             double rewardMoney,
             int rewardXp,
@@ -33,6 +35,7 @@ public final class TraderPlayerQuest {
         this.traderId = traderId;
         this.profession = profession;
         this.requestedMaterial = requestedMaterial;
+        this.requestedContentId = requestedContentId;
         this.requestedAmount = requestedAmount;
         this.rewardMoney = rewardMoney;
         this.rewardXp = rewardXp;
@@ -53,6 +56,14 @@ public final class TraderPlayerQuest {
 
     public Material getRequestedMaterial() {
         return requestedMaterial;
+    }
+
+    public String getRequestedContentId() {
+        return requestedContentId;
+    }
+
+    public boolean hasRequestedContent() {
+        return requestedContentId != null && !requestedContentId.isBlank();
     }
 
     public int getRequestedAmount() {
@@ -91,11 +102,12 @@ public final class TraderPlayerQuest {
         return new TraderQuestOffer(
                 profession,
                 requestedMaterial,
+                requestedContentId,
                 requestedAmount,
-            rewardMoney,
-            rewardXp,
-            rewardReputation,
-            difficultyTier
+                rewardMoney,
+                rewardXp,
+                rewardReputation,
+                difficultyTier
         );
     }
 }

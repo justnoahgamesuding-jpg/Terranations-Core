@@ -6,6 +6,7 @@ import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.domains.DefaultDomain;
+import com.sk89q.worldguard.protection.flags.Flags;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.managers.storage.StorageException;
 import com.sk89q.worldguard.protection.regions.ProtectedPolygonalRegion;
@@ -115,6 +116,8 @@ public class WorldGuardTerritoryService implements TerritoryService {
         if (region == null) {
             return TerritoryOperationResult.failure("region-not-found");
         }
+
+        region.setFlag(Flags.DENY_MESSAGE, "");
 
         region.setOwners(createOwnersDomain(plugin.getCountryTerritoryOwnerId(country)));
         region.setMembers(createMembersDomain(plugin.getCountryTerritoryMemberIds(country), plugin.getCountryTerritoryOwnerId(country)));

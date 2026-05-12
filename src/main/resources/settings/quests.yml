@@ -1,10 +1,11 @@
 quests:
   sidebar:
+    # Leave this off if another scoreboard plugin already owns the sidebar.
     enabled: false
     title: "&6Terra Guide"
   no-active:
-    title: "&7No active quest"
-    objective: "&7Explore Terra"
-    hint: ""
+    title: "&6What Next?"
+    objective: "&7Join a guild or prepare to build one"
+    hint: "&7Use the Terra Guide, check &f/jobs info&7, browse guilds with &f/guild&7, and turn your early money into real settlement progress."
   general:
     list: {}

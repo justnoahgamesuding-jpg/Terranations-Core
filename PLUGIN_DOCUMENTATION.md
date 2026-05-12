@@ -305,17 +305,22 @@ These files control the merchant economy.
 - their display names
 - icons
 - exact offers
+- sell and buy price spread
+- starting stock
+- stock caps
 - cooldowns
 
 What the merchant systems do:
 
 - `merchant-shop` is a rotating wave market
-- `freeport-merchants` are stable starter sellers/buyers for early progression
+- `freeport-merchants` are a shared Freeport island exchange for early progression
 
 Practical advice:
 
 - fixed starter merchants should help new players move, not let them skip progression
 - keep early prices modest and predictable
+- keep `buy-price` above `sell-price` on every Freeport offer so the market cannot be flipped for free money
+- use `initial-stock` and `max-stock` to decide how generous the island should feel when the server is fresh
 - use the wave merchant for variety, not as the entire economy
 - do not set trade cooldowns so low that players can spam the market faster than gathering loops can support
 
@@ -465,13 +470,50 @@ Broadly:
 
 - traders are route/economic progression systems
 - merchants are buy/sell shop systems
-- Freeport merchants are early-game fixed support merchants
+- Freeport merchants are early-game fixed support merchants with shared island stock
 
 Admin guidance:
 
 - use Freeport merchants to stabilize the start
+- treat Freeport as a starter exchange, not as an infinite shop
+- make sure every Freeport buy price stays above its matching sell price
 - use merchant waves to create movement and short-term opportunities
 - do not let buy prices trivialize core gathering loops
+
+### Freeport shared stock
+
+Freeport starter merchants now work as a shared market instead of a one-way payout button.
+
+That means:
+
+- when a player sells goods to a Freeport merchant, that stock is added to the island pool
+- when another player buys from that merchant, the stock is removed from the same pool
+- the island can run low on useful materials if players keep buying without supplying it
+- the island can become overstocked if players dump too much of one good into it
+
+Each offer in `settings/freeport-merchants.yml` can now control:
+
+- `amount`
+- `sell-price`
+- `buy-price`
+- `initial-stock`
+- `max-stock`
+
+Practical setup rule:
+
+- `sell-price` is what the island pays players
+- `buy-price` is what the island charges players
+- `buy-price` should always be higher than `sell-price`
+
+Good use cases:
+
+- miners sell stone, coal, and ingots into the island
+- builders buy starter blocks or dump excess logs and stone
+- farmers turn early crops into reliable starter cash, then buy back what the island still has
+
+Bad use case:
+
+- setting buy and sell values so close together that players can loop the market for easy profit
 
 ### Onboarding and tutorial
 

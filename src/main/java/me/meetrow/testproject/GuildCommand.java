@@ -87,7 +87,7 @@ public final class GuildCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(plugin.colorize("&cGuild not found."));
             return true;
         }
-        player.sendMessage(plugin.colorize("&6Guild: &f" + guild.getName() + " &8[" + guild.getTag() + "]"));
+        player.sendMessage(plugin.colorize("&6Guild: &f" + guild.getName() + " &8[" + plugin.formatGuildTag(guild) + "&8]"));
         player.sendMessage(plugin.colorize("&7Leader: &f" + plugin.safeOfflineName(guild.getLeaderId())));
         player.sendMessage(plugin.colorize("&7Level: &f" + plugin.getGuildLevel(guild) + " &8(score " + plugin.getGuildScore(guild) + ", xp " + guild.getGuildXp() + ")"));
         player.sendMessage(plugin.colorize("&7Members: &f" + guild.getMembers().size() + "&7/&f" + plugin.getGuildMemberCap(guild)));
@@ -519,7 +519,7 @@ public final class GuildCommand implements CommandExecutor, TabCompleter {
         }
         List<String> names = new ArrayList<>();
         for (Guild guild : guilds) {
-            names.add(guild.getName() + " [" + guild.getTag() + "]" + (guild.isRecruitingOpen() ? " open" : " closed"));
+            names.add(guild.getName() + " [" + plugin.formatGuildTag(guild) + "&r]" + (guild.isRecruitingOpen() ? " open" : " closed"));
         }
         player.sendMessage(plugin.colorize("&6Guilds: &f" + String.join("&7, &f", names)));
         return true;
@@ -553,7 +553,7 @@ public final class GuildCommand implements CommandExecutor, TabCompleter {
         Guild guild = plugin.getPlayerGuild(player.getUniqueId());
         player.sendMessage(plugin.colorize("&6Guild Commands"));
         if (guild != null) {
-            player.sendMessage(plugin.colorize("&7Current: &f" + guild.getName() + " &8[" + guild.getTag() + "]"));
+            player.sendMessage(plugin.colorize("&7Current: &f" + guild.getName() + " &8[" + plugin.formatGuildTag(guild) + "&8]"));
         }
         player.sendMessage(plugin.colorize("&e/guild create <name> <tag>"));
         player.sendMessage(plugin.colorize("&e/guild info [guild]"));

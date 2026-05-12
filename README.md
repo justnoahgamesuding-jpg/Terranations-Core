@@ -109,6 +109,7 @@ Generated runtime storage files include:
 - `guild` is the main player-facing ownership and progression layer
 - `country` is still the territory and settlement object underneath it
 - climate, stability, merchants, and crafting are active gameplay systems, not placeholders
+- Freeport starter merchants now use shared island stock with separate buy and sell pricing
 - some onboarding and legacy admin flows still reference countries directly
 
 ## Notes for maintainers

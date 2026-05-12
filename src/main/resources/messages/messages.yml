@@ -58,10 +58,10 @@ merchant:
   spawned-country: "&eA wandering merchant has arrived in &f%country%&e."
   cooldown: "&eYou must wait &f%time% &ebefore trading with the wandering merchant again."
   sold-out: "&cThat item is sold out for this stock rotation."
-  not-enough-money: "&cYou need &f$%money%&c to buy that."
+  not-enough-money: "&cYou need &f⛃%money%&c to buy that."
   no-sell-items: "&cYou do not have any &f%item%&c to sell."
-  bought: "&aBought &f%amount% %item%&a for &f$%money%&a."
-  sold: "&aSold &f%amount% %item%&a for &f$%money%&a."
+  bought: "&aBought &f%amount% %item%&a for &f⛃%money%&a."
+  sold: "&aSold &f%amount% %item%&a for &f⛃%money%&a."
 # Stability and building-system feedback.
 stability:
   place-blocked: "&cThat block would be unstable there. Build supports first."
@@ -194,7 +194,7 @@ tutorial:
     - "&eBe careful: /country home costs money, which you may need early on, and it has a 1 hour cooldown."
     - "&fYour long-term goal is to level your primary job, help your country grow, and max that first job to unlock your second."
   starter-hub:
-    build-blocked: "&cYou cannot build in the starter hub. Only crop planting is allowed here."
+    build-blocked: "&cYou cannot modify blocks in Freeport. Only fixed ore nodes and crop planting or harvesting are allowed here."
 # Passive server-wide tip broadcasts.
 tips:
   border: "&8&m                                                  "
@@ -402,8 +402,8 @@ terra:
     big-order-no-items: "&cYou are not carrying any items that this big order still needs."
     big-order-progress: "&eBig order progress: &f%current%&7/&f%required% &eitems delivered."
     big-order-member-update: "&6[Trade Route] &f%player% &eadded &f%amount% %item% &eto the &f%profession% &eportion of &f%country%'s &ebig order. &7(%current%/%required%)"
-    big-order-complete: "&aYour country finished the shared trade route order. Total route reward: &f$%money%&a and &e+%reputation% route reputation&a."
-    big-order-complete-member: "&aYour country completed the shared trade route order. You received &f$%money%&a and &e+%reputation% route reputation&a."
+    big-order-complete: "&aYour country finished the shared trade route order. Total route reward: &f⛃%money%&a and &e+%reputation% route reputation&a."
+    big-order-complete-member: "&aYour country completed the shared trade route order. You received &f⛃%money%&a and &e+%reputation% route reputation&a."
   merchant:
     usage: "&7Usage: &a/merchant <status|time|spawn|remove|open|manage>"
     time-usage: "&7Usage: &a/merchant time <status|next <minutes>|active <minutes>>"
@@ -518,49 +518,6 @@ country:
     set-trader-reputation-usage: "&7Usage: &a/country settraderreputation <country name> <value>"
     set-trader-reputation-success: "&aSet the trader reputation of &f%country%&a to &f%reputation%&a."
     set-trader-reputation-failed: "&cCould not update trader reputation for &f%country%&c."
-  territory:
-    integration-disabled: "&cCountry territory integration is disabled in the config."
-    worldguard-missing: "&cWorldGuard is not installed or could not be loaded."
-    integration-unavailable: "&cCountry territory integration is not available right now."
-    world-not-found: "&cWorld not found."
-    region-not-found: "&cThat WorldGuard region was not found in that world."
-    region-already-linked: "&cThat WorldGuard region is already linked to another country."
-    region-manager-unavailable: "&cWorldGuard region data for that world is not available."
-    save-failed: "&cFailed to save the WorldGuard region data."
-    not-bound: "&cThat country does not have a linked territory."
-    unknown: "&cCountry territory action failed: &f%reason%"
-    bound: "&aLinked &f%country%&a to &f%world%/%region%&a."
-    cleared: "&eCleared the linked territory for &f%country%&e."
-    synced: "&aSynced territory for &f%country%&a using &f%world%/%region%&a."
-    info: "&7%country% territory: &f%territory%"
-    enter: "&aEntering &f%country%"
-    leave: "&7Leaving &f%country%"
-    title:
-      enter: "&a%country%"
-      leave: "&7Wilderness"
-    subtitle:
-      enter: "&fEntering country territory"
-      leave: "&fLeaving %country%"
-    usage:
-      setregion: "&7Usage: &a/country territory setregion <world> <region-id> <country name>"
-      clear: "&7Usage: &a/country territory clear <country name>"
-      sync: "&7Usage: &a/country territory sync <country name>"
-      info: "&7Usage: &a/country territory info <country name>"
-      debug: "&7Usage: &a/country territory debug <country name>"
-    debug:
-      country: "&7Territory debug for &f%country%"
-      integration: "&7Integration available: &f%value%"
-      dynmap-installed: "&7Dynmap installed: &f%value%"
-      dynmap-enabled: "&7Dynmap enabled in config: &f%value%"
-      linked: "&7Territory linked: &f%value%"
-      world: "&7World: &f%value%"
-      world-found: "&7World found: &f%value%"
-      region: "&7Region: &f%value%"
-      region-found: "&7Region found: &f%value%"
-      region-type: "&7Region type: &f%value%"
-      point-count: "&7Polygon points: &f%value%"
-      marker-set-id: "&7Dynmap marker set: &f%value%"
-      marker-set-present: "&7Marker set present: &f%value%"
   created: "&aCreated country &f%country%&a with owner &f%owner%&a."
   joined: "&aYou joined &f%country%&a."
   home:

@@ -6,7 +6,10 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
+import org.bukkit.Tag;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -20,6 +23,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -35,9 +39,12 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 import org.bukkit.inventory.SmokingRecipe;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -116,6 +123,7 @@ public final class TerraCraftingManager implements Listener {
 
     private final Testproject plugin;
     private final NamespacedKey contentIdKey;
+    private final NamespacedKey qualityTierKey;
     private final NamespacedKey managedDisplayKey;
     private final NamespacedKey managedDisplayBlockKey;
     private final NamespacedKey campDishKey;
@@ -129,6 +137,9 @@ public final class TerraCraftingManager implements Listener {
     private final Map<WorldBlockKey, UUID> activeLabels = new ConcurrentHashMap<>();
     private final Map<WorldBlockKey, FurnaceBenchState> furnaceStates = new ConcurrentHashMap<>();
     private final Map<WorldBlockKey, RefinerBenchState> refinerStates = new ConcurrentHashMap<>();
+    private final Map<WorldBlockKey, RefinerUpgradeState> refinerUpgradeStates = new ConcurrentHashMap<>();
+    private final Map<StarterHubBenchKey, FurnaceBenchState> starterHubFurnaceStates = new ConcurrentHashMap<>();
+    private final Map<StarterHubBenchKey, RefinerBenchState> starterHubRefinerStates = new ConcurrentHashMap<>();
     private final List<SmeltingRecipeDefinition> smeltingRecipes = new ArrayList<>();
     private final Set<Material> overriddenVanillaResults = new LinkedHashSet<>();
     private final Set<String> overriddenContentResults = new LinkedHashSet<>();
@@ -141,6 +152,7 @@ public final class TerraCraftingManager implements Listener {
     public TerraCraftingManager(Testproject plugin) {
         this.plugin = plugin;
         this.contentIdKey = new NamespacedKey(plugin, "terra_crafting_content_id");
+        this.qualityTierKey = new NamespacedKey(plugin, "terra_crafting_quality_tier");
         this.managedDisplayKey = new NamespacedKey(plugin, "terra_crafting_label");
         this.managedDisplayBlockKey = new NamespacedKey(plugin, "terra_crafting_label_block");
         this.campDishKey = new NamespacedKey(plugin, "terra_camp_dish");
@@ -164,6 +176,7 @@ public final class TerraCraftingManager implements Listener {
         this.dataFile = new File(plugin.getDataFolder(), "terra_crafting_data.yml");
         this.dataConfig = YamlConfiguration.loadConfiguration(dataFile);
         loadPlacedBlocks();
+        loadRefinerUpgrades();
         loadGuiLayouts();
         removeAllManagedLabels();
         respawnWorkbenchLabels();
@@ -172,6 +185,7 @@ public final class TerraCraftingManager implements Listener {
 
     public void shutdown() {
         saveGuiLayouts();
+        saveRefinerUpgrades();
         savePlacedBlocks();
         activeLabels.clear();
         if (furnaceTickTask != null) {
@@ -274,17 +288,33 @@ public final class TerraCraftingManager implements Listener {
     }
 
     public ItemStack createContentItem(String contentId, int amount) {
+        return createContentItem(contentId, amount, TerraItemQuality.STANDARD);
+    }
+
+    public ItemStack createContentItem(String contentId, int amount, TerraItemQuality quality) {
         TerraContentDefinition definition = contentDefinitions.get(normalize(contentId));
         if (definition == null) {
             return null;
         }
-        ItemStack itemStack = new ItemStack(definition.material, Math.max(1, amount));
+        ItemStack itemStack = definition.itemsAdderItemId != null
+                ? plugin.createItemsAdderCustomItem(definition.itemsAdderItemId)
+                : null;
+        if (itemStack == null) {
+            itemStack = new ItemStack(definition.material, Math.max(1, amount));
+        } else {
+            itemStack.setAmount(Math.max(1, amount));
+        }
         ItemMeta meta = itemStack.getItemMeta();
         if (meta == null) {
             return itemStack;
         }
-        meta.displayName(plugin.legacyComponent(definition.color + definition.displayName));
+        TerraItemQuality resolvedQuality = quality == null ? TerraItemQuality.STANDARD : quality;
+        String displayName = resolvedQuality == TerraItemQuality.STANDARD
+                ? definition.color + definition.displayName
+                : resolvedQuality.color + resolvedQuality.label + " " + definition.displayName;
+        meta.displayName(plugin.legacyComponent(displayName));
         List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
+        lore.add(plugin.legacyComponent("&7Quality: " + resolvedQuality.color + resolvedQuality.label));
         for (String line : definition.lore) {
             lore.add(plugin.legacyComponent(line));
         }
@@ -293,6 +323,10 @@ public final class TerraCraftingManager implements Listener {
         if (definition.placeable) {
             lore.add(plugin.legacyComponent("&7Placeable Terra block."));
         }
+        if (definition.customModelData != null) {
+            meta.setCustomModelData(definition.customModelData);
+        }
+        applyUniqueItemTuning(meta, definition.id);
         CampDishEffect campDish = campDishEffect(definition.id);
         if (campDish != null) {
             lore.add(plugin.legacyComponent("&7Hunger: &f+" + campDish.displayedFoodPoints()));
@@ -312,8 +346,59 @@ public final class TerraCraftingManager implements Listener {
         meta.lore(lore);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.getPersistentDataContainer().set(contentIdKey, PersistentDataType.STRING, definition.id);
+        meta.getPersistentDataContainer().set(qualityTierKey, PersistentDataType.STRING, resolvedQuality.key);
         itemStack.setItemMeta(meta);
         return itemStack;
+    }
+
+    private void applyUniqueItemTuning(ItemMeta meta, String contentId) {
+        if (meta == null || contentId == null || contentId.isBlank()) {
+            return;
+        }
+        String normalized = normalize(contentId);
+        if ("settlers_hatchet".equalsIgnoreCase(normalized)) {
+            if (meta instanceof Damageable damageable) {
+                damageable.setMaxDamage(38);
+            }
+            meta.removeAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE);
+            meta.removeAttributeModifier(Attribute.GENERIC_ATTACK_SPEED);
+            meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
+                    new AttributeModifier(
+                            new NamespacedKey(plugin, "settlers_hatchet_attack_damage"),
+                            2.0D,
+                            AttributeModifier.Operation.ADD_NUMBER,
+                            EquipmentSlotGroup.HAND
+                    ));
+            meta.addAttributeModifier(Attribute.GENERIC_ATTACK_SPEED,
+                    new AttributeModifier(
+                            new NamespacedKey(plugin, "settlers_hatchet_attack_speed"),
+                            -3.4D,
+                            AttributeModifier.Operation.ADD_NUMBER,
+                            EquipmentSlotGroup.HAND
+                    ));
+            return;
+        }
+        if ("settlers_pickaxe".equalsIgnoreCase(normalized)) {
+            if (meta instanceof Damageable damageable) {
+                damageable.setMaxDamage(38);
+            }
+            meta.removeAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE);
+            meta.removeAttributeModifier(Attribute.GENERIC_ATTACK_SPEED);
+            meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
+                    new AttributeModifier(
+                            new NamespacedKey(plugin, "settlers_pickaxe_attack_damage"),
+                            2.0D,
+                            AttributeModifier.Operation.ADD_NUMBER,
+                            EquipmentSlotGroup.HAND
+                    ));
+            meta.addAttributeModifier(Attribute.GENERIC_ATTACK_SPEED,
+                    new AttributeModifier(
+                            new NamespacedKey(plugin, "settlers_pickaxe_attack_speed"),
+                            -3.6D,
+                            AttributeModifier.Operation.ADD_NUMBER,
+                            EquipmentSlotGroup.HAND
+                    ));
+        }
     }
 
     public String getContentId(ItemStack itemStack) {
@@ -322,6 +407,50 @@ public final class TerraCraftingManager implements Listener {
         }
         ItemMeta meta = itemStack.getItemMeta();
         return meta == null ? null : meta.getPersistentDataContainer().get(contentIdKey, PersistentDataType.STRING);
+    }
+
+    private boolean matchesContentItem(ItemStack itemStack, String contentId) {
+        if (itemStack == null || itemStack.getType().isAir() || contentId == null || contentId.isBlank()) {
+            return false;
+        }
+        String normalized = normalize(contentId);
+        String storedContentId = getContentId(itemStack);
+        if (normalized.equalsIgnoreCase(storedContentId)) {
+            return true;
+        }
+        TerraContentDefinition definition = contentDefinitions.get(normalized);
+        if (definition == null || itemStack.getType() != definition.material) {
+            return false;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null) {
+            return false;
+        }
+        if (definition.customModelData != null && meta.hasCustomModelData() && definition.customModelData.equals(meta.getCustomModelData())) {
+            return true;
+        }
+        net.kyori.adventure.text.Component displayName = meta.displayName();
+        if (displayName == null) {
+            return false;
+        }
+        String plainName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(displayName).trim();
+        if (plainName.isBlank()) {
+            return false;
+        }
+        return plainName.equalsIgnoreCase(definition.displayName)
+                || plainName.endsWith(" " + definition.displayName)
+                || plainName.endsWith(definition.displayName);
+    }
+
+    public TerraItemQuality getItemQuality(ItemStack itemStack) {
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return TerraItemQuality.STANDARD;
+        }
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null) {
+            return TerraItemQuality.STANDARD;
+        }
+        return TerraItemQuality.fromKey(meta.getPersistentDataContainer().get(qualityTierKey, PersistentDataType.STRING));
     }
 
     public boolean isTerraCustomItem(ItemStack itemStack) {
@@ -337,14 +466,31 @@ public final class TerraCraftingManager implements Listener {
         String placedId = placedBlockIds.get(WorldBlockKey.fromBlock(block));
         if (placedId != null && benches.containsKey(placedId)) {
             event.setCancelled(true);
-            if ("furnace_bench".equalsIgnoreCase(placedId)) {
-                openFurnaceBench(event.getPlayer(), WorldBlockKey.fromBlock(block));
-            } else if ("refiner".equalsIgnoreCase(placedId)) {
-                openRefinerBench(event.getPlayer(), WorldBlockKey.fromBlock(block));
-            } else {
-                openWorkbench(event.getPlayer(), placedId);
-            }
-            event.getPlayer().playSound(event.getPlayer().getLocation(), Sound.BLOCK_BARREL_OPEN, 0.8F, 1.1F);
+            BenchDefinition bench = benches.get(placedId);
+            plugin.handleTerraWorkbenchInteraction(
+                    event.getPlayer(),
+                    placedId,
+                    bench != null ? bench.displayName : placedId,
+                    block.getLocation(),
+                    () -> {
+                        if ("furnace_bench".equalsIgnoreCase(placedId)) {
+                            if (isStarterHubBench(block)) {
+                                openStarterHubFurnaceBench(event.getPlayer(), WorldBlockKey.fromBlock(block));
+                            } else {
+                                openFurnaceBench(event.getPlayer(), WorldBlockKey.fromBlock(block));
+                            }
+                        } else if ("refiner".equalsIgnoreCase(placedId)) {
+                            if (isStarterHubBench(block)) {
+                                openStarterHubRefinerBench(event.getPlayer(), WorldBlockKey.fromBlock(block));
+                            } else {
+                                openRefinerBench(event.getPlayer(), WorldBlockKey.fromBlock(block));
+                            }
+                        } else {
+                            openWorkbench(event.getPlayer(), placedId);
+                        }
+                        event.getPlayer().playSound(event.getPlayer().getLocation(), Sound.BLOCK_BARREL_OPEN, 0.8F, 1.1F);
+                    }
+            );
             return;
         }
         if (block.getType() == Material.CRAFTING_TABLE) {
@@ -399,6 +545,7 @@ public final class TerraCraftingManager implements Listener {
         if ("furnace_bench".equalsIgnoreCase(definition.id)) {
             furnaceStates.put(key, createFurnaceState(key));
         } else if ("refiner".equalsIgnoreCase(definition.id)) {
+            refinerUpgradeStates.putIfAbsent(key, new RefinerUpgradeState());
             refinerStates.put(key, createRefinerState(key));
         }
     }
@@ -416,12 +563,16 @@ public final class TerraCraftingManager implements Listener {
         if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
             furnaceStates.remove(key);
             refinerStates.remove(key);
+            refinerUpgradeStates.remove(key);
+            saveRefinerUpgrades();
             return;
         }
         if ("furnace_bench".equalsIgnoreCase(contentId)) {
             dropFurnaceContents(event.getBlock(), key);
         } else if ("refiner".equalsIgnoreCase(contentId)) {
             dropRefinerContents(event.getBlock(), key);
+            refinerUpgradeStates.remove(key);
+            saveRefinerUpgrades();
         }
         for (ItemStack drop : getBlockBreakDrops(contentId)) {
             if (drop != null && !drop.getType().isAir()) {
@@ -441,6 +592,76 @@ public final class TerraCraftingManager implements Listener {
         if (rawOre != null) {
             event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation(), rawOre);
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSettlersHatchetBreak(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        if (player == null || player.getGameMode() == GameMode.CREATIVE) {
+            return;
+        }
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        if (!"settlers_hatchet".equalsIgnoreCase(getContentId(heldItem))) {
+            return;
+        }
+        Material material = event.getBlock().getType();
+        boolean crudeLogTool = Tag.LOGS.isTagged(material) || Tag.LEAVES.isTagged(material);
+        if (!crudeLogTool) {
+            event.setCancelled(true);
+            player.sendActionBar(plugin.legacyComponent("&cSettler's Hatchet is too crude for that block."));
+            player.playSound(player.getLocation(), Sound.ITEM_AXE_STRIP, 0.5F, 0.6F);
+            return;
+        }
+        player.damageItemStack(EquipmentSlot.HAND, Tag.LOGS.isTagged(material) ? 2 : 3);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSettlersPickaxeBreak(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        if (player == null || player.getGameMode() == GameMode.CREATIVE) {
+            return;
+        }
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        if (!"settlers_pickaxe".equalsIgnoreCase(getContentId(heldItem))) {
+            return;
+        }
+        Material material = event.getBlock().getType();
+        boolean crudePickTool = material == Material.STONE
+                || material == Material.COBBLESTONE
+                || material == Material.COBBLED_DEEPSLATE
+                || material == Material.COAL_ORE
+                || material == Material.DEEPSLATE_COAL_ORE;
+        if (!crudePickTool) {
+            event.setCancelled(true);
+            player.sendActionBar(plugin.legacyComponent("&cSettler's Pickaxe is too crude for that block."));
+            player.playSound(player.getLocation(), Sound.BLOCK_STONE_HIT, 0.55F, 0.7F);
+            return;
+        }
+        player.damageItemStack(EquipmentSlot.HAND, (material == Material.COAL_ORE || material == Material.DEEPSLATE_COAL_ORE) ? 3 : 2);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSettlersHatchetDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Player player)) {
+            return;
+        }
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        if (!"settlers_hatchet".equalsIgnoreCase(getContentId(heldItem))) {
+            return;
+        }
+        event.setDamage(Math.min(event.getDamage(), 1.0D));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSettlersPickaxeDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Player player)) {
+            return;
+        }
+        ItemStack heldItem = player.getInventory().getItemInMainHand();
+        if (!"settlers_pickaxe".equalsIgnoreCase(getContentId(heldItem))) {
+            return;
+        }
+        event.setDamage(Math.min(event.getDamage(), 1.0D));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -504,8 +725,16 @@ public final class TerraCraftingManager implements Listener {
             handleFurnaceClick(event, furnaceHolder);
             return;
         }
+        if (holder instanceof StarterHubFurnaceBenchHolder furnaceHolder) {
+            handleStarterHubFurnaceClick(event, furnaceHolder);
+            return;
+        }
         if (holder instanceof RefinerBenchHolder refinerHolder) {
             handleRefinerClick(event, refinerHolder);
+            return;
+        }
+        if (holder instanceof StarterHubRefinerBenchHolder refinerHolder) {
+            handleStarterHubRefinerClick(event, refinerHolder);
         }
     }
 
@@ -537,7 +766,15 @@ public final class TerraCraftingManager implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (holder instanceof StarterHubFurnaceBenchHolder && event.getRawSlots().stream().anyMatch(slot -> slot < event.getView().getTopInventory().getSize())) {
+            event.setCancelled(true);
+            return;
+        }
         if (holder instanceof RefinerBenchHolder && event.getRawSlots().stream().anyMatch(slot -> slot < event.getView().getTopInventory().getSize())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (holder instanceof StarterHubRefinerBenchHolder && event.getRawSlots().stream().anyMatch(slot -> slot < event.getView().getTopInventory().getSize())) {
             event.setCancelled(true);
         }
     }
@@ -564,8 +801,22 @@ public final class TerraCraftingManager implements Listener {
             }
             return;
         }
+        if (event.getInventory().getHolder() instanceof StarterHubFurnaceBenchHolder furnaceHolder) {
+            FurnaceBenchState state = starterHubFurnaceStates.get(new StarterHubBenchKey(furnaceHolder.playerId, furnaceHolder.blockKey));
+            if (state != null) {
+                refreshFurnaceGui(state);
+            }
+            return;
+        }
         if (event.getInventory().getHolder() instanceof RefinerBenchHolder refinerHolder) {
             RefinerBenchState state = refinerStates.get(refinerHolder.blockKey);
+            if (state != null) {
+                refreshRefinerGui(state);
+            }
+            return;
+        }
+        if (event.getInventory().getHolder() instanceof StarterHubRefinerBenchHolder refinerHolder) {
+            RefinerBenchState state = starterHubRefinerStates.get(new StarterHubBenchKey(refinerHolder.playerId, refinerHolder.blockKey));
             if (state != null) {
                 refreshRefinerGui(state);
             }
@@ -737,19 +988,20 @@ public final class TerraCraftingManager implements Listener {
             player.closeInventory();
             return;
         }
-        if (clicked != null && clicked.getType() == Material.WOODEN_AXE) {
+        if (slot == WORKBENCH_BASIC_TOOLS_TAB_SLOT) {
             openWorkbenchBasicTools(player);
             return;
         }
-        if (clicked != null && clicked.getType() == Material.ANVIL) {
+        if (slot == WORKBENCH_STATIONS_TAB_SLOT) {
             openWorkbenchStations(player);
             return;
         }
-        if (clicked != null && clicked.getType() == Material.SCAFFOLDING) {
+        if (slot == WORKBENCH_BUILDING_TAB_SLOT) {
             openWorkbenchBlocks(player);
             return;
         }
-        RecipeDefinition recipe = clicked == null ? null : switch (clicked.getType()) {
+        String contentId = getContentId(clicked);
+        RecipeDefinition recipe = contentId != null ? findCustomRecipeByContentId(contentId) : clicked == null ? null : switch (clicked.getType()) {
             case WOODEN_SWORD -> findRecipeByResult("workbench", Material.WOODEN_SWORD);
             case WOODEN_PICKAXE -> findRecipeByResult("workbench", Material.WOODEN_PICKAXE);
             case WOODEN_SHOVEL -> findRecipeByResult("workbench", Material.WOODEN_SHOVEL);
@@ -781,15 +1033,15 @@ public final class TerraCraftingManager implements Listener {
             player.closeInventory();
             return;
         }
-        if (clicked != null && clicked.getType() == Material.WOODEN_AXE) {
+        if (slot == WORKBENCH_BASIC_TOOLS_TAB_SLOT) {
             openWorkbenchBasicTools(player);
             return;
         }
-        if (clicked != null && clicked.getType() == Material.ANVIL) {
+        if (slot == WORKBENCH_STATIONS_TAB_SLOT) {
             openWorkbenchStations(player);
             return;
         }
-        if (clicked != null && clicked.getType() == Material.SCAFFOLDING) {
+        if (slot == WORKBENCH_BUILDING_TAB_SLOT) {
             openWorkbenchBlocks(player);
             return;
         }
@@ -817,15 +1069,15 @@ public final class TerraCraftingManager implements Listener {
             player.closeInventory();
             return;
         }
-        if (clicked != null && clicked.getType() == Material.WOODEN_AXE) {
+        if (slot == WORKBENCH_BASIC_TOOLS_TAB_SLOT) {
             openWorkbenchBasicTools(player);
             return;
         }
-        if (clicked != null && clicked.getType() == Material.ANVIL) {
+        if (slot == WORKBENCH_STATIONS_TAB_SLOT) {
             openWorkbenchStations(player);
             return;
         }
-        if (clicked != null && clicked.getType() == Material.SCAFFOLDING) {
+        if (slot == WORKBENCH_BUILDING_TAB_SLOT) {
             openWorkbenchBlocks(player);
             return;
         }
@@ -1071,11 +1323,22 @@ public final class TerraCraftingManager implements Listener {
     }
 
     private void handleFurnaceClick(InventoryClickEvent event, FurnaceBenchHolder holder) {
+        FurnaceBenchState state = furnaceStates.computeIfAbsent(holder.blockKey, this::createFurnaceState);
+        handleFurnaceClick(event, state, "furnace_bench");
+    }
+
+    private void handleStarterHubFurnaceClick(InventoryClickEvent event, StarterHubFurnaceBenchHolder holder) {
+        FurnaceBenchState state = starterHubFurnaceStates.computeIfAbsent(
+                new StarterHubBenchKey(holder.playerId, holder.blockKey),
+                this::createStarterHubFurnaceState);
+        handleFurnaceClick(event, state, "furnace_bench");
+    }
+
+    private void handleFurnaceClick(InventoryClickEvent event, FurnaceBenchState state, String benchId) {
         if (!(event.getWhoClicked() instanceof Player player)) {
             event.setCancelled(true);
             return;
         }
-        FurnaceBenchState state = furnaceStates.computeIfAbsent(holder.blockKey, this::createFurnaceState);
         int rawSlot = event.getRawSlot();
         int topSize = event.getView().getTopInventory().getSize();
         if (rawSlot >= topSize) {
@@ -1095,8 +1358,14 @@ public final class TerraCraftingManager implements Listener {
             return;
         }
         if (isFurnaceOutputSlot(slot)) {
+            boolean collectingOutput = event.getCurrentItem() != null
+                    && !event.getCurrentItem().getType().isAir()
+                    && (event.isShiftClick() || event.getCursor() == null || event.getCursor().getType().isAir());
             if (event.getCursor() != null && !event.getCursor().getType().isAir()) {
                 event.setCancelled(true);
+            }
+            if (collectingOutput) {
+                plugin.recordTerraWorkbenchCollection(player, benchId);
             }
             return;
         }
@@ -1104,11 +1373,22 @@ public final class TerraCraftingManager implements Listener {
     }
 
     private void handleRefinerClick(InventoryClickEvent event, RefinerBenchHolder holder) {
+        RefinerBenchState state = refinerStates.computeIfAbsent(holder.blockKey, this::createRefinerState);
+        handleRefinerClick(event, state, "refiner");
+    }
+
+    private void handleStarterHubRefinerClick(InventoryClickEvent event, StarterHubRefinerBenchHolder holder) {
+        RefinerBenchState state = starterHubRefinerStates.computeIfAbsent(
+                new StarterHubBenchKey(holder.playerId, holder.blockKey),
+                this::createStarterHubRefinerState);
+        handleRefinerClick(event, state, "refiner");
+    }
+
+    private void handleRefinerClick(InventoryClickEvent event, RefinerBenchState state, String benchId) {
         if (!(event.getWhoClicked() instanceof Player player)) {
             event.setCancelled(true);
             return;
         }
-        RefinerBenchState state = refinerStates.computeIfAbsent(holder.blockKey, this::createRefinerState);
         int rawSlot = event.getRawSlot();
         int topSize = event.getView().getTopInventory().getSize();
         if (rawSlot >= topSize) {
@@ -1124,6 +1404,11 @@ public final class TerraCraftingManager implements Listener {
             player.closeInventory();
             return;
         }
+        if (slot == 46 || slot == 47) {
+            event.setCancelled(true);
+            handleRefinerUpgradeClick(player, state, slot);
+            return;
+        }
         if (isRefinerInputSlot(slot)) {
             if (!canPlaceIntoRefiner(player, event.getCursor())) {
                 event.setCancelled(true);
@@ -1131,8 +1416,14 @@ public final class TerraCraftingManager implements Listener {
             return;
         }
         if (isRefinerOutputSlot(slot)) {
+            boolean collectingOutput = event.getCurrentItem() != null
+                    && !event.getCurrentItem().getType().isAir()
+                    && (event.isShiftClick() || event.getCursor() == null || event.getCursor().getType().isAir());
             if (event.getCursor() != null && !event.getCursor().getType().isAir()) {
                 event.setCancelled(true);
+            }
+            if (collectingOutput) {
+                plugin.recordTerraWorkbenchCollection(player, benchId);
             }
             return;
         }
@@ -1235,8 +1526,22 @@ public final class TerraCraftingManager implements Listener {
         player.openInventory(state.inventory);
     }
 
+    private void openStarterHubFurnaceBench(Player player, WorldBlockKey blockKey) {
+        StarterHubBenchKey key = new StarterHubBenchKey(player.getUniqueId(), blockKey);
+        FurnaceBenchState state = starterHubFurnaceStates.computeIfAbsent(key, this::createStarterHubFurnaceState);
+        refreshFurnaceGui(state);
+        player.openInventory(state.inventory);
+    }
+
     private void openRefinerBench(Player player, WorldBlockKey blockKey) {
         RefinerBenchState state = refinerStates.computeIfAbsent(blockKey, this::createRefinerState);
+        refreshRefinerGui(state);
+        player.openInventory(state.inventory);
+    }
+
+    private void openStarterHubRefinerBench(Player player, WorldBlockKey blockKey) {
+        StarterHubBenchKey key = new StarterHubBenchKey(player.getUniqueId(), blockKey);
+        RefinerBenchState state = starterHubRefinerStates.computeIfAbsent(key, this::createStarterHubRefinerState);
         refreshRefinerGui(state);
         player.openInventory(state.inventory);
     }
@@ -1395,7 +1700,7 @@ public final class TerraCraftingManager implements Listener {
         Inventory inventory = Bukkit.createInventory(new WorkbenchMenuHolder("basic_tools"), 54, plugin.legacyComponent("&8Workbench"));
         applyWorkbenchFrame(inventory);
         setSlot(inventory, 3, simpleItem(Material.WOODEN_AXE, "&6Basic Tools", List.of(
-                "&7Starter tools, clothes, and camp basics.",
+                "&7Starter ore gear, clothes, and first-phase kit.",
                 "&eCurrent tab."
         )));
         setSlot(inventory, 4, simpleItem(Material.ANVIL, "&7Stations", List.of(
@@ -1408,11 +1713,11 @@ public final class TerraCraftingManager implements Listener {
         )));
         fillSlots(inventory, new int[]{10, 11, 12, 13, 14, 15, 16}, Material.GRAY_STAINED_GLASS_PANE, "&7");
         fillSlots(inventory, new int[]{19, 25, 28, 34, 37, 43, 46, 47, 48, 49, 50, 51, 52}, Material.GRAY_STAINED_GLASS_PANE, "&7");
-        clearSlots(inventory, new int[]{39, 40, 41, 42});
-        inventory.setItem(20, displayWorkbenchRecipe(Material.WOODEN_SWORD, "&fWooden Sword"));
-        inventory.setItem(21, displayWorkbenchRecipe(Material.WOODEN_PICKAXE, "&fWooden Pickaxe"));
+        clearSlots(inventory, new int[]{20, 21, 22, 23, 24, 29, 30, 31, 32, 33, 38, 39, 40, 41, 42});
+        inventory.setItem(20, displayWorkbenchContentRecipe("settlers_hatchet", Material.WOODEN_AXE, "&fSettler's Hatchet"));
+        inventory.setItem(21, displayWorkbenchContentRecipe("settlers_pickaxe", Material.WOODEN_PICKAXE, "&fSettler's Pickaxe"));
         inventory.setItem(22, displayWorkbenchRecipe(Material.WOODEN_SHOVEL, "&fWooden Shovel"));
-        inventory.setItem(23, displayWorkbenchRecipe(Material.WOODEN_AXE, "&fWooden Axe"));
+        inventory.setItem(23, displayWorkbenchContentRecipe("copper_pioneer_axe", Material.IRON_AXE, "&fCopper Axe"));
         inventory.setItem(24, displayWorkbenchRecipe(Material.WOODEN_HOE, "&fWooden Hoe"));
         inventory.setItem(29, displayWorkbenchRecipe(Material.LEATHER_HELMET, "&fLeather Helmet"));
         inventory.setItem(30, displayWorkbenchRecipe(Material.LEATHER_CHESTPLATE, "&fLeather Chestplate"));
@@ -1805,9 +2110,35 @@ public final class TerraCraftingManager implements Listener {
         return state;
     }
 
+    private FurnaceBenchState createStarterHubFurnaceState(StarterHubBenchKey key) {
+        Inventory inventory = Bukkit.createInventory(new StarterHubFurnaceBenchHolder(key.playerId, key.blockKey), 54, plugin.legacyComponent("&8Terra Furnace"));
+        FurnaceBenchState state = new FurnaceBenchState(key.blockKey, inventory, new int[FURNACE_INPUT_SLOTS.length], new SmeltingRecipeDefinition[FURNACE_INPUT_SLOTS.length], new int[1]);
+        initializeFurnaceLayout(state);
+        return state;
+    }
+
     private RefinerBenchState createRefinerState(WorldBlockKey blockKey) {
         Inventory inventory = Bukkit.createInventory(new RefinerBenchHolder(blockKey), 54, plugin.legacyComponent("&8Refiner"));
-        RefinerBenchState state = new RefinerBenchState(blockKey, inventory, new int[REFINER_INPUT_SLOTS.length], new RefinerRecipeDefinition[REFINER_INPUT_SLOTS.length]);
+        RefinerBenchState state = new RefinerBenchState(
+                blockKey,
+                inventory,
+                new int[REFINER_INPUT_SLOTS.length],
+                new RefinerRecipeDefinition[REFINER_INPUT_SLOTS.length],
+                refinerUpgradeStates.computeIfAbsent(blockKey, ignored -> new RefinerUpgradeState())
+        );
+        initializeRefinerLayout(state);
+        return state;
+    }
+
+    private RefinerBenchState createStarterHubRefinerState(StarterHubBenchKey key) {
+        Inventory inventory = Bukkit.createInventory(new StarterHubRefinerBenchHolder(key.playerId, key.blockKey), 54, plugin.legacyComponent("&8Refiner"));
+        RefinerBenchState state = new RefinerBenchState(
+                key.blockKey,
+                inventory,
+                new int[REFINER_INPUT_SLOTS.length],
+                new RefinerRecipeDefinition[REFINER_INPUT_SLOTS.length],
+                new RefinerUpgradeState()
+        );
         initializeRefinerLayout(state);
         return state;
     }
@@ -1853,23 +2184,28 @@ public final class TerraCraftingManager implements Listener {
         clearSlots(inventory, REFINER_OUTPUT_PRIMARY_SLOTS);
         clearSlots(inventory, REFINER_OUTPUT_SECONDARY_SLOTS);
         inventory.setItem(4, simpleItem(Material.GRINDSTONE, "&8Refiner", List.of(
-                "&7Load raw ore, gravel, or sand into",
-                "&7the upper rack to process it over time.",
-                "&7Rarer ore takes longer to clean."
+                "&7Load ore, timber, stone, grain, or",
+                "&7earth into the upper rack to process it.",
+                "&7Upgrade placed refiners to improve rate",
+                "&7and output quality."
         )));
         inventory.setItem(45, simpleItem(Material.RAW_IRON, "&fInput Rack", List.of(
                 "&7Row 2 slots 3 to 7 are input lanes.",
-                "&7Raw ore, sand, and gravel go here."
+                "&7Raw ore and processing stock go here."
         )));
-        inventory.setItem(46, simpleItem(Material.CLOCK, "&fCountdown", List.of(
-                "&7Row 3 shows each lane's timer",
-                "&7until the refined output is ready."
+        inventory.setItem(46, simpleItem(Material.LIGHTNING_ROD, "&bThroughput Upgrade", List.of(
+                "&7Install a throughput kit on a placed",
+                "&7refiner to shorten lane process time."
         )));
-        inventory.setItem(47, simpleItem(Material.IRON_NUGGET, "&fOutput Rack", List.of(
-                "&7Rows 4 and 5 hold refined output.",
-                "&7Each lane now has a larger output buffer."
+        inventory.setItem(47, simpleItem(Material.BRUSH, "&dQuality Upgrade", List.of(
+                "&7Install a quality kit on a placed",
+                "&7refiner to roll cleaner outputs."
         )));
         inventory.setItem(49, simpleItem(Material.BARRIER, "&cClose", List.of("&7Close this menu.")));
+        inventory.setItem(53, simpleItem(Material.CLOCK, "&eRefiner Status", List.of(
+                "&7Placed refiners show their station",
+                "&7upgrade state here."
+        )));
         if (editorPreview) {
             for (int slot : REFINER_INPUT_SLOTS) {
                 inventory.setItem(slot, simpleItem(Material.RAW_IRON, "&7Input Lane", List.of("&7Processing input appears here.")));
@@ -1915,6 +2251,7 @@ public final class TerraCraftingManager implements Listener {
     }
 
     private void refreshRefinerGui(RefinerBenchState state) {
+        updateRefinerUpgradeItems(state);
         for (int lane = 0; lane < REFINER_INPUT_SLOTS.length; lane++) {
             updateRefinerProgressItem(state, lane);
         }
@@ -1964,17 +2301,116 @@ public final class TerraCraftingManager implements Listener {
         String title = recipe == null ? "&7Idle Lane" : "&bRefining";
         List<String> lore = new ArrayList<>();
         if (recipe == null) {
-            lore.add("&7Insert raw ore, gravel, or sand");
-            lore.add("&7into the input lane above.");
+            lore.add("&7Insert ore, timber, stone,");
+            lore.add("&7sand, clay, or grain above.");
         } else {
-            int totalTicks = recipe.processTicks();
+            int totalTicks = applyRefinerThroughputTicks(recipe.processTicks(), state.upgradeState);
             int secondsRemaining = Math.max(0, (int) Math.ceil((totalTicks - progress) / 20.0D));
             lore.add("&7Input: &f" + recipe.inputDisplayName(this));
             lore.add("&7Output: &f" + recipe.outputDisplayName(this));
             lore.add("&7Ready in: &f" + secondsRemaining + "s");
+            lore.add("&7Quality floor: &f" + state.upgradeState.qualityFloor().label);
             lore.add(progressBarLine(progress, totalTicks));
         }
         state.inventory.setItem(REFINER_PROGRESS_SLOTS[lane], simpleItem(icon, title, lore));
+    }
+
+    private void updateRefinerUpgradeItems(RefinerBenchState state) {
+        RefinerUpgradeState upgrades = state.upgradeState;
+        state.inventory.setItem(46, simpleItem(
+                Material.LIGHTNING_ROD,
+                upgrades.throughputLevel >= RefinerUpgradeState.MAX_LEVEL ? "&bThroughput Upgrade Maxed" : "&bThroughput Upgrade",
+                buildRefinerUpgradeLore(
+                        "refiner_throughput_kit",
+                        upgrades.throughputLevel,
+                        "&712% faster lane time per level.",
+                        "&7Current speed: &f" + refinerRateText(upgrades)
+                )
+        ));
+        state.inventory.setItem(47, simpleItem(
+                Material.BRUSH,
+                upgrades.qualityLevel >= RefinerUpgradeState.MAX_LEVEL ? "&dQuality Upgrade Maxed" : "&dQuality Upgrade",
+                buildRefinerUpgradeLore(
+                        "refiner_quality_kit",
+                        upgrades.qualityLevel,
+                        "&7Raises the minimum output tier.",
+                        "&7Current floor: &f" + upgrades.qualityFloor().label
+                )
+        ));
+        state.inventory.setItem(53, simpleItem(Material.CLOCK, "&eRefiner Status", List.of(
+                "&7Throughput: &f" + upgrades.throughputLevel + "/" + RefinerUpgradeState.MAX_LEVEL,
+                "&7Quality: &f" + upgrades.qualityLevel + "/" + RefinerUpgradeState.MAX_LEVEL,
+                "&7Rate: &f" + refinerRateText(upgrades),
+                "&7Floor: &f" + upgrades.qualityFloor().label
+        )));
+    }
+
+    private List<String> buildRefinerUpgradeLore(String contentId, int level, String effectLine, String currentLine) {
+        List<String> lore = new ArrayList<>();
+        lore.add("&7Level: &f" + level + "/" + RefinerUpgradeState.MAX_LEVEL);
+        lore.add(effectLine);
+        lore.add(currentLine);
+        if (level >= RefinerUpgradeState.MAX_LEVEL) {
+            lore.add("&aThis track is fully upgraded.");
+        } else {
+            lore.add("&8");
+            lore.add("&7Consume: &f1x " + readableContentName(contentId));
+            lore.add("&eClick to install the upgrade kit.");
+        }
+        return lore;
+    }
+
+    private String refinerRateText(RefinerUpgradeState upgrades) {
+        double modifier = 1.0D - (upgrades.throughputLevel * RefinerUpgradeState.THROUGHPUT_REDUCTION_PER_LEVEL);
+        return Math.max(1, (int) Math.round(modifier * 100.0D)) + "% of base time";
+    }
+
+    private int applyRefinerThroughputTicks(int baseTicks, RefinerUpgradeState upgrades) {
+        if (upgrades == null) {
+            return Math.max(FURNACE_TICK_INTERVAL, baseTicks);
+        }
+        double modifier = 1.0D - (upgrades.throughputLevel * RefinerUpgradeState.THROUGHPUT_REDUCTION_PER_LEVEL);
+        return Math.max(FURNACE_TICK_INTERVAL, (int) Math.round(baseTicks * Math.max(0.45D, modifier)));
+    }
+
+    private void handleRefinerUpgradeClick(Player player, RefinerBenchState state, int slot) {
+        if (player == null || state == null) {
+            return;
+        }
+        if (!refinerUpgradeStates.containsKey(state.blockKey)) {
+            player.sendMessage(plugin.colorize("&cStarter hub refiners cannot be upgraded."));
+            return;
+        }
+        RefinerUpgradeState upgrades = state.upgradeState;
+        if (slot == 46) {
+            if (upgrades.throughputLevel >= RefinerUpgradeState.MAX_LEVEL) {
+                player.sendMessage(plugin.colorize("&cThis refiner already has maximum throughput."));
+                return;
+            }
+            if (removeOneContentItem(player, "refiner_throughput_kit")) {
+                upgrades.throughputLevel++;
+                persistRefinerUpgradeState(state.blockKey, upgrades);
+                player.sendMessage(plugin.colorize("&aInstalled a throughput kit. New level: &f" + upgrades.throughputLevel + "&a."));
+                player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 0.9F, 1.15F);
+                refreshRefinerGui(state);
+            } else {
+                player.sendMessage(plugin.colorize("&cYou need a &fRefiner Throughput Kit&c to install that upgrade."));
+            }
+            return;
+        }
+        if (upgrades.qualityLevel >= RefinerUpgradeState.MAX_LEVEL) {
+            player.sendMessage(plugin.colorize("&cThis refiner already has maximum quality tooling."));
+            return;
+        }
+        if (removeOneContentItem(player, "refiner_quality_kit")) {
+            upgrades.qualityLevel++;
+            persistRefinerUpgradeState(state.blockKey, upgrades);
+            player.sendMessage(plugin.colorize("&aInstalled a quality kit. New level: &f" + upgrades.qualityLevel + "&a."));
+            player.playSound(player.getLocation(), Sound.ITEM_BRUSH_BRUSHING_GENERIC, 0.9F, 1.1F);
+            refreshRefinerGui(state);
+        } else {
+            player.sendMessage(plugin.colorize("&cYou need a &fRefiner Quality Kit&c to install that upgrade."));
+        }
     }
 
     private String progressBarLine(int progress, int totalTicks) {
@@ -2060,9 +2496,45 @@ public final class TerraCraftingManager implements Listener {
         for (FurnaceBenchState state : furnaceStates.values()) {
             tickFurnaceState(state);
         }
+        for (FurnaceBenchState state : starterHubFurnaceStates.values()) {
+            tickFurnaceState(state);
+        }
         for (RefinerBenchState state : refinerStates.values()) {
             tickRefinerState(state);
         }
+        for (RefinerBenchState state : starterHubRefinerStates.values()) {
+            tickRefinerState(state);
+        }
+    }
+
+    public boolean isInteractiveTerraBench(Block block) {
+        if (block == null) {
+            return false;
+        }
+        String placedId = placedBlockIds.get(WorldBlockKey.fromBlock(block));
+        return placedId != null && benches.containsKey(placedId);
+    }
+
+    public List<String> getWorkbenchQuestKeys() {
+        List<String> keys = new ArrayList<>();
+        keys.add("terra_workbench_any");
+        for (String benchId : benches.keySet()) {
+            keys.add("terra_workbench_" + normalize(benchId));
+        }
+        return keys;
+    }
+
+    public List<String> getWorkbenchCollectionQuestKeys() {
+        List<String> keys = new ArrayList<>();
+        keys.add("terra_workbench_collect_any");
+        for (String benchId : benches.keySet()) {
+            keys.add("terra_workbench_collect_" + normalize(benchId));
+        }
+        return keys;
+    }
+
+    private boolean isStarterHubBench(Block block) {
+        return block != null && plugin.isStarterHubBuildProtected(block.getLocation());
     }
 
     private void tickFurnaceState(FurnaceBenchState state) {
@@ -2114,7 +2586,7 @@ public final class TerraCraftingManager implements Listener {
                 state.activeRecipes[lane] = recipe;
             }
             state.progressTicks[lane] += FURNACE_TICK_INTERVAL;
-            if (state.progressTicks[lane] >= recipe.processTicks()) {
+            if (state.progressTicks[lane] >= applyRefinerThroughputTicks(recipe.processTicks(), state.upgradeState)) {
                 finishRefiningCycle(state, lane, recipe);
                 state.progressTicks[lane] = 0;
             }
@@ -2222,10 +2694,47 @@ public final class TerraCraftingManager implements Listener {
         if (input.getType() == Material.GRAVEL) {
             return RefinerRecipeDefinition.gravel();
         }
-        if (input.getType() == Material.SAND) {
-            return RefinerRecipeDefinition.sand();
+        if (input.getType() == Material.SAND || input.getType() == Material.RED_SAND) {
+            return RefinerRecipeDefinition.washedSand(input.getType());
+        }
+        if (input.getType() == Material.CLAY_BALL) {
+            return RefinerRecipeDefinition.washedClay();
+        }
+        if (input.getType() == Material.WHEAT) {
+            return RefinerRecipeDefinition.flourSack();
+        }
+        if (isRefinerTimberInput(input.getType())) {
+            return RefinerRecipeDefinition.timberBundle(input.getType());
+        }
+        if (isRefinerBeamInput(input.getType())) {
+            return RefinerRecipeDefinition.supportBeam(input.getType());
+        }
+        if (isRefinerStoneInput(input.getType())) {
+            return RefinerRecipeDefinition.stoneAggregate(input.getType());
         }
         return null;
+    }
+
+    private boolean isRefinerTimberInput(Material material) {
+        return switch (material) {
+            case OAK_LOG, SPRUCE_LOG, BIRCH_LOG, JUNGLE_LOG, ACACIA_LOG, DARK_OAK_LOG, MANGROVE_LOG, CHERRY_LOG -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isRefinerBeamInput(Material material) {
+        return switch (material) {
+            case STRIPPED_OAK_LOG, STRIPPED_SPRUCE_LOG, STRIPPED_BIRCH_LOG, STRIPPED_JUNGLE_LOG,
+                    STRIPPED_ACACIA_LOG, STRIPPED_DARK_OAK_LOG, STRIPPED_MANGROVE_LOG, STRIPPED_CHERRY_LOG -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isRefinerStoneInput(Material material) {
+        return switch (material) {
+            case COBBLESTONE, STONE, ANDESITE, DIORITE, GRANITE, TUFF -> true;
+            default -> false;
+        };
     }
 
     private boolean canStackTogether(ItemStack first, ItemStack second) {
@@ -2234,7 +2743,65 @@ public final class TerraCraftingManager implements Listener {
         }
         String firstContentId = getContentId(first);
         String secondContentId = getContentId(second);
-        return Objects.equals(firstContentId, secondContentId);
+        if (!Objects.equals(firstContentId, secondContentId)) {
+            return false;
+        }
+        return getItemQuality(first) == getItemQuality(second);
+    }
+
+    private boolean removeOneContentItem(Player player, String contentId) {
+        if (player == null || contentId == null || contentId.isBlank()) {
+            return false;
+        }
+        String normalized = normalize(contentId);
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack itemStack = contents[slot];
+            if (itemStack == null || itemStack.getType().isAir()) {
+                continue;
+            }
+            if (!matchesContentItem(itemStack, normalized)) {
+                continue;
+            }
+            itemStack.setAmount(itemStack.getAmount() - 1);
+            player.getInventory().setItem(slot, itemStack.getAmount() <= 0 ? null : itemStack);
+            player.updateInventory();
+            return true;
+        }
+        return false;
+    }
+
+    private String readableContentName(String contentId) {
+        TerraContentDefinition definition = contentDefinitions.get(normalize(contentId));
+        return definition != null ? definition.displayName : contentId;
+    }
+
+    private void persistRefinerUpgradeState(WorldBlockKey blockKey, RefinerUpgradeState upgradeState) {
+        if (blockKey == null || upgradeState == null) {
+            return;
+        }
+        refinerUpgradeStates.put(blockKey, upgradeState);
+        saveRefinerUpgrades();
+    }
+
+    private TerraItemQuality rollRefinerOutputQuality(RefinerUpgradeState upgrades) {
+        double roll = Math.random();
+        if (upgrades == null) {
+            return roll < 0.12D ? TerraItemQuality.FINE : TerraItemQuality.STANDARD;
+        }
+        return switch (upgrades.qualityLevel) {
+            case 0 -> roll < 0.12D ? TerraItemQuality.FINE : TerraItemQuality.STANDARD;
+            case 1 -> roll < 0.10D ? TerraItemQuality.EXCEPTIONAL : (roll < 0.55D ? TerraItemQuality.FINE : TerraItemQuality.STANDARD);
+            case 2 -> roll < 0.18D ? TerraItemQuality.EXCEPTIONAL : (roll < 0.78D ? TerraItemQuality.FINE : TerraItemQuality.STANDARD);
+            default -> roll < 0.28D ? TerraItemQuality.EXCEPTIONAL : TerraItemQuality.FINE;
+        };
+    }
+
+    private double adjustRareChance(double baseChance, RefinerUpgradeState upgrades) {
+        if (upgrades == null) {
+            return baseChance;
+        }
+        return Math.min(0.65D, baseChance + (upgrades.qualityLevel * 0.05D));
     }
 
     private boolean isRefinerInputSlot(int slot) {
@@ -2320,6 +2887,12 @@ public final class TerraCraftingManager implements Listener {
 
     private void craftRecipe(Player player, BenchDefinition bench, RecipeDefinition recipe) {
         boolean bypass = plugin.hasCraftingBypass(player.getUniqueId());
+        Profession cooldownProfession = bench != null && plugin.hasProfession(player.getUniqueId(), bench.specialistProfession)
+                ? bench.specialistProfession
+                : null;
+        if (!bypass && !plugin.tryConsumeSharedActionCooldown(player, cooldownProfession)) {
+            return;
+        }
         if (!bypass && "refiner".equalsIgnoreCase(bench.id) && !canUseRefinerRecipe(player, recipe)) {
             player.sendMessage(plugin.colorize("&cYou cannot refine that material with your current job."));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7F, 0.8F);
@@ -2347,6 +2920,9 @@ public final class TerraCraftingManager implements Listener {
             return;
         }
         giveOrDrop(player, result);
+        if (bench != null) {
+            plugin.recordTerraWorkbenchCollection(player, bench.id);
+        }
         if (bench.specialistProfession != null
                 && !bypass
                 && plugin.hasProfession(player.getUniqueId(), bench.specialistProfession)
@@ -2416,7 +2992,7 @@ public final class TerraCraftingManager implements Listener {
         }
         input.setAmount(input.getAmount() - 1);
         state.inventory.setItem(inputSlot, input.getAmount() <= 0 ? null : input);
-        RefiningRoll roll = recipe.rollOutput(this);
+        RefiningRoll roll = recipe.rollOutput(this, state.upgradeState);
         if (roll == null || roll.primaryResult == null || roll.primaryResult.getType().isAir()) {
             return;
         }
@@ -2447,6 +3023,10 @@ public final class TerraCraftingManager implements Listener {
                 state.inventory.setItem(outputSlot, result);
                 return;
             }
+        }
+        Block block = state.blockKey.resolveBlock();
+        if (block != null) {
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5D, 1.0D, 0.5D), result);
         }
     }
 
@@ -2560,7 +3140,7 @@ public final class TerraCraftingManager implements Listener {
                 continue;
             }
             if (ingredient.contentId != null) {
-                if (ingredient.contentId.equalsIgnoreCase(getContentId(itemStack))) {
+                if (matchesContentItem(itemStack, ingredient.contentId)) {
                     total += itemStack.getAmount();
                 }
             } else if (!isTerraCustomItem(itemStack) && ingredient.materialOptions.contains(itemStack.getType())) {
@@ -2580,7 +3160,7 @@ public final class TerraCraftingManager implements Listener {
                     continue;
                 }
                 boolean matches = ingredient.contentId != null
-                        ? ingredient.contentId.equalsIgnoreCase(getContentId(itemStack))
+                        ? matchesContentItem(itemStack, ingredient.contentId)
                         : !isTerraCustomItem(itemStack) && ingredient.materialOptions.contains(itemStack.getType());
                 if (!matches) {
                     continue;
@@ -2809,10 +3389,13 @@ public final class TerraCraftingManager implements Listener {
                 new BenchCategory("smelt_misc", "Misc", Material.CHARCOAL)
         )));
         addBench(new BenchDefinition("refiner", "&8", "Refiner", Material.GRINDSTONE, Profession.MINER, List.of(
-                "&7Sorts raw ore, gravel, and sand",
-                "&7into cleaner material and rare finds."
+                "&7Processes ore, timber, stone, and grain",
+                "&7into settlement-grade refined goods."
         ), List.of(
                 new BenchCategory("ore_refining", "Ore Refining", Material.RAW_IRON),
+                new BenchCategory("timber_processing", "Timber Processing", Material.OAK_LOG),
+                new BenchCategory("masonry_processing", "Masonry Processing", Material.COBBLESTONE),
+                new BenchCategory("food_processing", "Food Processing", Material.WHEAT),
                 new BenchCategory("sifting", "Sifting", Material.FLINT)
         )));
         addBench(new BenchDefinition("campfire_bench", "&6", "Campfire", Material.CAMPFIRE, Profession.FARMER, List.of(
@@ -2842,8 +3425,8 @@ public final class TerraCraftingManager implements Listener {
                 "&7other processed recipe outputs."
         )));
         registerContent(new TerraContentDefinition("refiner", TerraCatalogCategory.WORKBENCHES, Material.GRINDSTONE, "&8", "Refiner", true, Profession.MINER, "&ePlace and right-click to open this station.", List.of(
-                "&7Ore sorting station for refining",
-                "&7raw material, gravel, and sand."
+                "&7Material processing station for ore,",
+                "&7timber, masonry mix, and grain."
         )));
         registerContent(new TerraContentDefinition("campfire_bench", TerraCatalogCategory.WORKBENCHES, Material.CAMPFIRE, "&6", "Campfire", true, Profession.FARMER, "&ePlace and right-click to open this station.", List.of(
                 "&7Open-fire station for roasted",
@@ -2853,15 +3436,16 @@ public final class TerraCraftingManager implements Listener {
                 "&7A soft frontier metal deposit",
                 "&7used for survey tools and early alloys."
         )));
+        int oreModelData = 91001;
         for (RefinerOreType oreType : RefinerOreType.values()) {
             registerContent(new TerraContentDefinition(oreType.rawContentId, TerraCatalogCategory.RAW_REFINED_ORE, oreType.rawMaterial, oreType.color, "Raw " + oreType.displayName, false, null, "&eUnrefined ore chunk. Smelt it or refine it first.", List.of(
                     "&7Crude ore taken straight from the vein.",
                     "&7Can be smelted 1 to 1 or cleaned in a refiner."
-            )));
+            ), oreModelData++));
             registerContent(new TerraContentDefinition(oreType.refinedContentId, TerraCatalogCategory.RAW_REFINED_ORE, oreType.refinedMaterial, oreType.color, "Refined " + oreType.displayName, false, null, "&eCleaned ore ready for better smelting yield chances.", List.of(
                     "&7Sorted and cleaned ore from the refiner.",
                     "&7Has a chance to come from double-refining."
-            )));
+            ), oreModelData++));
         }
         registerContent(new TerraContentDefinition("vein_shard", TerraCatalogCategory.MATERIALS, Material.AMETHYST_SHARD, "&d", "Vein Shard", false, null, "&eA rare refining byproduct used for trade and late work.", List.of(
                 "&7Dense crystal growth pulled from rich ore.",
@@ -2879,6 +3463,62 @@ public final class TerraCraftingManager implements Listener {
                 "&7A bright residue found in high-value",
                 "&7refining work and rich sediment."
         )));
+        registerContent(new TerraContentDefinition("timber_bundle", TerraCatalogCategory.MATERIALS, Material.OAK_PLANKS, "&6", "Timber Bundle", false, null, "&eCut structural timber ready for settlement work.", List.of(
+                "&7Trimmed wood stock sized for",
+                "&7serious building instead of rough placement."
+        )));
+        registerContent(new TerraContentDefinition("support_beam", TerraCatalogCategory.MATERIALS, Material.OAK_LOG, "&e", "Support Beam", false, null, "&eA heavy beam cut for frames, roofs, and roadwork.", List.of(
+                "&7Refined lumber intended for",
+                "&7structural projects and builder contracts."
+        )));
+        registerContent(new TerraContentDefinition("joinery_kit", TerraCatalogCategory.MATERIALS, Material.ITEM_FRAME, "&6", "Joinery Kit", false, null, "&ePrepared fittings, pegs, and braces for advanced construction.", List.of(
+                "&7Packed hardware and carpentry parts",
+                "&7used in better settlement builds."
+        )));
+        registerContent(new TerraContentDefinition("bark_fiber", TerraCatalogCategory.MATERIALS, Material.STRING, "&a", "Bark Fiber", false, null, "&eUsable plant fiber stripped during timber processing.", List.of(
+                "&7A byproduct of wood refining",
+                "&7useful in trade and light craft."
+        )));
+        registerContent(new TerraContentDefinition("stone_aggregate", TerraCatalogCategory.MATERIALS, Material.GRAVEL, "&7", "Stone Aggregate", false, null, "&eBroken and sorted stone ready for mixed construction work.", List.of(
+                "&7A dense filler used in roads,",
+                "&7masonry cores, and settlement expansion."
+        )));
+        registerContent(new TerraContentDefinition("washed_sand", TerraCatalogCategory.MATERIALS, Material.SAND, "&e", "Washed Sand", false, null, "&eCleaned sand prepared for mortar, glass, and fine work.", List.of(
+                "&7Rinsed and screened sand from",
+                "&7the refiner's settling trays."
+        )));
+        registerContent(new TerraContentDefinition("washed_clay", TerraCatalogCategory.MATERIALS, Material.CLAY_BALL, "&f", "Washed Clay", false, null, "&ePrepared clay for brick and finishing mixes.", List.of(
+                "&7Cleaner clay stock separated",
+                "&7from common earth and grit."
+        )));
+        registerContent(new TerraContentDefinition("mortar_mix", TerraCatalogCategory.MATERIALS, Material.BRICK, "&f", "Mortar Mix", false, null, "&eA builder-ready binder for brick, stone, and heavy settlement work.", List.of(
+                "&7A refined blend of washed sand,",
+                "&7clay, and ground stone."
+        )));
+        registerContent(new TerraContentDefinition("flour_sack", TerraCatalogCategory.MATERIALS, Material.WHEAT, "&e", "Flour Sack", false, null, "&eMilled grain ready for kitchen and ration work.", List.of(
+                "&7Clean grain crushed into a",
+                "&7stable ingredient for better food chains."
+        )));
+        registerContent(new TerraContentDefinition("refiner_throughput_kit", TerraCatalogCategory.MATERIALS, Material.LIGHTNING_ROD, "&b", "Refiner Throughput Kit", false, null, "&eUpgrade hardware that speeds up one placed refiner.", List.of(
+                "&7Bolted rails, bearings, and braces",
+                "&7used to push more material through each lane."
+        )));
+        registerContent(new TerraContentDefinition("refiner_quality_kit", TerraCatalogCategory.MATERIALS, Material.BRUSH, "&d", "Refiner Quality Kit", false, null, "&eUpgrade tooling that improves refined output quality.", List.of(
+                "&7Screens, brushes, and sorting tools",
+                "&7tuned for cleaner high-grade output."
+        )));
+        registerContent(new TerraContentDefinition("settlers_hatchet", TerraCatalogCategory.TOOLS, Material.WOODEN_AXE, "&e", "Settler's Hatchet", false, null, "&eA rough frontier hatchet for the first phase of the server.", List.of(
+                "&7A cheap starter chopping tool made from",
+                "&7simple wood stock, wraps, and rough fittings."
+        ), 41001, "terra_starter_gear:settlers_hatchet"));
+        registerContent(new TerraContentDefinition("settlers_pickaxe", TerraCatalogCategory.TOOLS, Material.WOODEN_PICKAXE, "&e", "Settler's Pickaxe", false, null, "&eA rough frontier pick for the first phase of the server.", List.of(
+                "&7A cheap starter mining tool made from",
+                "&7simple wood stock, wraps, and rough fittings."
+        ), 41003, "terra_starter_gear:settlers_pickaxe"));
+        registerContent(new TerraContentDefinition("copper_pioneer_axe", TerraCatalogCategory.TOOLS, Material.IRON_AXE, "&6", "Copper Pioneer Axe", false, null, "&eA sturdy copper axe for woodcutting and defense.", List.of(
+                "&7Stronger than the tin set and suited",
+                "&7for first real settlement expansion."
+        ), 41002, "terra_starter_gear:copper_pioneer_axe"));
         registerContent(new TerraContentDefinition("charred_skewer", TerraCatalogCategory.FOOD, Material.COOKED_CHICKEN, "&6", "Charred Skewer", false, null, "&eRough campfire food. Fills little and fades fast.", List.of(
                 "&7A stick of scorched meat pulled",
                 "&7straight off the fire."
@@ -2991,11 +3631,11 @@ public final class TerraCraftingManager implements Listener {
         addRecipe(customRecipe("field_chowder_recipe", "Field Chowder", "campfire_bench", "campfire_hearty", "Field Meals", Material.MUSHROOM_STEW, "field_chowder", 1, false, 0, 6,
                 ingredient(Material.BOWL, 1), ingredient(Material.POTATO, 2), ingredient(Material.CARROT, 2), ingredient(Material.BEETROOT, 2), ingredient(Material.BROWN_MUSHROOM, 1)));
         addRecipe(customRecipe("grain_loaf_recipe", "Grain Loaf", "farmer_workbench", "prepared_meals", "Prepared Meals", Material.BREAD, "grain_loaf", 1, false, 1, 6,
-                ingredient(Material.WHEAT, 5), ingredient(Material.POTATO, 1)));
+                ingredient("flour_sack", 2), ingredient(Material.POTATO, 1)));
         addRecipe(customRecipe("vegetable_stew_recipe", "Vegetable Stew", "farmer_workbench", "prepared_meals", "Prepared Meals", Material.BEETROOT_SOUP, "vegetable_stew", 1, false, 1, 7,
                 ingredient(Material.BOWL, 1), ingredient(Material.POTATO, 2), ingredient(Material.CARROT, 2), ingredient(Material.BEETROOT, 2)));
         addRecipe(customRecipe("stuffed_flatbread_recipe", "Stuffed Flatbread", "farmer_workbench", "prepared_meals", "Prepared Meals", Material.BREAD, "stuffed_flatbread", 1, false, 1, 7,
-                ingredient(Material.WHEAT, 4), ingredient(Material.CARROT, 2), ingredient(Material.BEETROOT, 1)));
+                ingredient("flour_sack", 2), ingredient(Material.CARROT, 2), ingredient(Material.BEETROOT, 1)));
         addRecipe(customRecipe("workers_hotpot_recipe", "Worker's Hotpot", "farmer_workbench", "prepared_meals", "Prepared Meals", Material.RABBIT_STEW, "workers_hotpot", 1, false, 1, 8,
                 ingredient(Material.BOWL, 1), ingredient(Material.POTATO, 3), ingredient(Material.CARROT, 2), ingredient(Material.BEETROOT, 2), ingredient(Material.COOKED_CHICKEN, 1)));
         addRecipe(customRecipe("orchard_mix_recipe", "Orchard Mix", "farmer_workbench", "prepared_meals", "Prepared Meals", Material.MUSHROOM_STEW, "orchard_mix", 1, false, 1, 7,
@@ -3003,7 +3643,7 @@ public final class TerraCraftingManager implements Listener {
         addRecipe(customRecipe("root_bundle_recipe", "Root Bundle", "farmer_workbench", "preserves", "Preserves", Material.PAPER, "root_bundle", 1, false, 1, 6,
                 ingredient(Material.POTATO, 3), ingredient(Material.CARROT, 3), ingredient(Material.PAPER, 1)));
         addRecipe(customRecipe("grain_ration_recipe", "Grain Ration", "farmer_workbench", "preserves", "Preserves", Material.PAPER, "grain_ration", 1, false, 1, 6,
-                ingredient(Material.WHEAT, 6), ingredient(Material.PAPER, 1)));
+                ingredient("flour_sack", 2), ingredient(Material.PAPER, 1)));
         addRecipe(customRecipe("pickled_roots_recipe", "Pickled Roots", "farmer_workbench", "preserves", "Preserves", Material.HONEY_BOTTLE, "pickled_roots", 1, false, 1, 7,
                 ingredient(Material.CARROT, 2), ingredient(Material.BEETROOT, 2), ingredient(Material.HONEY_BOTTLE, 1)));
         addRecipe(customRecipe("farmers_pack_recipe", "Farmer's Pack", "farmer_workbench", "preserves", "Preserves", Material.BUNDLE, "farmers_pack", 1, false, 1, 8,
@@ -3013,10 +3653,42 @@ public final class TerraCraftingManager implements Listener {
             addRecipe(customRecipe("refine_" + oreType.key, "Refined " + oreType.displayName, "refiner", "ore_refining", "Ore Refining", oreType.rawMaterial, oreType.refinedContentId, 1, false, 0, 5,
                     ingredient(oreType.rawContentId, 1)));
         }
+        addRecipe(customRecipe("refine_timber_bundle", "Timber Bundle", "refiner", "timber_processing", "Timber Processing", Material.OAK_LOG, "timber_bundle", 1, false, 0, 4,
+                ingredient(Material.OAK_LOG, 1)));
+        addRecipe(customRecipe("refine_support_beam", "Support Beam", "refiner", "timber_processing", "Timber Processing", Material.STRIPPED_OAK_LOG, "support_beam", 1, false, 0, 5,
+                ingredient(Material.STRIPPED_OAK_LOG, 1)));
+        addRecipe(customRecipe("refine_stone_aggregate", "Stone Aggregate", "refiner", "masonry_processing", "Masonry Processing", Material.COBBLESTONE, "stone_aggregate", 1, false, 0, 4,
+                ingredient(Material.COBBLESTONE, 2)));
+        addRecipe(customRecipe("refine_washed_sand", "Washed Sand", "refiner", "masonry_processing", "Masonry Processing", Material.SAND, "washed_sand", 1, false, 0, 4,
+                ingredient(Material.SAND, 2)));
+        addRecipe(customRecipe("refine_washed_clay", "Washed Clay", "refiner", "masonry_processing", "Masonry Processing", Material.CLAY_BALL, "washed_clay", 1, false, 0, 4,
+                ingredient(Material.CLAY_BALL, 2)));
+        addRecipe(customRecipe("refine_flour_sack", "Flour Sack", "refiner", "food_processing", "Food Processing", Material.WHEAT, "flour_sack", 1, false, 0, 4,
+                ingredient(Material.WHEAT, 3)));
         addRecipe(terraVanillaRecipe("refine_gravel", "refiner", "sifting", "Sifting", Material.FLINT, "Sifted Gravel", 1,
                 new ItemStack(Material.FLINT), "Refiner Sift", false, 0, 2, ingredient(Material.GRAVEL, 4)));
         addRecipe(terraVanillaRecipe("refine_sand", "refiner", "sifting", "Sifting", Material.SAND, "Washed Sand", 1,
                 new ItemStack(Material.CLAY_BALL), "Refiner Sift", false, 0, 2, ingredient(Material.SAND, 4)));
+        addRecipe(customRecipe("builder_stone_bricks_refined", "Stone Brick Batch", "builder_workbench", "masonry", "Masonry", Material.STONE_BRICKS, null, 8, false, 0, 6,
+                ingredient("stone_aggregate", 4), ingredient("mortar_mix", 2)));
+        addRecipe(customRecipe("builder_mud_bricks_refined", "Mud Brick Batch", "builder_workbench", "masonry", "Masonry", Material.MUD_BRICKS, null, 6, false, 0, 6,
+                ingredient("washed_sand", 2), ingredient("mortar_mix", 2), ingredient(Material.MUD, 2)));
+        addRecipe(customRecipe("builder_tuff_bricks_refined", "Tuff Brick Batch", "builder_workbench", "masonry", "Masonry", Material.TUFF_BRICKS, null, 6, false, 0, 6,
+                ingredient("stone_aggregate", 3), ingredient("mortar_mix", 2), ingredient(Material.TUFF, 2)));
+        addRecipe(customRecipe("builder_joinery_kit", "Joinery Kit", "builder_workbench", "fixtures", "Fixtures", Material.ITEM_FRAME, "joinery_kit", 1, false, 0, 5,
+                ingredient("support_beam", 1), ingredient("bark_fiber", 2), ingredient(Material.IRON_NUGGET, 2)));
+        addRecipe(customRecipe("builder_mortar_mix", "Mortar Mix", "builder_workbench", "masonry", "Masonry", Material.BRICK, "mortar_mix", 1, false, 0, 5,
+                ingredient("washed_sand", 2), ingredient("washed_clay", 1), ingredient("stone_aggregate", 1)));
+        addRecipe(customRecipe("refiner_throughput_kit_recipe", "Refiner Throughput Kit", "builder_workbench", "fixtures", "Refiner Upgrades", Material.LIGHTNING_ROD, "refiner_throughput_kit", 1, false, 0, 8,
+                ingredient("refined_iron", 2), ingredient("support_beam", 1), ingredient("joinery_kit", 1)));
+        addRecipe(customRecipe("refiner_quality_kit_recipe", "Refiner Quality Kit", "builder_workbench", "fixtures", "Refiner Upgrades", Material.BRUSH, "refiner_quality_kit", 1, false, 0, 8,
+                ingredient("refined_copper", 2), ingredient("washed_sand", 2), ingredient("bark_fiber", 1)));
+        addRecipe(customRecipe("settlers_hatchet_recipe", "Settler's Hatchet", "workbench", "starter_tools", "Starter Tools", Material.WOODEN_AXE, "settlers_hatchet", 1, false, 0, 4,
+                ingredient("timber_bundle", 1), ingredient("bark_fiber", 1), ingredient(Material.STICK, 1)));
+        addRecipe(customRecipe("settlers_pickaxe_recipe", "Settler's Pickaxe", "workbench", "starter_tools", "Starter Tools", Material.WOODEN_PICKAXE, "settlers_pickaxe", 1, false, 0, 4,
+                ingredient("timber_bundle", 1), ingredient("bark_fiber", 1), ingredient(Material.STICK, 1)));
+        addRecipe(customRecipe("copper_pioneer_axe_recipe", "Copper Pioneer Axe", "workbench", "starter_tools", "Starter Tools", Material.IRON_AXE, "copper_pioneer_axe", 1, false, 0, 9,
+                ingredient("refined_copper", 3), ingredient("support_beam", 1), ingredient(Material.STICK, 2)));
     }
 
     private void registerCustomSmeltingRecipes() {
@@ -4224,6 +4896,23 @@ public final class TerraCraftingManager implements Listener {
         }
     }
 
+    private void loadRefinerUpgrades() {
+        refinerUpgradeStates.clear();
+        ConfigurationSection section = dataConfig.getConfigurationSection("refiner-upgrades");
+        if (section == null) {
+            return;
+        }
+        for (String key : section.getKeys(false)) {
+            WorldBlockKey blockKey = WorldBlockKey.deserialize(key);
+            if (blockKey == null) {
+                continue;
+            }
+            int throughput = Math.max(0, Math.min(RefinerUpgradeState.MAX_LEVEL, section.getInt(key + ".throughput", 0)));
+            int quality = Math.max(0, Math.min(RefinerUpgradeState.MAX_LEVEL, section.getInt(key + ".quality", 0)));
+            refinerUpgradeStates.put(blockKey, new RefinerUpgradeState(throughput, quality));
+        }
+    }
+
     private void loadGuiLayouts() {
         guiLayoutOverrides.clear();
         ConfigurationSection section = dataConfig.getConfigurationSection("gui-layouts");
@@ -4251,6 +4940,23 @@ public final class TerraCraftingManager implements Listener {
         dataConfig.set("placed-blocks", null);
         for (Map.Entry<WorldBlockKey, String> entry : placedBlockIds.entrySet()) {
             dataConfig.set("placed-blocks." + entry.getKey().serialize(), entry.getValue());
+        }
+        try {
+            dataConfig.save(dataFile);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Failed to save terra_crafting_data.yml: " + exception.getMessage());
+        }
+    }
+
+    private void saveRefinerUpgrades() {
+        dataConfig.set("refiner-upgrades", null);
+        for (Map.Entry<WorldBlockKey, RefinerUpgradeState> entry : refinerUpgradeStates.entrySet()) {
+            if (entry.getValue() == null || entry.getValue().isBaseState()) {
+                continue;
+            }
+            String path = "refiner-upgrades." + entry.getKey().serialize();
+            dataConfig.set(path + ".throughput", entry.getValue().throughputLevel);
+            dataConfig.set(path + ".quality", entry.getValue().qualityLevel);
         }
         try {
             dataConfig.save(dataFile);
@@ -4294,6 +5000,35 @@ public final class TerraCraftingManager implements Listener {
             this.displayName = displayName;
             this.icon = icon;
             this.color = color;
+        }
+    }
+
+    public enum TerraItemQuality {
+        CRUDE("crude", "Crude", "&8"),
+        STANDARD("standard", "Standard", "&f"),
+        FINE("fine", "Fine", "&b"),
+        EXCEPTIONAL("exceptional", "Exceptional", "&d");
+
+        private final String key;
+        private final String label;
+        private final String color;
+
+        TerraItemQuality(String key, String label, String color) {
+            this.key = key;
+            this.label = label;
+            this.color = color;
+        }
+
+        private static TerraItemQuality fromKey(String key) {
+            if (key == null || key.isBlank()) {
+                return STANDARD;
+            }
+            for (TerraItemQuality quality : values()) {
+                if (quality.key.equalsIgnoreCase(key)) {
+                    return quality;
+                }
+            }
+            return STANDARD;
         }
     }
 
@@ -4368,6 +5103,30 @@ public final class TerraCraftingManager implements Listener {
             return new RefinerRecipeDefinition(oreType.key, oreType.rawContentId, null, oreType.refinedContentId, null, oreType.refineTicks, true);
         }
 
+        private static RefinerRecipeDefinition timberBundle(Material inputMaterial) {
+            return new RefinerRecipeDefinition("timber_" + inputMaterial.name().toLowerCase(Locale.ROOT), null, inputMaterial, "timber_bundle", null, 140, false);
+        }
+
+        private static RefinerRecipeDefinition supportBeam(Material inputMaterial) {
+            return new RefinerRecipeDefinition("beam_" + inputMaterial.name().toLowerCase(Locale.ROOT), null, inputMaterial, "support_beam", null, 180, false);
+        }
+
+        private static RefinerRecipeDefinition stoneAggregate(Material inputMaterial) {
+            return new RefinerRecipeDefinition("aggregate_" + inputMaterial.name().toLowerCase(Locale.ROOT), null, inputMaterial, "stone_aggregate", null, 160, false);
+        }
+
+        private static RefinerRecipeDefinition washedSand(Material inputMaterial) {
+            return new RefinerRecipeDefinition("washed_sand_" + inputMaterial.name().toLowerCase(Locale.ROOT), null, inputMaterial, "washed_sand", null, 140, false);
+        }
+
+        private static RefinerRecipeDefinition washedClay() {
+            return new RefinerRecipeDefinition("washed_clay", null, Material.CLAY_BALL, "washed_clay", null, 150, false);
+        }
+
+        private static RefinerRecipeDefinition flourSack() {
+            return new RefinerRecipeDefinition("flour_sack", null, Material.WHEAT, "flour_sack", null, 120, false);
+        }
+
         private static RefinerRecipeDefinition gravel() {
             return new RefinerRecipeDefinition("gravel", null, Material.GRAVEL, null, Material.FLINT, 160, false);
         }
@@ -4403,15 +5162,31 @@ public final class TerraCraftingManager implements Listener {
             return outputMaterial != null ? manager.plugin.formatMaterialName(outputMaterial) : "Unknown";
         }
 
-        private RefiningRoll rollOutput(TerraCraftingManager manager) {
+        private RefiningRoll rollOutput(TerraCraftingManager manager, RefinerUpgradeState upgrades) {
             if ("gravel".equalsIgnoreCase(key)) {
                 return new RefiningRoll(manager.rollSiftingResult("refine_gravel", 1), null);
             }
             if ("sand".equalsIgnoreCase(key)) {
                 return new RefiningRoll(manager.rollSiftingResult("refine_sand", 1), null);
             }
-            ItemStack result = manager.createContentItem(outputContentId, Math.random() < 0.30D ? 2 : 1);
-            ItemStack rare = Math.random() < 0.12D ? manager.rollRareRefiningMaterial() : null;
+            TerraItemQuality quality = manager.rollRefinerOutputQuality(upgrades);
+            int amount = Math.random() < 0.30D ? 2 : 1;
+            if (quality == TerraItemQuality.EXCEPTIONAL && Math.random() < 0.25D) {
+                amount++;
+            }
+            ItemStack result = manager.createContentItem(outputContentId, amount, quality);
+            ItemStack rare = null;
+            if (key.startsWith("timber_") || key.startsWith("beam_")) {
+                rare = Math.random() < manager.adjustRareChance(0.18D, upgrades) ? manager.createContentItem("bark_fiber", 1, quality) : null;
+            } else if (key.startsWith("aggregate_")) {
+                rare = Math.random() < manager.adjustRareChance(0.14D, upgrades) ? manager.createContentItem("mineral_resin", 1, quality) : null;
+            } else if (key.startsWith("washed_sand_")) {
+                rare = Math.random() < manager.adjustRareChance(0.18D, upgrades) ? manager.createContentItem("washed_clay", 1, quality) : null;
+            } else if ("flour_sack".equalsIgnoreCase(key)) {
+                rare = Math.random() < manager.adjustRareChance(0.10D, upgrades) ? new ItemStack(Material.WHEAT_SEEDS) : null;
+            } else if (Math.random() < manager.adjustRareChance(0.12D, upgrades)) {
+                rare = manager.rollRareRefiningMaterial();
+            }
             return new RefiningRoll(result, rare);
         }
     }
@@ -4424,7 +5199,27 @@ public final class TerraCraftingManager implements Listener {
 
     private record BenchCategory(String key, String displayName, Material icon) {}
 
-    private record TerraContentDefinition(String id, TerraCatalogCategory catalogCategory, Material material, String color, String displayName, boolean placeable, Profession specialistProfession, String useLine, List<String> lore) {}
+    private record TerraContentDefinition(
+            String id,
+            TerraCatalogCategory catalogCategory,
+            Material material,
+            String color,
+            String displayName,
+            boolean placeable,
+            Profession specialistProfession,
+            String useLine,
+            List<String> lore,
+            Integer customModelData,
+            String itemsAdderItemId
+    ) {
+        private TerraContentDefinition(String id, TerraCatalogCategory catalogCategory, Material material, String color, String displayName, boolean placeable, Profession specialistProfession, String useLine, List<String> lore) {
+            this(id, catalogCategory, material, color, displayName, placeable, specialistProfession, useLine, lore, null, null);
+        }
+
+        private TerraContentDefinition(String id, TerraCatalogCategory catalogCategory, Material material, String color, String displayName, boolean placeable, Profession specialistProfession, String useLine, List<String> lore, Integer customModelData) {
+            this(id, catalogCategory, material, color, displayName, placeable, specialistProfession, useLine, lore, customModelData, null);
+        }
+    }
 
     private record RecipeDefinition(String id, String benchId, String categoryKey, String familyKey, String familyName, Material familyIcon, String contentId, ItemStack vanillaResult, String resultDisplayName, int resultAmount, String sourceLabel, boolean specialistOnly, int specialistBonusOutput, int specialistXpReward, List<RecipeIngredient> ingredients) {
         private ItemStack iconItem(TerraCraftingManager manager) {
@@ -4682,6 +5477,8 @@ public final class TerraCraftingManager implements Listener {
         }
     }
 
+    private record StarterHubBenchKey(UUID playerId, WorldBlockKey blockKey) {}
+
     private record CatalogRootHolder() implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
     private record CatalogCategoryHolder(TerraCatalogCategory category, int page) implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
     private record BenchRootHolder(String benchId, int page) implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
@@ -4696,10 +5493,41 @@ public final class TerraCraftingManager implements Listener {
     private record BenchFamilyHolder(String benchId, String familyKey, int page) implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
     private record FurnaceBenchHolder(WorldBlockKey blockKey) implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
     private record RefinerBenchHolder(WorldBlockKey blockKey) implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
+    private record StarterHubFurnaceBenchHolder(UUID playerId, WorldBlockKey blockKey) implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
+    private record StarterHubRefinerBenchHolder(UUID playerId, WorldBlockKey blockKey) implements InventoryHolder { @Override public Inventory getInventory() { return null; } }
     private record GuiEditorSession(String screenKey, ItemStack[] originalContents, ItemStack[] confirmContents) {}
     private record LayoutEntry(int slot, String key, ItemStack itemStack) {}
     private record FurnaceBenchState(WorldBlockKey blockKey, Inventory inventory, int[] progressTicks, SmeltingRecipeDefinition[] activeRecipes, int[] fuelTicksRemaining) {}
-    private record RefinerBenchState(WorldBlockKey blockKey, Inventory inventory, int[] progressTicks, RefinerRecipeDefinition[] activeRecipes) {}
+    private static final class RefinerUpgradeState {
+        private static final int MAX_LEVEL = 3;
+        private static final double THROUGHPUT_REDUCTION_PER_LEVEL = 0.12D;
+
+        private int throughputLevel;
+        private int qualityLevel;
+
+        private RefinerUpgradeState() {
+            this(0, 0);
+        }
+
+        private RefinerUpgradeState(int throughputLevel, int qualityLevel) {
+            this.throughputLevel = throughputLevel;
+            this.qualityLevel = qualityLevel;
+        }
+
+        private TerraItemQuality qualityFloor() {
+            return switch (qualityLevel) {
+                case 1, 2 -> TerraItemQuality.STANDARD;
+                case 3 -> TerraItemQuality.FINE;
+                default -> TerraItemQuality.STANDARD;
+            };
+        }
+
+        private boolean isBaseState() {
+            return throughputLevel <= 0 && qualityLevel <= 0;
+        }
+    }
+
+    private record RefinerBenchState(WorldBlockKey blockKey, Inventory inventory, int[] progressTicks, RefinerRecipeDefinition[] activeRecipes, RefinerUpgradeState upgradeState) {}
     private record BuilderMenuEntry(BuilderVariantGroup group, RecipeDefinition directRecipe) {
         private static BuilderMenuEntry group(BuilderVariantGroup group) {
             return new BuilderMenuEntry(group, null);
